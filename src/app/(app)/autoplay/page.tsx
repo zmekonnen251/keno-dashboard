@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getAutoplayConfig,
   setAutoplayConfig,
@@ -9,12 +9,14 @@ import {
   stopAutoplay,
   refreshTokens,
   testAutoplayRound,
+  checkBalances,
 } from '@/lib/api';
-import type { AutoplayPlacedBet } from '@/lib/types';
+import type { AutoplayPlacedBet, CheckBalanceItem } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Card, StatCard, Empty, ErrorBox, Loading } from '@/components/app';
 import { formatTime } from '@/lib/format';
 
@@ -38,6 +40,13 @@ function textToTickets(text: string): number[][] | null {
   return tickets.length > 0 ? tickets : null;
 }
 
+function stateTone(state: string): 'default' | 'destructive' | 'secondary' | 'outline' {
+  if (state === 'won') return 'default';
+  if (state === 'lost' || state === 'error') return 'destructive';
+  if (state === 'betting' || state === 'pending') return 'secondary';
+  return 'outline';
+}
+
 export default function AutoplayPage() {
   const config = useApi(() => getAutoplayConfig(), []);
   const status = useApi(() => autoplayStatus(), []);
@@ -52,6 +61,18 @@ export default function AutoplayPage() {
   const [testMsg, setTestMsg] = useState('');
   const [lastPlaced, setLastPlaced] = useState<AutoplayPlacedBet[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkingAll, setCheckingAll] = useState(false);
+  const [checkingIds, setCheckingIds] = useState<Set<number>>(new Set());
+  const [balances, setBalances] = useState<Record<number, CheckBalanceItem>>({});
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
+
+  // Poll per-account live game status every 5s so the table stays current.
+  useEffect(() => {
+    if (status.data?.running) {
+      const t = setInterval(() => status.refresh(), 5000);
+      return () => clearInterval(t);
+    }
+  }, [status.data?.running, status]);
 
   const cfg = config.data;
 
@@ -125,6 +146,37 @@ export default function AutoplayPage() {
     }
   }
 
+  async function onCheckBalances(id?: number) {
+    if (typeof id === 'number') {
+      setCheckingIds((prev) => new Set(prev).add(id));
+    } else {
+      setCheckingAll(true);
+    }
+    try {
+      const res = await checkBalances(id);
+      setBalances((prev) => {
+        const next = { ...prev };
+        (res.results || []).forEach((r) => (next[r.accountId] = r));
+        return next;
+      });
+      status.refresh();
+    } catch (e) {
+      setTestMsg('Balance check failed: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      if (typeof id === 'number') setCheckingIds((prev) => new Set([...prev].filter((x) => x !== id)));
+      else setCheckingAll(false);
+    }
+  }
+
+  async function onRefreshStatus() {
+    setRefreshingStatus(true);
+    try {
+      await status.refresh();
+    } finally {
+      setRefreshingStatus(false);
+    }
+  }
+
   const conn = status.data;
 
   return (
@@ -142,6 +194,9 @@ export default function AutoplayPage() {
           </Button>
           <Button variant="outline" onClick={onRefreshTokens} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh tokens'}
+          </Button>
+          <Button variant="outline" onClick={() => onCheckBalances()} disabled={checkingAll}>
+            {checkingAll ? 'Checking…' : 'Check balances'}
           </Button>
         </div>
       </div>
@@ -264,6 +319,95 @@ export default function AutoplayPage() {
           </div>
         </Card>
       )}
+
+      <Card
+        title={`Account game status${status.data?.running ? ' (live)' : ''}`}
+        actions={
+          <Button variant="outline" size="sm" onClick={onRefreshStatus} disabled={refreshingStatus}>
+            {refreshingStatus ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        }
+      >
+        {!conn?.accounts || conn.accounts.length === 0 ? (
+          <Empty label="No active accounts. Run a test round or start autoplay." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="px-2 py-1.5 font-medium">Account</th>
+                  <th className="px-2 py-1.5 font-medium">State</th>
+                  <th className="px-2 py-1.5 font-medium">Last bet</th>
+                  <th className="px-2 py-1.5 font-medium">Win</th>
+                  <th className="px-2 py-1.5 font-medium">Balance</th>
+                  <th className="px-2 py-1.5 font-medium">Status</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conn.accounts.map((a) => {
+                  const bal = balances[a.accountId]?.balance;
+                  return (
+                    <tr key={a.accountId} className="border-b border-border/60">
+                      <td className="px-2 py-2">
+                        <div className="font-medium">#{a.accountId}</div>
+                        <div className="text-muted-foreground">{a.phone}</div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Badge variant={stateTone(a.state)}>{a.state}</Badge>
+                        {a.deleted && <Badge variant="destructive" className="ml-1">deleted</Badge>}
+                      </td>
+                      <td className="px-2 py-2">
+                        {a.lastSpots ? (
+                          <>
+                            <div className="font-mono">[{a.lastSpots.join(',')}]</div>
+                            <div className="text-muted-foreground">{a.lastStake ?? '—'} ETB</div>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        {a.winAmount != null ? (
+                          <span className={a.winAmount > 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
+                            {a.winAmount > 0 ? '+' : ''}{a.winAmount} ETB
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className={a.balance < 2 ? 'text-red-600 font-semibold' : ''}>{a.balance?.toFixed?.(2) ?? a.balance} ETB</div>
+                        {bal && (
+                          <div className="text-muted-foreground">
+                            live: {bal.balance != null ? `${bal.balance} ETB` : '—'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className={a.connected ? 'text-emerald-600' : 'text-muted-foreground'}>
+                          {a.connected ? 'connected' : 'offline'}
+                        </div>
+                        <div className="text-muted-foreground">{a.lastStatus}</div>
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={checkingIds.has(a.accountId)}
+                          onClick={() => onCheckBalances(a.accountId)}
+                        >
+                          {checkingIds.has(a.accountId) ? 'Checking…' : 'Check balance'}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {!cfg && <Empty label="No autoplay config" />}
     </div>

@@ -247,6 +247,48 @@ export interface AutoplayStatus {
   running: boolean;
   workers: number;
   config: AutoplayConfig;
+  accounts: AccountGameStatus[];
+}
+
+// Per-account live autoplay/game status surfaced from the gateway workers.
+export interface AccountGameStatus {
+  accountId: number;
+  phone: string;
+  tokenOk: boolean;
+  connected: boolean;
+  lastStatus: string;
+  lastBetAt: number | null;
+  lastSpots: number[] | null;
+  lastStake: number | null;
+  state: 'idle' | 'betting' | 'won' | 'lost' | 'pending' | 'error';
+  winAmount: number | null;
+  balance: number;
+  deleted: boolean;
+  updatedAt: number;
+}
+
+export interface AccountBalanceResult {
+  balance: number | null;
+  totalBalance: number | null;
+  bonusBalance: number | null;
+  lockedBalance: number | null;
+  withdrawableBalance: number | null;
+  userID: string | null;
+}
+
+export interface CheckBalanceItem {
+  accountId: number;
+  phone: string;
+  token: boolean;
+  refreshed: boolean;
+  balance: AccountBalanceResult | null;
+  failed: boolean;
+}
+
+export interface CheckBalancesResponse {
+  ok: boolean;
+  count: number;
+  results: CheckBalanceItem[];
 }
 
 export interface AutoplayPlacedBet {

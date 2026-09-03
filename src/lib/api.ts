@@ -17,6 +17,7 @@ import type {
   AutoplayConfig,
   AutoplayStatus,
   AutoplayTestRoundResponse,
+  CheckBalancesResponse,
   CreateAccountsResponse,
   UploadResponse,
   ClientsResponse,
@@ -165,6 +166,13 @@ export async function testAutoplayRound(pick?: number[]): Promise<AutoplayTestRo
   return apiFetch<AutoplayTestRoundResponse>('api/accounts/autoplay/test-round', {
     method: 'POST',
     body: JSON.stringify({ pick }),
+  });
+}
+
+export async function checkBalances(id?: number): Promise<CheckBalancesResponse> {
+  const q = typeof id === 'number' ? `?id=${id}` : '';
+  return apiFetch<CheckBalancesResponse>(`api/accounts/autoplay/check-balances${q}`, {
+    method: 'POST',
   });
 }
 

@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, checkBalances } from '@/lib/api';
 import { useSite } from '@/components/site-provider';
 import { useApi } from '@/lib/hooks';
+import type { CheckBalanceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -92,6 +93,29 @@ export default function AccountsPage() {
     refresh();
   }
 
+  const [checkingIds, setCheckingIds] = useState<Set<number>>(new Set());
+  const [balances, setBalances] = useState<Record<number, CheckBalanceItem>>({});
+
+  async function onCheckBalance(id: number) {
+    setCheckingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await checkBalances(id);
+      setBalances((prev) => {
+        const next = { ...prev };
+        (res.results || []).forEach((r) => (next[r.accountId] = r));
+        return next;
+      });
+    } catch {
+      // Surface failures inline in the balance cell rather than blocking.
+      setBalances((prev) => ({
+        ...prev,
+        [id]: { accountId: id, phone: '', token: false, refreshed: false, balance: null, failed: true },
+      }));
+    } finally {
+      setCheckingIds((prev) => new Set([...prev].filter((x) => x !== id)));
+    }
+  }
+
   if (loading) return <Loading />;
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No accounts" />;
@@ -165,11 +189,32 @@ export default function AccountsPage() {
               {data.accounts.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-xs">+{a.phone}</TableCell>
-                  <TableCell>{a.balance}</TableCell>
+                  <TableCell>
+                    <div>{a.balance}</div>
+                    {balances[a.id] && (
+                      <div className="mt-0.5 text-xs">
+                        {balances[a.id].failed ? (
+                          <span className="text-red-600 dark:text-red-400">balance unavailable</span>
+                        ) : balances[a.id].balance?.balance != null ? (
+                          <span className="text-muted-foreground">live: {balances[a.id].balance?.balance} ETB</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>{a.reward ?? '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{formatTime(a.last_spin_at)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="destructive" size="sm" onClick={() => onDelete(a.id)}>Delete</Button>
+                    <div className="flex justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={checkingIds.has(a.id)}
+                        onClick={() => onCheckBalance(a.id)}
+                      >
+                        {checkingIds.has(a.id) ? 'Checking…' : 'Check balance'}
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => onDelete(a.id)}>Delete</Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
