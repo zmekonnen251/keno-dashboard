@@ -107,8 +107,8 @@ export async function refreshSession(id: number) {
 }
 
 // ---- accounts ----
-export async function getAccounts(provider: string): Promise<AccountsResponse> {
-  return apiFetch<AccountsResponse>(`api/accounts?provider=${provider}`);
+export async function getAccounts(provider = 'fungames'): Promise<AccountsResponse> {
+  return apiFetch<AccountsResponse>(`api/accounts?provider=${encodeURIComponent(provider)}`);
 }
 
 export async function deleteAccount(id: number) {

@@ -2,7 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { getAccounts, deleteAccount, createAccounts, uploadAccounts, checkBalances } from '@/lib/api';
-import { useSite } from '@/components/site-provider';
 import { useApi } from '@/lib/hooks';
 import type { CheckBalanceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -21,8 +20,9 @@ import { formatTime } from '@/lib/format';
 import { parseAccountFile } from '@/lib/phone';
 
 export default function AccountsPage() {
-  const { siteId } = useSite();
-  const { data, error, loading, refresh } = useApi(() => getAccounts(siteId), [siteId]);
+  // Autoplay accounts are always ToloBirr/FunGames credentials, independent of
+  // the prediction-site dropdown (phoenixbet, etc.).
+  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
 
   const [createCount, setCreateCount] = useState('5');
   const [creating, setCreating] = useState(false);
