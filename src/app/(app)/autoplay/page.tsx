@@ -53,8 +53,9 @@ export default function AutoplayPage() {
   const [loaded, setLoaded] = useState(false);
   const [stake, setStake] = useState('');
   const [batch, setBatch] = useState('');
-  const [mode, setMode] = useState<'A' | 'B'>('A');
+  const [mode, setMode] = useState<'A' | 'B' | 'C'>('A');
   const [splitRatio, setSplitRatio] = useState<'uniform' | '1/2' | '1/3'>('uniform');
+  const [digitCount, setDigitCount] = useState<2 | 3>(3);
   const [ticketsText, setTicketsText] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -85,6 +86,7 @@ export default function AutoplayPage() {
     setBatch(String(cfg?.batch_size ?? ''));
     setMode(cfg?.mode ?? 'A');
     setSplitRatio(cfg?.split_ratio ?? 'uniform');
+    setDigitCount(cfg?.digit_count ?? 3);
     setTicketsText(ticketsToText(cfg?.base_tickets));
     setLoaded(true);
     setTestMsg('');
@@ -93,8 +95,9 @@ export default function AutoplayPage() {
   function onNew() {
     setStake('');
     setBatch('');
-    setMode('B');
+    setMode('C');
     setSplitRatio('uniform');
+    setDigitCount(3);
     setTicketsText('1,2,3\n8,9,10\n58,59,60\n71,72,73\n77,78,79\n78,79,80');
     setLoaded(true);
     setTestMsg('');
@@ -110,6 +113,7 @@ export default function AutoplayPage() {
         batch_size: batch !== '' ? parseInt(batch, 10) : undefined,
         mode,
         split_ratio: splitRatio,
+        ...(mode === 'C' ? { digit_count: digitCount } : {}),
         base_tickets: textToTickets(ticketsText),
       });
       setTestMsg('Configuration saved.');
@@ -232,28 +236,48 @@ export default function AutoplayPage() {
                 <Label>Mode</Label>
                 <select
                   value={mode}
-                  onChange={(e) => setMode(e.target.value as 'A' | 'B')}
+                  onChange={(e) => setMode(e.target.value as 'A' | 'B' | 'C')}
                   className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
                 >
                   <option value="A">A — Guided (same pick, all accounts)</option>
                   <option value="B">B — Split (distinct tickets)</option>
+                  <option value="C">C — Suggestions (digits from server picks)</option>
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Mode B with uniform ratio spreads each configured ticket onto its own account.
+                  {mode === 'C'
+                    ? 'Mode C takes tickets from the server suggestion numbers each round. Pick how many digits per ticket below.'
+                    : 'Mode B with uniform ratio spreads each configured ticket onto its own account.'}
                 </p>
               </div>
-              <div className="space-y-1.5">
-                <Label>Split ratio (Mode B)</Label>
-                <select
-                  value={splitRatio}
-                  onChange={(e) => setSplitRatio(e.target.value as 'uniform' | '1/2' | '1/3')}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-                >
-                  <option value="uniform">Uniform — one ticket per account</option>
-                  <option value="1/2">1/2 — split in two groups</option>
-                  <option value="1/3">1/3 — split in three groups</option>
-                </select>
-              </div>
+              {mode === 'C' ? (
+                <div className="space-y-1.5">
+                  <Label>Digits per ticket (Mode C)</Label>
+                  <select
+                    value={String(digitCount)}
+                    onChange={(e) => setDigitCount(e.target.value === '2' ? 2 : 3)}
+                    className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                  >
+                    <option value="2">2 — two-digit tickets</option>
+                    <option value="3">3 — three-digit tickets</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Each account bets its own {digitCount}-number ticket sliced from the server suggestion pool.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>Split ratio (Mode B)</Label>
+                  <select
+                    value={splitRatio}
+                    onChange={(e) => setSplitRatio(e.target.value as 'uniform' | '1/2' | '1/3')}
+                    className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                  >
+                    <option value="uniform">Uniform — one ticket per account</option>
+                    <option value="1/2">1/2 — split in two groups</option>
+                    <option value="1/3">1/3 — split in three groups</option>
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Stake (Birr)</Label>
