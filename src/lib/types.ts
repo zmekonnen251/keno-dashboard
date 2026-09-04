@@ -247,8 +247,56 @@ export interface AutoplayStatus {
   enabled: boolean;
   running: boolean;
   workers: number;
+  connectedWorkers?: number;
   config: AutoplayConfig;
   accounts: AccountGameStatus[];
+  bets?: AutoplayPlacedBet[];
+}
+
+export interface AutoplayPlacedBet {
+  accountId: number;
+  phone: string;
+  spots: number[];
+  stake: number;
+  requestId: string;
+  ok: boolean;
+  status?: 'failed' | 'pending' | 'won' | 'lost';
+  failReason?: string;
+  winAmount?: number | null;
+  drawnSpots?: number[] | null;
+  matched?: number | null;
+  balanceAfter?: number | null;
+  placedAt?: number;
+  settledAt?: number | null;
+}
+
+export interface CheckBalanceItem {
+  accountId: number;
+  phone: string;
+  token: boolean;
+  refreshed: boolean;
+  balance: number | null;
+  failed: boolean;
+  deleted?: boolean;
+}
+
+export interface CheckBalancesResponse {
+  ok: boolean;
+  count: number;
+  synced?: number;
+  failed?: number;
+  deleted?: number;
+  timedOut?: boolean;
+  results: CheckBalanceItem[];
+}
+
+export interface AutoplayTestRoundResponse {
+  ok: boolean;
+  running: boolean;
+  workers: number;
+  sent?: number;
+  placed: AutoplayPlacedBet[];
+  bets?: AutoplayPlacedBet[];
 }
 
 // Per-account live autoplay/game status surfaced from the gateway workers.
@@ -275,37 +323,6 @@ export interface AccountBalanceResult {
   lockedBalance: number | null;
   withdrawableBalance: number | null;
   userID: string | null;
-}
-
-export interface CheckBalanceItem {
-  accountId: number;
-  phone: string;
-  token: boolean;
-  refreshed: boolean;
-  balance: AccountBalanceResult | null;
-  failed: boolean;
-}
-
-export interface CheckBalancesResponse {
-  ok: boolean;
-  count: number;
-  results: CheckBalanceItem[];
-}
-
-export interface AutoplayPlacedBet {
-  accountId: number;
-  phone: string;
-  spots: number[];
-  stake: number;
-  requestId: string;
-  ok: boolean;
-}
-
-export interface AutoplayTestRoundResponse {
-  ok: boolean;
-  running: boolean;
-  workers: number;
-  placed: AutoplayPlacedBet[];
 }
 
 export interface SpinResponse {

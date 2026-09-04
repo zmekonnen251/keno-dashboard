@@ -1,9 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, checkBalances } from '@/lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
-import type { CheckBalanceItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,13 +19,12 @@ import { formatTime } from '@/lib/format';
 import { parseAccountFile } from '@/lib/phone';
 
 export default function AccountsPage() {
-  // Autoplay accounts are always ToloBirr/FunGames credentials, independent of
-  // the prediction-site dropdown (phoenixbet, etc.).
   const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
-
   const [createCount, setCreateCount] = useState('5');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -34,12 +32,15 @@ export default function AccountsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
 
+  useEffect(() => {
+    const t = setInterval(() => refresh(), 10000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
   function onFileChange(f: File | null) {
     setSelectedFile(f);
     setUploadMsg('');
     if (!f) { setPreview(null); return; }
-    // Client-side check: validate + normalize the phones before uploading so the
-    // admin sees immediately how many rows are usable and in what format.
     f.text().then((text) => {
       const parsed = parseAccountFile(text, f.name);
       setPreview({
@@ -93,39 +94,44 @@ export default function AccountsPage() {
     refresh();
   }
 
-  const [checkingIds, setCheckingIds] = useState<Set<number>>(new Set());
-  const [balances, setBalances] = useState<Record<number, CheckBalanceItem>>({});
-
-  async function onCheckBalance(id: number) {
-    setCheckingIds((prev) => new Set(prev).add(id));
+  async function onSyncWallets() {
+    setSyncing(true);
+    setSyncMsg('');
     try {
-      const res = await checkBalances(id);
-      setBalances((prev) => {
-        const next = { ...prev };
-        (res.results || []).forEach((r) => (next[r.accountId] = r));
-        return next;
-      });
-    } catch {
-      // Surface failures inline in the balance cell rather than blocking.
-      setBalances((prev) => ({
-        ...prev,
-        [id]: { accountId: id, phone: '', token: false, refreshed: false, balance: null, failed: true },
-      }));
+      const res = await syncBalances();
+      setSyncMsg(
+        `Synced ${res.synced ?? 0} of ${res.count} wallets` +
+          (res.timedOut ? ' (partial).' : '.') +
+          (res.deleted ? ` ${res.deleted} empty account(s) removed.` : '')
+      );
+      refresh();
+    } catch (e) {
+      setSyncMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
-      setCheckingIds((prev) => new Set([...prev].filter((x) => x !== id)));
+      setSyncing(false);
     }
   }
 
-  if (loading) return <Loading />;
-  if (error) return <ErrorBox message={error} />;
+  if (loading && !data) return <Loading />;
+  if (error && !data) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No accounts" />;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Accounts</h2>
-        <Button variant="outline" onClick={refresh}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onSyncWallets} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync wallets'}
+          </Button>
+          <Button variant="outline" onClick={refresh}>Refresh</Button>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Balance is the live ToloBirr wallet, written to the database every couple of minutes
+        (and when you click Sync wallets). New accounts start at 2 ETB until the first sync.
+      </p>
+      {syncMsg && <p className="text-xs text-muted-foreground">{syncMsg}</p>}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card title="Create accounts">
@@ -179,9 +185,9 @@ export default function AccountsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Phone</TableHead>
-                <TableHead>Balance</TableHead>
+                <TableHead>Balance (ETB)</TableHead>
+                <TableHead>Last bet</TableHead>
                 <TableHead>Reward</TableHead>
-                <TableHead>Last spin</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -190,31 +196,14 @@ export default function AccountsPage() {
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-xs">+{a.phone}</TableCell>
                   <TableCell>
-                    <div>{a.balance}</div>
-                    {balances[a.id] && (
-                      <div className="mt-0.5 text-xs">
-                        {balances[a.id].failed ? (
-                          <span className="text-red-600 dark:text-red-400">balance unavailable</span>
-                        ) : balances[a.id].balance?.balance != null ? (
-                          <span className="text-muted-foreground">live: {balances[a.id].balance?.balance} ETB</span>
-                        ) : null}
-                      </div>
-                    )}
+                    <span className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
+                      {typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance}
+                    </span>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{formatTime(a.last_bet_at)}</TableCell>
                   <TableCell>{a.reward ?? '—'}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{formatTime(a.last_spin_at)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={checkingIds.has(a.id)}
-                        onClick={() => onCheckBalance(a.id)}
-                      >
-                        {checkingIds.has(a.id) ? 'Checking…' : 'Check balance'}
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => onDelete(a.id)}>Delete</Button>
-                    </div>
+                    <Button variant="destructive" size="sm" onClick={() => onDelete(a.id)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}

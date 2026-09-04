@@ -176,6 +176,12 @@ export async function checkBalances(id?: number): Promise<CheckBalancesResponse>
   });
 }
 
+export async function syncBalances(): Promise<CheckBalancesResponse> {
+  return apiFetch<CheckBalancesResponse>('api/accounts/autoplay/sync-balances', {
+    method: 'POST',
+  });
+}
+
 // ---- proxies ----
 export async function getProxies(): Promise<ProxiesResponse> {
   return apiFetch<ProxiesResponse>('api/accounts/proxies');

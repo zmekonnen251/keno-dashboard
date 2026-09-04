@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSites } from './api';
 import type { ProviderSummary } from './types';
@@ -25,6 +23,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const fetcherRef = useRef(fetcher);
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
     fetcherRef.current = fetcher;
@@ -36,15 +35,19 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError('');
+    const initial = !hasDataRef.current;
+    if (initial) setLoading(true);
     fetcherRef
       .current()
       .then((res) => {
-        if (!cancelled) setData(res);
+        if (cancelled) return;
+        hasDataRef.current = true;
+        setData(res);
+        setError('');
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Request failed');
+        if (cancelled) return;
+        if (!hasDataRef.current) setError(e instanceof Error ? e.message : 'Request failed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

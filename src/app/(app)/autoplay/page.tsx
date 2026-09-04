@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import {
-  getAutoplayConfig,
   setAutoplayConfig,
   autoplayStatus,
   startAutoplay,
   stopAutoplay,
   refreshTokens,
   testAutoplayRound,
-  checkBalances,
+  syncBalances,
 } from '@/lib/api';
-import type { AutoplayPlacedBet, CheckBalanceItem } from '@/lib/types';
+import type { AutoplayPlacedBet } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,14 +41,25 @@ function textToTickets(text: string): number[][] | null {
 
 function stateTone(state: string): 'default' | 'destructive' | 'secondary' | 'outline' {
   if (state === 'won') return 'default';
-  if (state === 'lost' || state === 'error') return 'destructive';
+  if (state === 'lost' || state === 'error' || state === 'failed') return 'destructive';
   if (state === 'betting' || state === 'pending') return 'secondary';
   return 'outline';
 }
 
+function betLabel(p: AutoplayPlacedBet): string {
+  if (p.status === 'won') return 'won';
+  if (p.status === 'lost') return 'lost';
+  if (p.status === 'pending' || p.ok) return 'sent';
+  return 'not sent';
+}
+
+function formatTs(ms?: number | null): string {
+  if (!ms) return '—';
+  return new Date(ms).toLocaleTimeString();
+}
+
 export default function AutoplayPage() {
-  const config = useApi(() => getAutoplayConfig(), []);
-  const status = useApi(() => autoplayStatus(), []);
+  const { data: conn, error, loading, refresh } = useApi(() => autoplayStatus(), []);
   const [loaded, setLoaded] = useState(false);
   const [stake, setStake] = useState('');
   const [batch, setBatch] = useState('');
@@ -60,26 +70,18 @@ export default function AutoplayPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState('');
-  const [lastPlaced, setLastPlaced] = useState<AutoplayPlacedBet[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [checkingAll, setCheckingAll] = useState(false);
-  const [checkingIds, setCheckingIds] = useState<Set<number>>(new Set());
-  const [balances, setBalances] = useState<Record<number, CheckBalanceItem>>({});
-  const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  // Poll per-account live game status every 5s so the table stays current.
   useEffect(() => {
-    if (status.data?.running) {
-      const t = setInterval(() => status.refresh(), 5000);
-      return () => clearInterval(t);
-    }
-  }, [status.data?.running, status]);
+    const t = setInterval(() => refresh(), 4000);
+    return () => clearInterval(t);
+  }, [refresh]);
 
-  const cfg = config.data;
+  const cfg = conn?.config;
 
-  if (config.loading || status.loading) return <Loading />;
-  const err = config.error || status.error;
-  if (err) return <ErrorBox message={err} />;
+  if (loading && !conn) return <Loading />;
+  if (error && !conn) return <ErrorBox message={error} />;
 
   function onLoadCurrent() {
     setStake(String(cfg?.stake ?? ''));
@@ -101,7 +103,6 @@ export default function AutoplayPage() {
     setTicketsText('1,2,3\n8,9,10\n58,59,60\n71,72,73\n77,78,79\n78,79,80');
     setLoaded(true);
     setTestMsg('');
-    setLastPlaced(null);
   }
 
   async function onSave() {
@@ -117,8 +118,7 @@ export default function AutoplayPage() {
         base_tickets: textToTickets(ticketsText),
       });
       setTestMsg('Configuration saved.');
-      config.refresh();
-      status.refresh();
+      refresh();
     } finally {
       setSaving(false);
     }
@@ -129,11 +129,14 @@ export default function AutoplayPage() {
     setTestMsg('');
     try {
       const res = await testAutoplayRound();
-      setLastPlaced(res.placed || []);
-      const ok = (res.placed || []).filter((p) => p.ok).length;
+      const sent = res.sent ?? (res.placed || []).filter((p) => p.ok).length;
+      const failed = (res.placed || []).filter((p) => !p.ok);
+      const reason = failed[0]?.failReason ? ` (${failed[0].failReason})` : '';
       setTestMsg(
-        `Round ran across ${res.workers} worker(s). ${ok}/${(res.placed || []).length} bets placed.`
+        `Sent ${sent}/${(res.placed || []).length} tickets on ${res.workers} worker(s)${reason}. ` +
+          'Results (win/loss) appear in the bet log after the draw settles.'
       );
+      refresh();
     } catch (e) {
       setTestMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -150,38 +153,23 @@ export default function AutoplayPage() {
     }
   }
 
-  async function onCheckBalances(id?: number) {
-    if (typeof id === 'number') {
-      setCheckingIds((prev) => new Set(prev).add(id));
-    } else {
-      setCheckingAll(true);
-    }
+  async function onSyncWallets() {
+    setSyncing(true);
     try {
-      const res = await checkBalances(id);
-      setBalances((prev) => {
-        const next = { ...prev };
-        (res.results || []).forEach((r) => (next[r.accountId] = r));
-        return next;
-      });
-      status.refresh();
+      const res = await syncBalances();
+      setTestMsg(
+        `Wallets synced: ${res.synced ?? 0} updated, ${res.failed ?? 0} failed` +
+          (res.timedOut ? ' (partial — still running in background).' : '.')
+      );
+      refresh();
     } catch (e) {
-      setTestMsg('Balance check failed: ' + (e instanceof Error ? e.message : String(e)));
+      setTestMsg('Wallet sync failed: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
-      if (typeof id === 'number') setCheckingIds((prev) => new Set([...prev].filter((x) => x !== id)));
-      else setCheckingAll(false);
+      setSyncing(false);
     }
   }
 
-  async function onRefreshStatus() {
-    setRefreshingStatus(true);
-    try {
-      await status.refresh();
-    } finally {
-      setRefreshingStatus(false);
-    }
-  }
-
-  const conn = status.data;
+  const bets = conn?.bets || [];
 
   return (
     <div className="space-y-5">
@@ -189,9 +177,9 @@ export default function AutoplayPage() {
         <h2 className="text-lg font-bold text-foreground">Autoplay</h2>
         <div className="flex flex-wrap gap-2">
           {conn?.running ? (
-            <Button variant="destructive" onClick={() => stopAutoplay().then(() => status.refresh())}>Stop</Button>
+            <Button variant="destructive" onClick={() => stopAutoplay().then(() => refresh())}>Stop</Button>
           ) : (
-            <Button onClick={() => startAutoplay().then(() => status.refresh())}>Start</Button>
+            <Button onClick={() => startAutoplay().then(() => refresh())}>Start</Button>
           )}
           <Button variant="outline" onClick={onTestRound} disabled={testing || !conn?.running}>
             {testing ? 'Testing…' : 'Test Round'}
@@ -199,8 +187,8 @@ export default function AutoplayPage() {
           <Button variant="outline" onClick={onRefreshTokens} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh tokens'}
           </Button>
-          <Button variant="outline" onClick={() => onCheckBalances()} disabled={checkingAll}>
-            {checkingAll ? 'Checking…' : 'Check balances'}
+          <Button variant="outline" onClick={onSyncWallets} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync wallets'}
           </Button>
         </div>
       </div>
@@ -208,9 +196,14 @@ export default function AutoplayPage() {
       {testMsg && <p className="text-sm text-muted-foreground">{testMsg}</p>}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Enabled" value={cfg?.enabled ? 'Yes' : 'No'} tone={cfg?.enabled ? 'positive' : 'default'} />
+        <StatCard label="Enabled" value={conn?.enabled ? 'Yes' : 'No'} tone={conn?.enabled ? 'positive' : 'default'} />
         <StatCard label="Running" value={conn?.running ? 'Yes' : 'No'} tone={conn?.running ? 'positive' : 'default'} />
-        <StatCard label="Workers" value={conn?.workers ?? 0} tone="accent" />
+        <StatCard
+          label="Workers"
+          value={`${conn?.connectedWorkers ?? 0}/${conn?.workers ?? 0}`}
+          sub="connected / pool"
+          tone="accent"
+        />
         <StatCard label="Stake" value={cfg?.stake ?? '—'} />
       </div>
 
@@ -321,39 +314,70 @@ export default function AutoplayPage() {
         )}
       </Card>
 
-      {lastPlaced && lastPlaced.length > 0 && (
-        <Card title="Last test round">
-          <div className="space-y-1">
-            {lastPlaced.map((p) => (
-              <div key={p.accountId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${p.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-                    {p.ok ? '✓' : '✗'}
-                  </span>
-                  <span className="font-medium">#{p.accountId}</span>
-                  <span className="text-muted-foreground">{p.phone}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono">[{p.spots.join(',')}]</span>
-                  <span className="text-muted-foreground">{p.stake} ETB</span>
-                  <span className="text-muted-foreground">{p.requestId}</span>
-                </div>
-              </div>
-            ))}
+      <Card title="Bet log (live)">
+        {bets.length === 0 ? (
+          <Empty label="No bets recorded yet. Start autoplay or run a test round." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="px-2 py-1.5 font-medium">Time</th>
+                  <th className="px-2 py-1.5 font-medium">Account</th>
+                  <th className="px-2 py-1.5 font-medium">Ticket</th>
+                  <th className="px-2 py-1.5 font-medium">Stake</th>
+                  <th className="px-2 py-1.5 font-medium">Status</th>
+                  <th className="px-2 py-1.5 font-medium">Hits</th>
+                  <th className="px-2 py-1.5 font-medium">Won</th>
+                  <th className="px-2 py-1.5 font-medium">Drawn</th>
+                  <th className="px-2 py-1.5 font-medium">Balance after</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bets.map((p) => (
+                  <tr key={`${p.accountId}-${p.requestId}-${p.placedAt}`} className="border-b border-border/60">
+                    <td className="px-2 py-2 text-muted-foreground">{formatTs(p.placedAt)}</td>
+                    <td className="px-2 py-2">
+                      <div className="font-medium">#{p.accountId}</div>
+                      <div className="text-muted-foreground">{p.phone}</div>
+                    </td>
+                    <td className="px-2 py-2 font-mono">[{(p.spots || []).join(',')}]</td>
+                    <td className="px-2 py-2">{p.stake} ETB</td>
+                    <td className="px-2 py-2">
+                      <Badge variant={stateTone(p.status || (p.ok ? 'pending' : 'failed'))}>
+                        {betLabel(p)}
+                      </Badge>
+                      {p.failReason && (
+                        <div className="mt-0.5 max-w-48 truncate text-muted-foreground" title={p.failReason}>
+                          {p.failReason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-2">{p.matched != null ? p.matched : '—'}</td>
+                    <td className="px-2 py-2">
+                      {p.winAmount != null ? (
+                        <span className={p.winAmount > 0 ? 'font-semibold text-emerald-500' : 'text-muted-foreground'}>
+                          {p.winAmount > 0 ? '+' : ''}{p.winAmount} ETB
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-muted-foreground">
+                      {p.drawnSpots && p.drawnSpots.length > 0 ? `[${p.drawnSpots.slice(0, 8).join(',')}${p.drawnSpots.length > 8 ? '…' : ''}]` : '—'}
+                    </td>
+                    <td className="px-2 py-2">{p.balanceAfter != null ? `${p.balanceAfter} ETB` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
-      <Card
-        title={`Account game status${status.data?.running ? ' (live)' : ''}`}
-        actions={
-          <Button variant="outline" size="sm" onClick={onRefreshStatus} disabled={refreshingStatus}>
-            {refreshingStatus ? 'Refreshing…' : 'Refresh'}
-          </Button>
-        }
-      >
+      <Card title={`Account game status${conn?.running ? ' (live)' : ''}`}>
         {!conn?.accounts || conn.accounts.length === 0 ? (
-          <Empty label="No active accounts. Run a test round or start autoplay." />
+          <Empty label="No active workers. Start autoplay to open gateway connections." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -364,76 +388,57 @@ export default function AutoplayPage() {
                   <th className="px-2 py-1.5 font-medium">Last bet</th>
                   <th className="px-2 py-1.5 font-medium">Win</th>
                   <th className="px-2 py-1.5 font-medium">Balance</th>
-                  <th className="px-2 py-1.5 font-medium">Status</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Actions</th>
+                  <th className="px-2 py-1.5 font-medium">Socket</th>
                 </tr>
               </thead>
               <tbody>
-                {conn.accounts.map((a) => {
-                  const bal = balances[a.accountId]?.balance;
-                  return (
-                    <tr key={a.accountId} className="border-b border-border/60">
-                      <td className="px-2 py-2">
-                        <div className="font-medium">#{a.accountId}</div>
-                        <div className="text-muted-foreground">{a.phone}</div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Badge variant={stateTone(a.state)}>{a.state}</Badge>
-                        {a.deleted && <Badge variant="destructive" className="ml-1">deleted</Badge>}
-                      </td>
-                      <td className="px-2 py-2">
-                        {a.lastSpots ? (
-                          <>
-                            <div className="font-mono">[{a.lastSpots.join(',')}]</div>
-                            <div className="text-muted-foreground">{a.lastStake ?? '—'} ETB</div>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2">
-                        {a.winAmount != null ? (
-                          <span className={a.winAmount > 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
-                            {a.winAmount > 0 ? '+' : ''}{a.winAmount} ETB
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className={a.balance < 2 ? 'text-red-600 font-semibold' : ''}>{a.balance?.toFixed?.(2) ?? a.balance} ETB</div>
-                        {bal && (
-                          <div className="text-muted-foreground">
-                            live: {bal.balance != null ? `${bal.balance} ETB` : '—'}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className={a.connected ? 'text-emerald-600' : 'text-muted-foreground'}>
-                          {a.connected ? 'connected' : 'offline'}
-                        </div>
-                        <div className="text-muted-foreground">{a.lastStatus}</div>
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={checkingIds.has(a.accountId)}
-                          onClick={() => onCheckBalances(a.accountId)}
-                        >
-                          {checkingIds.has(a.accountId) ? 'Checking…' : 'Check balance'}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {conn.accounts.map((a) => (
+                  <tr key={a.accountId} className="border-b border-border/60">
+                    <td className="px-2 py-2">
+                      <div className="font-medium">#{a.accountId}</div>
+                      <div className="text-muted-foreground">{a.phone}</div>
+                    </td>
+                    <td className="px-2 py-2">
+                      <Badge variant={stateTone(a.state)}>{a.state}</Badge>
+                      {a.deleted && <Badge variant="destructive" className="ml-1">deleted</Badge>}
+                    </td>
+                    <td className="px-2 py-2">
+                      {a.lastSpots ? (
+                        <>
+                          <div className="font-mono">[{a.lastSpots.join(',')}]</div>
+                          <div className="text-muted-foreground">{a.lastStake ?? '—'} ETB</div>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      {a.winAmount != null ? (
+                        <span className={a.winAmount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}>
+                          {a.winAmount > 0 ? '+' : ''}{a.winAmount} ETB
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
+                        {typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance} ETB
+                      </div>
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className={a.connected ? 'text-emerald-500' : 'text-muted-foreground'}>
+                        {a.connected ? 'connected' : 'offline'}
+                      </div>
+                      <div className="text-muted-foreground">{a.lastStatus}</div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </Card>
-
-      {!cfg && <Empty label="No autoplay config" />}
     </div>
   );
 }
