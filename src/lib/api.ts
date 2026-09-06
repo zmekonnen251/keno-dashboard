@@ -162,6 +162,13 @@ export async function refreshTokens(limit = 50) {
   });
 }
 
+export async function refreshWsToken(id: number) {
+  return apiFetch('api/accounts/autoplay/refresh-ws-token', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  });
+}
+
 export async function testAutoplayRound(pick?: number[]): Promise<AutoplayTestRoundResponse> {
   return apiFetch<AutoplayTestRoundResponse>('api/accounts/autoplay/test-round', {
     method: 'POST',

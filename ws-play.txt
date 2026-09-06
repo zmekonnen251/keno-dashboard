@@ -1,0 +1,69 @@
+1-For placing a bet, the client sends a message to the server with the following structure:
+  {
+    "type": "GAME",
+    "payload": {
+        "type": "PLACE_BET",
+        "wager": {
+            "type": "CASH",
+            "amount": ${stake}
+        },
+        "chosen_spots": [${spots}],
+        "request_id": "${requestId}"
+    }
+  }
+->for making more than one bet, the client can send multiple PLACE_BET messages with different request_id values. The server will respond to each message with a corresponding GAME_STATE message indicating the result of the bet.
+
+2-After the bet is placed, the server responds with a message indicating the result of the bet. The response has the following structure:
+  {
+    "type": "GAME",
+    "payload": {
+        "type": "GAME_STATE",
+        "round_id": "${roundId}",
+        "round_no": ${roundNo},
+        "status": {
+            "type": "ROUND_COMPLETE",
+            "drawn_spots": [${drawnSpots}],
+            "timestamp": ${timestamp},
+            "tickets": [
+                {
+                    "id": "${ticketId}",
+                    "wager": {
+                        "type": "CASH",
+                        "amount": ${stake}
+                    },
+                    "spots": [${spots}],
+                    "result": {
+                        "matched_spots": [${matchedSpots}],
+                        "odd": ${odd},
+                        "won": ${won}
+                    }
+                }
+            ]
+        }
+    }
+  }
+
+-->all the results of the bets placed in a round are included in the tickets array. Each ticket contains the wager amount, the chosen spots, and the result of the bet, including the matched spots, the odd, and the amount won.
+
+3-This is how to get about self-profile config from the websocket server. The client sends a message to the server with the following structure, like if want the player_id
+    {
+"type": "PROFILE",
+"payload": {
+    "type": "profile_self",
+    "profile": {
+        "player_id": "${playerId}",
+        "display_name": null,
+        "avatar_id": null
+    }
+}}
+
+4-This is the message we get from the websocket server about the user balance, the client receives a message from the server with the following structure:
+
+{
+    "type": "BALANCE",
+    "payload": {
+        "balance": 0,
+        "timestamp": 1788645881334
+    }
+}
+

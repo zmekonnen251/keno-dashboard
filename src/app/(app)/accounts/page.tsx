@@ -1,22 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Card, Empty, ErrorBox, Loading } from '@/components/app';
-import { formatTime } from '@/lib/format';
 import { parseAccountFile } from '@/lib/phone';
+import { DataTable } from '@/components/ui/data-table';
+import { AccountMobileCard, columns } from '@/components/accounts-columns';
 
 export default function AccountsPage() {
   const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
@@ -32,6 +25,7 @@ export default function AccountsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
 
+  
   useEffect(() => {
     const t = setInterval(() => refresh(), 10000);
     return () => clearInterval(t);
@@ -94,6 +88,20 @@ export default function AccountsPage() {
     refresh();
   }
 
+  async function onRefreshWsToken(id: number) {
+    setSyncing(true);
+    setSyncMsg('Refreshing WS token…');
+    try {
+      await refreshWsToken(id);
+      setSyncMsg('WS token refreshed.');
+      refresh();
+    } catch (e) {
+      setSyncMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function onSyncWallets() {
     setSyncing(true);
     setSyncMsg('');
@@ -117,100 +125,118 @@ export default function AccountsPage() {
   if (!data) return <Empty label="No accounts" />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-foreground">Accounts</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onSyncWallets} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sync wallets'}
-          </Button>
-          <Button variant="outline" onClick={refresh}>Refresh</Button>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Balance is the live ToloBirr wallet, written to the database every couple of minutes
-        (and when you click Sync wallets). New accounts start at 2 ETB until the first sync.
-      </p>
-      {syncMsg && <p className="text-xs text-muted-foreground">{syncMsg}</p>}
+		<div className='space-y-5'>
+			<div className='flex flex-wrap items-center justify-between gap-3'>
+				<h2 className='text-lg font-bold text-foreground'>Accounts</h2>
+				<div className='flex gap-2'>
+					<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
+						{syncing ? 'Syncing…' : 'Sync wallets'}
+					</Button>
+					<Button variant='outline' onClick={refresh}>
+						Refresh
+					</Button>
+				</div>
+			</div>
+			<p className='text-xs text-muted-foreground'>
+				Balance is the live ToloBirr wallet, written to the database every
+				couple of minutes (and when you click Sync wallets). New accounts start
+				at 2 ETB until the first sync.
+			</p>
+			{syncMsg && <p className='text-xs text-muted-foreground'>{syncMsg}</p>}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Card title="Create accounts">
-          <p className="mb-3 text-xs text-muted-foreground">
-            Register new ToloBirr accounts (phone + access token). No spinning is
-            performed here.
-          </p>
-          <div className="flex items-end gap-2">
-            <div className="w-28">
-              <Label htmlFor="create-count">How many</Label>
-              <Input id="create-count" type="number" min={1} max={100} value={createCount} onChange={(e) => setCreateCount(e.target.value)} />
-            </div>
-            <Button onClick={onCreate} disabled={creating}>{creating ? 'Creating…' : 'Create accounts'}</Button>
-          </div>
-          {createMsg && <p className="mt-2 text-xs text-muted-foreground">{createMsg}</p>}
-        </Card>
+			<div className='grid grid-cols-1 gap-5 lg:grid-cols-2'>
+				<Card title='Create accounts'>
+					<p className='mb-3 text-xs text-muted-foreground'>
+						Register new ToloBirr accounts (phone + access token). No spinning
+						is performed here.
+					</p>
+					<div className='flex items-end gap-2'>
+						<div className='w-28'>
+							<Label htmlFor='create-count'>How many</Label>
+							<Input
+								id='create-count'
+								type='number'
+								min={1}
+								max={100}
+								value={createCount}
+								onChange={(e) => setCreateCount(e.target.value)}
+							/>
+						</div>
+						<Button onClick={onCreate} disabled={creating}>
+							{creating ? 'Creating…' : 'Create accounts'}
+						</Button>
+					</div>
+					{createMsg && (
+						<p className='mt-2 text-xs text-muted-foreground'>{createMsg}</p>
+					)}
+				</Card>
 
-        <Card title="Import accounts from CSV / JSON">
-          <p className="mb-3 text-xs text-muted-foreground">
-            CSV: <code>phone,password[,token]</code> per line. JSON: array of{' '}
-            <code>{'{ phone, password, token? }'}</code>. Phones are normalized
-            to <code>2517… / 2519…</code> (no <code>+</code>, no leading
-            <code>0</code>); invalid ones are rejected.
-          </p>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Label htmlFor="accounts-file">File (.csv / .json)</Label>
-              <Input id="accounts-file" ref={fileRef} type="file" accept=".csv,.json,.txt" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
-            </div>
-            <Button
-              onClick={() => onUpload(selectedFile)}
-              disabled={uploading || !selectedFile || (preview !== null && preview.valid === 0)}
-            >
-              {uploading ? 'Uploading…' : 'Import'}
-            </Button>
-          </div>
-          {preview && (
-            <p className={`mt-2 text-xs ${preview.valid === 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-              {preview.valid} valid row(s), {preview.rejected} rejected.
-              {preview.sample.length > 0 && <> Sample: {preview.sample.join(', ')}.</>}
-              {preview.valid === 0 && ' No importable rows found.'}
-            </p>
-          )}
-          {uploadMsg && <p className="mt-2 text-xs text-muted-foreground">{uploadMsg}</p>}
-        </Card>
-      </div>
+				<Card title='Import accounts from CSV / JSON'>
+					<p className='mb-3 text-xs text-muted-foreground'>
+						CSV: <code>phone,password[,token]</code> per line. JSON: array of{' '}
+						<code>{'{ phone, password, token? }'}</code>. Phones are normalized
+						to <code>2517… / 2519…</code> (no <code>+</code>, no leading
+						<code>0</code>); invalid ones are rejected.
+					</p>
+					<div className='flex items-end gap-2'>
+						<div className='flex-1'>
+							<Label htmlFor='accounts-file'>File (.csv / .json)</Label>
+							<Input
+								id='accounts-file'
+								ref={fileRef}
+								type='file'
+								accept='.csv,.json,.txt'
+								onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+							/>
+						</div>
+						<Button
+							onClick={() => onUpload(selectedFile)}
+							disabled={
+								uploading ||
+								!selectedFile ||
+								(preview !== null && preview.valid === 0)
+							}
+						>
+							{uploading ? 'Uploading…' : 'Import'}
+						</Button>
+					</div>
+					{preview && (
+						<p
+							className={`mt-2 text-xs ${preview.valid === 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}
+						>
+							{preview.valid} valid row(s), {preview.rejected} rejected.
+							{preview.sample.length > 0 && (
+								<> Sample: {preview.sample.join(', ')}.</>
+							)}
+							{preview.valid === 0 && ' No importable rows found.'}
+						</p>
+					)}
+					{uploadMsg && (
+						<p className='mt-2 text-xs text-muted-foreground'>{uploadMsg}</p>
+					)}
+				</Card>
+			</div>
 
-      <Card title={`Accounts (${data.accounts.length})`}>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Phone</TableHead>
-                <TableHead>Balance (ETB)</TableHead>
-                <TableHead>Last bet</TableHead>
-                <TableHead>Reward</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.accounts.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-mono text-xs">+{a.phone}</TableCell>
-                  <TableCell>
-                    <span className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
-                      {typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{formatTime(a.last_bet_at)}</TableCell>
-                  <TableCell>{a.reward ?? '—'}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="destructive" size="sm" onClick={() => onDelete(a.id)}>Delete</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-    </div>
-  );
+			<Card title={`Accounts (${data.accounts.length})`}>
+				<DataTable
+					columns={columns}
+					data={data.accounts}
+					meta={{ onDelete, onRefreshWsToken }}
+					groupOptions={[
+						{
+							value: 'provider',
+							label: 'Group provider',
+						},
+					]}
+					renderMobileRowCard={(account) => (
+						<AccountMobileCard
+							account={account}
+							onDelete={onDelete}
+							onRefreshWsToken={onRefreshWsToken}
+						/>
+					)}
+				/>
+			</Card>
+		</div>
+	);
 }

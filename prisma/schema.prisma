@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accounts {
+  id               BigInt    @id @default(autoincrement())
+  provider         String    @default("fungames")
+  phone            String    @unique
+  password         String
+  balance          Float     @default(2) @db.Real
+  token            String?
+  reward           String?
+  last_spin_at     DateTime? @db.Timestamptz(6)
+  token_updated_at DateTime? @db.Timestamptz(6)
+  last_bet_at      DateTime? @db.Timestamptz(6)
+  is_deleted       Boolean   @default(false)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  ws_token         String?
+
+  @@index([is_deleted, balance], map: "idx_accounts_active")
+  @@index([provider], map: "idx_accounts_provider")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model autoplay_config {
+  id           Int       @id
+  enabled      Boolean   @default(false)
+  mode         String    @default("A")
+  batch_size   Int       @default(1)
+  stake        Float     @default(2) @db.Real
+  split_ratio  String    @default("uniform")
+  base_tickets String?
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  digit_count  Int       @default(3)
+}
+
+model draws {
+  id          BigInt    @id @default(autoincrement())
+  site_id     String
+  round_id    String
+  results     String
+  drawn_at    DateTime  @db.Timestamptz(6)
+  hour_of_day Int
+  day_of_week Int
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  round_no    BigInt?
+  complete    Boolean   @default(true)
+
+  @@unique([site_id, round_id])
+  @@index([site_id, day_of_week], map: "idx_draws_dow")
+  @@index([site_id, hour_of_day], map: "idx_draws_hour")
+  @@index([site_id, round_id], map: "idx_draws_site_round")
+  @@index([site_id, drawn_at], map: "idx_draws_site_time")
+}
+
+model game_configs {
+  provider         String    @id
+  currency         String?
+  min_wager        Float?    @db.Real
+  max_wager        Float?    @db.Real
+  default_wager    Float?    @db.Real
+  max_win          Float?    @db.Real
+  odd_table        String?
+  game_config      String?
+  drawn_spot_size  Int?
+  waiting_duration Int?
+  draw_duration    Int?
+  status           String?
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model pattern_history {
+  id                  BigInt   @id @default(autoincrement())
+  site_id             String
+  pattern_type        String
+  pattern_numbers     String
+  occurred_at         DateTime @db.Timestamptz(6)
+  hour_of_day         Int?
+  day_of_week         Int?
+  interval_since_last Int?
+
+  @@index([site_id, occurred_at], map: "idx_pattern_history_site")
+  @@index([site_id, pattern_numbers], map: "idx_pattern_history_site_pattern")
+}
+
+model predictions {
+  id              BigInt    @id @default(autoincrement())
+  site_id         String
+  prediction_type String
+  numbers         String
+  confidence      Float?    @db.Real
+  reasoning       String?
+  time_context    String?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  hit             Int?
+
+  @@index([site_id, created_at], map: "idx_predictions_site")
+}
+
+model proxies {
+  id              BigInt    @id @default(autoincrement())
+  host            String
+  port            Int
+  username        String?
+  password        String?
+  protocol        String    @default("http")
+  is_active       Boolean   @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @db.Timestamptz(6)
+  last_checked_at DateTime? @db.Timestamptz(6)
+  last_ok         Boolean?
+  last_error      String?
+
+  @@unique([host, port])
+}
+
+model recent_bets {
+  id            BigInt    @id @default(autoincrement())
+  provider      String
+  round_no      BigInt?
+  player_id     String?
+  wager         Float?    @db.Real
+  currency      String?
+  spots         String?
+  matched_spots String?
+  odd           Float?    @db.Real
+  won           Float?    @db.Real
+  payload       String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, created_at], map: "idx_recent_bets_provider_time")
+}
+
+model sessions {
+  id           BigInt    @id @default(autoincrement())
+  provider     String
+  url          String    @unique
+  base_url     String?
+  token        String?
+  instance_id  String?
+  name         String?
+  status       String?   @default("idle")
+  last_error   String?
+  last_draw_at DateTime? @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([provider], map: "idx_sessions_provider")
+  @@index([status], map: "idx_sessions_status")
+}
+
+model time_stats {
+  id                   BigInt    @id @default(autoincrement())
+  site_id              String
+  hour_of_day          Int
+  day_of_week          Int
+  number_freq          String
+  avg_repetitive_count Float?    @db.Real
+  avg_cluster_score    Float?    @db.Real
+  avg_sequential_pairs Float?    @db.Real
+  draw_count           Int?      @default(0)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@unique([site_id, hour_of_day, day_of_week])
+  @@index([site_id], map: "idx_time_stats_site")
+}
