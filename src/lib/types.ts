@@ -188,6 +188,7 @@ export interface Account {
 	last_spin_at?: string | null;
 	last_bet_at?: string | null;
 	is_deleted: boolean;
+	is_enabled?: boolean;
 	created_at: string;
 	updated_at: string;
 }
@@ -249,7 +250,24 @@ export interface AutoplayConfig {
 	split_ratio: 'uniform' | '1/2' | '1/3';
 	digit_count: 2 | 3;
 	base_tickets: number[][] | null;
+	repetitive_auto_bet: boolean;
 	updated_at: string;
+}
+
+// Live recurrence / pattern-trend signal used to auto-bet recent repetitive
+// tickets (mirrors server RecurrenceSignalBuilder output).
+export interface RecurrenceSignal {
+	siteId: string;
+	computedAt: string;
+	level: 'easy' | 'medium' | 'hard' | 'insufficient';
+	confidence: number;
+	avgRepetitive: number;
+	drawCount: number;
+	dominantPattern: string;
+	suggestions: number[];
+	chainNumbers: number[];
+	recurrenceNumbers: number[];
+	trendNumbers: number[];
 }
 
 export interface AutoplayStatus {
@@ -257,9 +275,11 @@ export interface AutoplayStatus {
 	running: boolean;
 	workers: number;
 	connectedWorkers?: number;
+	freshAccounts?: number;
 	config: AutoplayConfig;
 	accounts: AccountGameStatus[];
 	bets?: AutoplayPlacedBet[];
+	recurrence?: RecurrenceSignal | null;
 }
 
 export interface AutoplayPlacedBet {

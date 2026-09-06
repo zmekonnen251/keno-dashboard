@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,6 +85,11 @@ export default function AccountsPage() {
 
   async function onDelete(id: number) {
     await deleteAccount(id);
+    refresh();
+  }
+
+  async function onToggleEnabled(id: number, enabled: boolean) {
+    await setAccountEnabled(id, enabled);
     refresh();
   }
 
@@ -221,7 +226,7 @@ export default function AccountsPage() {
 				<DataTable
 					columns={columns}
 					data={data.accounts}
-					meta={{ onDelete, onRefreshWsToken }}
+					meta={{ onDelete, onRefreshWsToken, onToggleEnabled }}
 					groupOptions={[
 						{
 							value: 'provider',
@@ -233,6 +238,7 @@ export default function AccountsPage() {
 							account={account}
 							onDelete={onDelete}
 							onRefreshWsToken={onRefreshWsToken}
+							onToggleEnabled={onToggleEnabled}
 						/>
 					)}
 				/>

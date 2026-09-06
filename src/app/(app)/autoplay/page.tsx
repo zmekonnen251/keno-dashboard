@@ -67,6 +67,7 @@ export default function AutoplayPage() {
   const [splitRatio, setSplitRatio] = useState<'uniform' | '1/2' | '1/3'>('uniform');
   const [digitCount, setDigitCount] = useState<2 | 3>(3);
   const [ticketsText, setTicketsText] = useState('');
+  const [repBet, setRepBet] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState('');
@@ -90,6 +91,7 @@ export default function AutoplayPage() {
     setSplitRatio(cfg?.split_ratio ?? 'uniform');
     setDigitCount(cfg?.digit_count ?? 3);
     setTicketsText(ticketsToText(cfg?.base_tickets));
+    setRepBet(cfg?.repetitive_auto_bet ?? true);
     setLoaded(true);
     setTestMsg('');
   }
@@ -101,6 +103,7 @@ export default function AutoplayPage() {
     setSplitRatio('uniform');
     setDigitCount(3);
     setTicketsText('1,2,3\n8,9,10\n58,59,60\n71,72,73\n77,78,79\n78,79,80');
+    setRepBet(true);
     setLoaded(true);
     setTestMsg('');
   }
@@ -116,6 +119,7 @@ export default function AutoplayPage() {
         split_ratio: splitRatio,
         ...(mode === 'C' ? { digit_count: digitCount } : {}),
         base_tickets: textToTickets(ticketsText),
+        repetitive_auto_bet: repBet,
       });
       setTestMsg('Configuration saved.');
       refresh();
@@ -170,6 +174,7 @@ export default function AutoplayPage() {
   }
 
   const bets = conn?.bets || [];
+  const rec = conn?.recurrence;
 
   return (
     <div className="space-y-5">
@@ -195,7 +200,7 @@ export default function AutoplayPage() {
 
       {testMsg && <p className="text-sm text-muted-foreground">{testMsg}</p>}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <StatCard label="Enabled" value={conn?.enabled ? 'Yes' : 'No'} tone={conn?.enabled ? 'positive' : 'default'} />
         <StatCard label="Running" value={conn?.running ? 'Yes' : 'No'} tone={conn?.running ? 'positive' : 'default'} />
         <StatCard
@@ -204,8 +209,49 @@ export default function AutoplayPage() {
           sub="connected / pool"
           tone="accent"
         />
-        <StatCard label="Stake" value={cfg?.stake ?? '—'} />
+        <StatCard
+          label="Fresh pool"
+          value={`${conn?.freshAccounts ?? 0}/${conn?.workers ?? 0}`}
+          sub="2-Birr / never-bet accounts prioritized"
+          tone={conn?.connectedWorkers ? 'accent' : 'default'}
+        />
+        <StatCard label="Stake" value={`${cfg?.stake ?? '—'} ETB`} />
+        <StatCard
+          label="Repetitive auto-bet"
+          value={cfg?.repetitive_auto_bet ? 'On' : 'Off'}
+          sub="bet recent repeating numbers / patterns"
+          tone={cfg?.repetitive_auto_bet ? 'positive' : 'default'}
+        />
       </div>
+
+      {rec && (
+        <Card
+          title="Recurrence signal"
+          actions={
+            <Badge variant="outline">
+              {rec.drawCount > 0 ? `${rec.level} · ${(rec.confidence * 100).toFixed(0)}% conf` : 'no draws yet'}
+            </Badge>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{rec.dominantPattern || 'Waiting for draw history…'}</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Chain picks</div>
+                <div className="mt-1 font-mono text-xs">{rec.chainNumbers.length ? `[${rec.chainNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recurrence picks</div>
+                <div className="mt-1 font-mono text-xs">{rec.recurrenceNumbers.length ? `[${rec.recurrenceNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Carryover trend</div>
+                <div className="mt-1 font-mono text-xs">{rec.trendNumbers.length ? `[${rec.trendNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card
         title="Configuration"
@@ -281,6 +327,22 @@ export default function AutoplayPage() {
                   <Input type="number" min="1" value={batch} onChange={(e) => setBatch(e.target.value)} placeholder="1" />
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+              <input
+                id="repBet"
+                type="checkbox"
+                checked={repBet}
+                onChange={(e) => setRepBet(e.target.checked)}
+                className="h-4 w-4 accent-blue-600"
+              />
+              <Label htmlFor="repBet" className="cursor-pointer">
+                Auto-bet recent repetitive tickets (recurrence &amp; pattern-trend picks lead the round)
+              </Label>
+              <span className="ml-auto text-xs text-muted-foreground">
+                Chains · overdue/time patterns · carryover
+              </span>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">

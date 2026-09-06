@@ -11,6 +11,8 @@ import { GATEWAY_URL } from '@/hooks/useGatewayWorker';
 import {
 	LoaderCircle,
 	MoreVertical,
+	Power,
+	PowerOff,
 	RefreshCw,
 	Trash2,
 	Wifi,
@@ -113,7 +115,7 @@ export function TestGatewayConnection({ token }: { token?: string | null }) {
 	);
 }
 
-export function AccountMobileCard({ account, onDelete, onRefreshWsToken }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void }) {
+export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void }) {
 	return (
 		<TooltipProvider>
 			<article className='rounded-lg border bg-card p-4 text-sm shadow-sm'>
@@ -134,6 +136,9 @@ export function AccountMobileCard({ account, onDelete, onRefreshWsToken }: { acc
 							<TooltipContent>Account actions</TooltipContent>
 						</Tooltip>
 						<DropdownMenuContent align='end'>
+							<DropdownMenuItem onClick={() => onToggleEnabled(account.id, !account.is_enabled)}>
+								{account.is_enabled ? <PowerOff /> : <Power />} {account.is_enabled ? 'Disable autoplay' : 'Enable autoplay'}
+							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => onRefreshWsToken(account.id)}>
 								<RefreshCw /> Refresh WS token
 							</DropdownMenuItem>
@@ -150,16 +155,20 @@ export function AccountMobileCard({ account, onDelete, onRefreshWsToken }: { acc
 						<dd className={account.balance < 2 ? 'font-semibold text-red-500' : 'font-medium'}>{account.balance.toFixed(2)} ETB</dd>
 					</div>
 					<div>
+						<dt className='text-xs text-muted-foreground'>Autoplay</dt>
+						<dd className='mt-1'>
+							<Badge variant={account.is_enabled ? 'default' : 'secondary'}>
+								{account.is_enabled ? 'Enabled' : 'Disabled'}
+							</Badge>
+						</dd>
+					</div>
+					<div>
 						<dt className='text-xs text-muted-foreground'>WebSocket</dt>
 						<dd className='mt-1'><TestGatewayConnection token={account.ws_token} /></dd>
 					</div>
 					<div>
 						<dt className='text-xs text-muted-foreground'>Last bet</dt>
 						<dd className='text-xs'>{formatTime(account.last_bet_at)}</dd>
-					</div>
-					<div>
-						<dt className='text-xs text-muted-foreground'>Access token</dt>
-						<dd className='text-xs font-medium'>{account.token ? 'Available' : 'Missing'}</dd>
 					</div>
 				</dl>
 			</article>
@@ -201,6 +210,14 @@ export const columns = columnHelper.columns([
     header: 'Has WS Token',
     cell: (info) => (info.getValue() ? 'Yes' : 'No'),
   }),
+  columnHelper.accessor('is_enabled', {
+    header: 'Autoplay',
+    cell: (info) => (
+      <Badge variant={info.getValue() ? 'default' : 'secondary'}>
+        {info.getValue() ? 'Enabled' : 'Disabled'}
+      </Badge>
+    ),
+  }),
   
 	columnHelper.display({
 		id: 'connection',
@@ -212,6 +229,18 @@ export const columns = columnHelper.columns([
 		header: 'Actions',
     cell: ({ table, row }) => (
       <div className='flex gap-2'>
+				<Button
+          variant={row.original.is_enabled ? 'outline' : 'default'}
+          size='sm'
+          onClick={() =>
+            (table.options.meta as { onToggleEnabled: (id: number, enabled: boolean) => void }).onToggleEnabled(
+              row.original.id,
+              !row.original.is_enabled,
+            )
+          }
+        >
+          {row.original.is_enabled ? <><PowerOff className='size-3.5' /> Disable</> : <><Power className='size-3.5' /> Enable</>}
+        </Button>
 				<Button
 					variant='destructive'
 					size='sm'

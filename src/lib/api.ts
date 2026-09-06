@@ -115,6 +115,15 @@ export async function deleteAccount(id: number) {
   return apiFetch(`api/accounts/${id}`, { method: 'DELETE' });
 }
 
+// Enable/disable an account for autoplay. Disabled accounts are excluded from
+// the active autoplay pool (and the WS-token backfill).
+export async function setAccountEnabled(id: number, enabled: boolean) {
+  return apiFetch<{ ok: boolean; id: number; is_enabled: boolean }>(`api/accounts/${id}/enabled`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export async function createAccounts(count: number): Promise<CreateAccountsResponse> {
   return apiFetch<CreateAccountsResponse>('api/accounts/create', {
     method: 'POST',
