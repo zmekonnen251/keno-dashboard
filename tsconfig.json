@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "../junk/__not-used-page.tsx", "../junk/useWsAutoplayEngine.ts"  ],
   "exclude": ["node_modules"]
 }
