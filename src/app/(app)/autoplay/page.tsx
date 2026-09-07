@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   setAutoplayConfig,
   autoplayStatus,
@@ -9,6 +9,8 @@ import {
   refreshTokens,
   testAutoplayRound,
   syncBalances,
+  getEligibleAccounts,
+  placeManualBet,
 } from '@/lib/api';
 import type { AutoplayPlacedBet } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
@@ -18,6 +20,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, StatCard, Empty, ErrorBox, Loading } from '@/components/app';
 import { formatTime } from '@/lib/format';
+import { useSocket } from '@/lib/service-gateway';
+import { useGatewayGameState } from '@/lib/gateway-game-state';
 
 function ticketsToText(tickets: number[][] | null | undefined): string {
   return (tickets || []).map((t) => t.join(',')).join('\n');
@@ -73,11 +77,27 @@ export default function AutoplayPage() {
   const [testMsg, setTestMsg] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
+  const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
+  const [showAccountSelector, setShowAccountSelector] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [manualStake, setManualStake] = useState('');
+  const [manualBetPlaced, setManualBetPlaced] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => refresh(), 4000);
     return () => clearInterval(t);
   }, [refresh]);
+
+  useEffect(() => {
+    const unsub = useGatewayGameState(setGameState);
+    return () => unsub?.();
+  }, [gameState, refresh]);
+
+  useEffect(() => {
+    const unsub = useSocket('/autoplay/signals', setSignals);
+    return () => unsub?.();
+  }, [signals, refresh]);
 
   const cfg = conn?.config;
 
@@ -92,6 +112,8 @@ export default function AutoplayPage() {
     setDigitCount(cfg?.digit_count ?? 3);
     setTicketsText(ticketsToText(cfg?.base_tickets));
     setRepBet(cfg?.repetitive_auto_bet ?? true);
+    setGameState(cfg?.game_state ?? 'unknown');
+    setSignals(cfg?.signals ?? 'repetitive');
     setLoaded(true);
     setTestMsg('');
   }
@@ -104,6 +126,8 @@ export default function AutoplayPage() {
     setDigitCount(3);
     setTicketsText('1,2,3\n8,9,10\n58,59,60\n71,72,73\n77,78,79\n78,79,80');
     setRepBet(true);
+    setGameState('unknown');
+    setSignals('repetitive');
     setLoaded(true);
     setTestMsg('');
   }
@@ -120,6 +144,8 @@ export default function AutoplayPage() {
         ...(mode === 'C' ? { digit_count: digitCount } : {}),
         base_tickets: textToTickets(ticketsText),
         repetitive_auto_bet: repBet,
+        game_state: gameState,
+        signals,
       });
       setTestMsg('Configuration saved.');
       refresh();
@@ -198,6 +224,10 @@ export default function AutoplayPage() {
         </div>
       </div>
 
+      <div className="alert alert-info mt-3">
+        <strong>Game State:</strong> {gameState === 'betting_open' ? 'Betting OPEN — inject tickets now' : gameState === 'drawing' ? 'Drawing in progress — bets scheduled for next round' : gameState === 'settled' ? 'Settled — results announced' : 'Unknown'}
+      </div>
+
       {testMsg && <p className="text-sm text-muted-foreground">{testMsg}</p>}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -223,6 +253,67 @@ export default function AutoplayPage() {
           tone={cfg?.repetitive_auto_bet ? 'positive' : 'default'}
         />
       </div>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <StatCard label="Enabled" value={conn?.enabled ? 'Yes' : 'No'} tone={conn?.enabled ? 'positive' : 'default'} />
+        <StatCard label="Running" value={conn?.running ? 'Yes' : 'No'} tone={conn?.running ? 'positive' : 'default'} />
+        <StatCard
+          label="Workers"
+          value={`${conn?.connectedWorkers ?? 0}/${conn?.workers ?? 0}`}
+          sub="connected / pool"
+          tone="accent"
+        />
+        <StatCard
+          label="Fresh pool"
+          value={`${conn?.freshAccounts ?? 0}/${conn?.workers ?? 0}`}
+          sub="2-Birr / never-bet accounts prioritized"
+          tone={conn?.connectedWorkers ? 'accent' : 'default'}
+        />
+        <StatCard label="Stake" value={`${cfg?.stake ?? '—'} ETB`} />
+        <StatCard
+          label="Repetitive auto-bet"
+          value={cfg?.repetitive_auto_bet ? 'On' : 'Off'}
+          sub="bet recent repeating numbers / patterns"
+          tone={cfg?.repetitive_auto_bet ? 'positive' : 'default'}
+        />
+        <StatCard label="Game state" value={gameState === 'betting_open' ? 'OPEN' : gameState === 'drawing' ? 'DRAWING' : gameState === 'settled' ? 'SETTLED' : 'Unknown'} tone={gameState === 'betting_open' ? 'positive' : gameState === 'drawing' ? 'destructive' : 'accent'} />
+        <StatCard
+          label="Signals"
+          value={signals === 'repetitive' ? 'Repetitive' : signals === 'recurring' ? 'Recurring' : signals === 'hot' ? 'Hot digits' : 'None'}
+          tone={signals === 'repetitive' ? 'positive' : signals === 'recurring' ? 'accent' : 'default'}
+        />
+      </div>
+
+      <Card title="Signal panel" actions="">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{rec?.dominantPattern || 'Waiting for draw history…'}</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Chain picks</div>
+              <div className="mt-1 font-mono text-xs">{rec?.chainNumbers.length ? `[${rec.chainNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recurrence picks</div>
+              <div className="mt-1 font-mono text-xs">{rec?.recurrenceNumbers.length ? `[${rec.recurrenceNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Carryover trend</div>
+              <div className="mt-1 font-mono text-xs">{rec?.trendNumbers.length ? `[${rec.trendNumbers.slice(0, 8).join(',')}]` : '—'}</div>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Button variant="outline" size="sm" onClick={() => setSignals('repetitive')}>
+              Repetitive tickets
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSignals('recurring')}>
+              Recurring patterns
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSignals('hot')}>
+              Hot digits
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {rec && (
         <Card
