@@ -252,6 +252,8 @@ export interface AutoplayConfig {
 	base_tickets: number[][] | null;
 	repetitive_auto_bet: boolean;
 	updated_at: string;
+	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
+	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
 }
 
 // Live recurrence / pattern-trend signal used to auto-bet recent repetitive

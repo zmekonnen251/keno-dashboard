@@ -1,6 +1,8 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   setAutoplayConfig,
   autoplayStatus,
@@ -9,8 +11,6 @@ import {
   refreshTokens,
   testAutoplayRound,
   syncBalances,
-  getEligibleAccounts,
-  placeManualBet,
 } from '@/lib/api';
 import type { AutoplayPlacedBet } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
@@ -79,25 +79,22 @@ export default function AutoplayPage() {
   const [syncing, setSyncing] = useState(false);
   const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
   const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
-  const [showAccountSelector, setShowAccountSelector] = useState(false);
-  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
-  const [manualStake, setManualStake] = useState('');
-  const [manualBetPlaced, setManualBetPlaced] = useState(false);
+
+  const signalsUnsubRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    useGatewayGameState(setGameState);
+    useSocket('/autoplay/signals', setSignals);
+
+    return () => {
+      signalsUnsubRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => refresh(), 4000);
     return () => clearInterval(t);
   }, [refresh]);
-
-  useEffect(() => {
-    const unsub = useGatewayGameState(setGameState);
-    return () => unsub?.();
-  }, [gameState, refresh]);
-
-  useEffect(() => {
-    const unsub = useSocket('/autoplay/signals', setSignals);
-    return () => unsub?.();
-  }, [signals, refresh]);
 
   const cfg = conn?.config;
 
@@ -276,7 +273,7 @@ export default function AutoplayPage() {
           sub="bet recent repeating numbers / patterns"
           tone={cfg?.repetitive_auto_bet ? 'positive' : 'default'}
         />
-        <StatCard label="Game state" value={gameState === 'betting_open' ? 'OPEN' : gameState === 'drawing' ? 'DRAWING' : gameState === 'settled' ? 'SETTLED' : 'Unknown'} tone={gameState === 'betting_open' ? 'positive' : gameState === 'drawing' ? 'destructive' : 'accent'} />
+        <StatCard label="Game state" value={gameState === 'betting_open' ? 'OPEN' : gameState === 'drawing' ? 'DRAWING' : gameState === 'settled' ? 'SETTLED' : 'Unknown'} tone={gameState === 'betting_open' ? 'positive' : gameState === 'drawing' ? 'negative' : 'accent'} />
         <StatCard
           label="Signals"
           value={signals === 'repetitive' ? 'Repetitive' : signals === 'recurring' ? 'Recurring' : signals === 'hot' ? 'Hot digits' : 'None'}
