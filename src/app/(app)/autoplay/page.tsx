@@ -1,8 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react-hooks/rules-of-hooks */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   setAutoplayConfig,
   autoplayStatus,
@@ -80,16 +78,13 @@ export default function AutoplayPage() {
   const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
   const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
 
-  const signalsUnsubRef = useRef<(() => void) | null>(null);
+  useGatewayGameState(setGameState);
 
-  useEffect(() => {
-    useGatewayGameState(setGameState);
-    useSocket('/autoplay/signals', setSignals);
-
-    return () => {
-      signalsUnsubRef.current?.();
-    };
-  }, []);
+  useSocket('/autoplay/signals', (data: unknown) => {
+    if (data === 'repetitive' || data === 'recurring' || data === 'hot' || data === 'none') {
+      setSignals(data);
+    }
+  });
 
   useEffect(() => {
     const t = setInterval(() => refresh(), 4000);

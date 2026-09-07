@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef } from 'react';
 
-export function useSocket(channel: string, setData: (data: any) => void) {
+export function useSocket(channel: string, setData: (data: unknown) => void) {
   const setDataRef = useRef(setData);
   const unsubRef = useRef<(() => void) | null>(null);
   const socketRef = useRef<WebSocket | null>(null);

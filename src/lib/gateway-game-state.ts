@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useRef } from 'react';
 
 export function useGatewayGameState(setState: (state: 'betting_open' | 'drawing' | 'settled' | 'unknown') => void) {
@@ -21,7 +20,8 @@ export function useGatewayGameState(setState: (state: 'betting_open' | 'drawing'
             setStateRef.current(data.state || 'unknown');
           }
         }
-      } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e:unknown) {
         // silently retry on network errors
       }
     };
