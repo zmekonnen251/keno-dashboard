@@ -22,7 +22,8 @@ import type {
   UploadResponse,
   ClientsResponse,
   LogsResponse,
-  AccountGameStatus,
+  ManualBetResponse,
+  EligibleAccountsResponse,
 } from './types';
 
 // ---- auth ----
@@ -186,28 +187,15 @@ export async function testAutoplayRound(pick?: number[]): Promise<AutoplayTestRo
   });
 }
 
-export interface ManualBetResponse {
-  ok: boolean;
-  placed?: {
-    accountId: number;
-    phone: string;
-    stake: number;
-    requestId: string;
-    status: string;
-  };
-  failReason?: string;
-}
-
-export async function placeManualBet(stake: number, accountId?: number): Promise<ManualBetResponse> {
+export async function placeManualBet(
+  spots: number[],
+  stake: number,
+  accountId?: number,
+): Promise<ManualBetResponse> {
   return apiFetch<ManualBetResponse>('api/accounts/autoplay/manual-bet', {
     method: 'POST',
-    body: JSON.stringify({ stake, accountId }),
+    body: JSON.stringify({ spots, stake, accountId }),
   });
-}
-
-export interface EligibleAccountsResponse {
-  ok: boolean;
-  accounts: AccountGameStatus[];
 }
 
 export async function getEligibleAccounts(stake?: number): Promise<EligibleAccountsResponse> {

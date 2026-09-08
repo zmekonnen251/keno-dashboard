@@ -160,8 +160,8 @@ export interface Session {
 	provider: string;
 	url: string;
 	base_url: string | null;
-  token: string | null;
-  ws_token: string | null;
+	token: string | null;
+	ws_token: string | null;
 	instance_id: string | null;
 	name: string | null;
 	status: string;
@@ -182,8 +182,8 @@ export interface Account {
 	phone: string;
 	password?: string;
 	balance: number;
-  token?: string | null;
-  ws_token?: string | null;
+	token?: string | null;
+	ws_token?: string | null;
 	reward?: number | null;
 	last_spin_at?: string | null;
 	last_bet_at?: string | null;
@@ -254,7 +254,7 @@ export interface AutoplayConfig {
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
-	manual_account_selection: boolean; // true = admin selects account, false = server selects auto
+	manual_account_selection: boolean;
 }
 
 // Live recurrence / pattern-trend signal used to auto-bet recent repetitive
@@ -335,8 +335,8 @@ export interface AutoplayTestRoundResponse {
 export interface AccountGameStatus {
 	accountId: number;
 	phone: string;
-  tokenOk: boolean;
-  wsTokenOk: boolean;
+	tokenOk: boolean;
+	wsTokenOk: boolean;
 	connected: boolean;
 	lastStatus: string;
 	lastBetAt: number | null;
@@ -415,20 +415,107 @@ export interface LogsResponse {
 	logs: LogEntry[];
 }
 
-// Account Autoplay Types
-export interface AccountGameStatus {
+// ---- Ticket strategy types (mirrors extension BotTicket) ----
+
+export interface BotTicket {
+	id: string;
+	spots: number;
+	strategy: 'cluster' | 'standard' | 'pattern';
+	stake: number;
+	enabled: boolean;
+	staticTicket?: boolean;
+	numbers?: number[];
+}
+
+export type DifficultyLevel = 'very_easy' | 'easy' | 'medium' | 'hard' | 'very_hard';
+
+export interface AccountTicket {
 	accountId: number;
 	phone: string;
-  tokenOk: boolean;
-  wsTokenOk: boolean;
-	connected: boolean;
-	lastStatus: string;
-	lastBetAt: number | null;
-	lastSpots: number[] | null;
-	lastStake: number | null;
-	state: 'idle' | 'betting' | 'won' | 'lost' | 'pending' | 'error';
-	winAmount: number | null;
+	tickets: BotTicket[];
+	lastDraw?: number;
+	lastWin?: number;
+	balanceHistory: number[];
+}
+
+export interface RoundTicket {
+	accountId: number;
+	spots: number[];
+	stake: number;
+	strategy: string;
+	difficulty: DifficultyLevel;
+}
+
+export interface TicketPerformance {
+	ticketId: string;
+	strategy: string;
+	timesPlayed: number;
+	wins: number;
+	totalStaked: number;
+	totalWon: number;
+	lastWinAt: number | null;
+	avgStake: number;
+}
+
+export interface StrategyPerformance {
+	[key: string]: {
+		timesPlayed: number;
+		wins: number;
+		totalStaked: number;
+		totalWon: number;
+		winRate: number;
+		lastResult: 'win' | 'loss' | 'pending';
+	};
+}
+
+export interface DifficultyAnalysis {
+	level: DifficultyLevel;
+	repetitiveScore: number;
+	clusterScore: number;
+	patternScore: number;
+	standardScore: number;
+	recommendation: 'cluster' | 'standard' | 'pattern';
+}
+
+export interface RoundSummary {
+	roundNo: number;
+	totalTickets: number;
+	totalStaked: number;
+	totalWon: number;
+	tickets: RoundTicket[];
+}
+
+export interface TicketGenerationResult {
+	success: boolean;
+	tickets: RoundTicket[];
+	errors: string[];
+}
+
+export interface ManualBetResponse {
+	ok: boolean;
+	accountId?: number;
+	phone?: string;
+	balance?: number;
+	stake?: number;
+	message?: string;
+	placed?: {
+		accountId: number;
+		phone: string;
+		stake: number;
+		requestId: string;
+		status: string;
+	};
+	failReason?: string;
+}
+
+export interface EligibleAccount {
+	accountId: number;
+	phone: string;
 	balance: number;
-	deleted: boolean;
-	updatedAt: number;
+	connected: boolean;
+}
+
+export interface EligibleAccountsResponse {
+	ok: boolean;
+	accounts: EligibleAccount[];
 }

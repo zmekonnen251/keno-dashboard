@@ -1,0 +1,81 @@
+'use client';
+
+import { Badge } from '@/components/ui/badge';
+import { Empty } from '@/components/app';
+import type { AccountGameStatus } from '@/lib/types';
+import { CollapsibleCard } from './CollapsibleCard';
+import { stateTone } from './utils';
+
+export function AccountStatusCard({ accounts, running }: { accounts: AccountGameStatus[]; running: boolean }) {
+	return (
+		<CollapsibleCard title={`Account game status${running ? ' (live)' : ''}`} defaultOpen={false}>
+			{!accounts || accounts.length === 0 ? (
+				<Empty label='No active workers. Start autoplay to open gateway connections.' />
+			) : (
+				<div className='overflow-x-auto'>
+					<table className='w-full text-xs'>
+						<thead>
+							<tr className='border-b border-border text-left text-muted-foreground'>
+								<th className='px-2 py-1.5 font-medium'>Account</th>
+								<th className='px-2 py-1.5 font-medium'>State</th>
+								<th className='px-2 py-1.5 font-medium'>Last bet</th>
+								<th className='px-2 py-1.5 font-medium'>Win</th>
+								<th className='px-2 py-1.5 font-medium'>Balance</th>
+								<th className='px-2 py-1.5 font-medium'>Socket</th>
+							</tr>
+						</thead>
+						<tbody>
+							{accounts.map((a) => (
+								<tr key={a.accountId} className='border-b border-border/60'>
+									<td className='px-2 py-2'>
+										<div className='font-medium'>#{a.accountId}</div>
+										<div className='text-muted-foreground'>{a.phone}</div>
+									</td>
+									<td className='px-2 py-2'>
+										<Badge variant={stateTone(a.state)}>{a.state}</Badge>
+										{a.deleted && (
+											<Badge variant='destructive' className='ml-1'>
+												deleted
+											</Badge>
+										)}
+									</td>
+									<td className='px-2 py-2'>
+										{a.lastSpots ? (
+											<>
+												<div className='font-mono'>[{a.lastSpots.join(',')}]</div>
+												<div className='text-muted-foreground'>{a.lastStake ?? '—'} ETB</div>
+											</>
+										) : (
+											<span className='text-muted-foreground'>—</span>
+										)}
+									</td>
+									<td className='px-2 py-2'>
+										{a.winAmount != null ? (
+											<span className={a.winAmount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}>
+												{a.winAmount > 0 ? '+' : ''}
+												{a.winAmount} ETB
+											</span>
+										) : (
+											<span className='text-muted-foreground'>—</span>
+										)}
+									</td>
+									<td className='px-2 py-2'>
+										<div className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
+											{typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance} ETB
+										</div>
+									</td>
+									<td className='px-2 py-2'>
+										<div className={a.connected ? 'text-emerald-500' : 'text-muted-foreground'}>
+											{a.connected ? 'connected' : 'offline'}
+										</div>
+										<div className='text-muted-foreground'>{a.lastStatus}</div>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+		</CollapsibleCard>
+	);
+}
