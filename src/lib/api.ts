@@ -25,6 +25,7 @@ import type {
   ManualBetResponse,
   EligibleAccountsResponse,
   CleanupSpentResponse,
+  LiveBalancesResponse,
 } from './types';
 
 // ---- auth ----
@@ -223,6 +224,10 @@ export async function cleanupSpentAccounts(): Promise<CleanupSpentResponse> {
   return apiFetch<CleanupSpentResponse>('api/accounts/autoplay/cleanup-spent', {
     method: 'POST',
   });
+}
+
+export async function getLiveBalances(): Promise<LiveBalancesResponse> {
+  return apiFetch<LiveBalancesResponse>('api/accounts/autoplay/balances-live');
 }
 
 // ---- proxies ----

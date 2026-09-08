@@ -8,6 +8,7 @@ import {
 	refreshTokens,
 	testAutoplayRound,
 	syncBalances,
+	getLiveBalances,
 } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export default function AutoplayPage() {
 	const [testMsg, setTestMsg] = useState('');
 	const [refreshing, setRefreshing] = useState(false);
 	const [syncing, setSyncing] = useState(false);
+	const [checking, setChecking] = useState(false);
 	const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
 	const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
 	const [manualPicks, setManualPicks] = useState<number[]>([]);
@@ -100,6 +102,19 @@ export default function AutoplayPage() {
 		}
 	}
 
+	async function onCheckLiveBalances() {
+		setChecking(true);
+		try {
+			const res = await getLiveBalances();
+			setTestMsg(`Live balances: ${res.wsHits} from gateway streams, ${res.stored} stored (total ${res.count}).`);
+			refresh();
+		} catch (e) {
+			setTestMsg('Live balance check failed: ' + (e instanceof Error ? e.message : String(e)));
+		} finally {
+			setChecking(false);
+		}
+	}
+
 	return (
 		<div className='space-y-5'>
 			<div className='flex flex-wrap items-center justify-between gap-3'>
@@ -120,6 +135,9 @@ export default function AutoplayPage() {
 					</Button>
 					<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
 						{syncing ? 'Syncing…' : 'Sync wallets'}
+					</Button>
+					<Button variant='outline' onClick={onCheckLiveBalances} disabled={checking}>
+						{checking ? 'Checking…' : 'WS balances'}
 					</Button>
 				</div>
 			</div>

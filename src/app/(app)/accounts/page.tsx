@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ export default function AccountsPage() {
   const [createMsg, setCreateMsg] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [checking, setChecking] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleanMsg, setCleanMsg] = useState('');
 
@@ -127,6 +128,19 @@ export default function AccountsPage() {
     }
   }
 
+  async function onCheckLiveBalances() {
+    setChecking(true);
+    try {
+      const res = await getLiveBalances();
+      setSyncMsg(`Live balances: ${res.wsHits} from gateway streams, ${res.stored} stored (total ${res.count}).`);
+      refresh();
+    } catch (e) {
+      setSyncMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setChecking(false);
+    }
+  }
+
   async function onCleanupSpent() {
     if (!data) return;
     const eligible = data.accounts.filter((a) => (a.balance ?? 0) < 2 && a.last_bet_at != null);
@@ -165,6 +179,9 @@ export default function AccountsPage() {
 					</Button>
 					<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
 						{syncing ? 'Syncing…' : 'Sync wallets'}
+					</Button>
+					<Button variant='outline' onClick={onCheckLiveBalances} disabled={checking}>
+						{checking ? 'Checking…' : 'WS balances'}
 					</Button>
 					<Button variant='outline' onClick={refresh}>
 						Refresh

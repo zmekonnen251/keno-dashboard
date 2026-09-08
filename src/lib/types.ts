@@ -527,3 +527,19 @@ export interface CleanupSpentResponse {
 	skippedPending: number[];
 	errors?: string[];
 }
+
+export interface LiveBalanceEntry {
+	accountId: number;
+	phone: string;
+	balance: number;
+	source: 'ws' | 'stored';
+	connected: boolean;
+}
+
+export interface LiveBalancesResponse {
+	ok: boolean;
+	count: number;
+	wsHits: number;
+	stored: number;
+	accounts: LiveBalanceEntry[];
+}
