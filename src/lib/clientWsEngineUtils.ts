@@ -49,9 +49,11 @@ export const MODE_A_BASELINE: number[][] = [
 ];
 
 export function randRequestId(): string {
-	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-	let s = '';
-	for (let i = 0; i < 4; i++)
+	// Timestamp prefix + randomness: unique across thousands of bets per day
+	// (short random IDs collide and corrupt same-id bet records).
+	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+	let s = Date.now().toString(36).toUpperCase();
+	for (let i = 0; i < 6; i++)
 		s += chars[Math.floor(Math.random() * chars.length)];
 	return s;
 }
