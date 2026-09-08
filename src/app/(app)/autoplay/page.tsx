@@ -18,6 +18,7 @@ import { StatOverview } from '@/components/autoplay/StatOverview';
 import { SignalPanel } from '@/components/autoplay/SignalPanel';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
+import { LiveDrawBoard } from '@/components/autoplay/LiveDrawBoard';
 import { BetLogCard } from '@/components/autoplay/BetLogCard';
 import { ActiveBettingCard } from '@/components/autoplay/ActiveBettingCard';
 import { AccountStatusCard } from '@/components/autoplay/AccountStatusCard';
@@ -30,6 +31,7 @@ export default function AutoplayPage() {
 	const [syncing, setSyncing] = useState(false);
 	const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
 	const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
+	const [manualPicks, setManualPicks] = useState<number[]>([]);
 
 	useGatewayGameState(setGameState);
 
@@ -136,6 +138,8 @@ export default function AutoplayPage() {
 
 			<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
 
+			<LiveDrawBoard picks={manualPicks} />
+
 			<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
 
 			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} />
@@ -146,11 +150,12 @@ export default function AutoplayPage() {
 				accounts={accounts}
 				onMessage={setTestMsg}
 				onRefresh={refresh}
+				onPicksChange={setManualPicks}
 			/>
 
 			<ActiveBettingCard accounts={accounts} running={conn?.running ?? false} />
 
-			<BetLogCard bets={bets} />
+			<BetLogCard bets={bets} accounts={accounts} />
 
 			<AccountStatusCard accounts={accounts} running={conn?.running ?? false} />
 		</div>

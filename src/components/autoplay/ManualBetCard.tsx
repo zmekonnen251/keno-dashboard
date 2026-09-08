@@ -37,12 +37,14 @@ export function ManualBetCard({
 	accounts,
 	onMessage,
 	onRefresh,
+	onPicksChange,
 }: {
 	running: boolean;
 	recurrence?: RecurrenceSignal | null;
 	accounts: AccountGameStatus[];
 	onMessage: (msg: string) => void;
 	onRefresh: () => void;
+	onPicksChange?: (spots: number[]) => void;
 }) {
 	const [spotsCount, setSpotsCount] = useState<2 | 3>(3);
 	const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
@@ -60,6 +62,10 @@ export function ManualBetCard({
 	const [genCount, setGenCount] = useState(0);
 
 	const stakeNum = parseFloat(manualStake) || 2;
+
+	useEffect(() => {
+		onPicksChange?.(selectedSpots);
+	}, [selectedSpots, onPicksChange]);
 
 	useEffect(() => {
 		if (accountMode !== 'manual') return;
