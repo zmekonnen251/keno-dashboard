@@ -16,6 +16,7 @@ import { useSocket } from '@/lib/service-gateway';
 import { useGatewayGameState } from '@/lib/gateway-game-state';
 import { StatOverview } from '@/components/autoplay/StatOverview';
 import { SignalPanel } from '@/components/autoplay/SignalPanel';
+import { CollapsibleCard } from '@/components/autoplay/CollapsibleCard';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
 import { LiveDrawBoard } from '@/components/autoplay/LiveDrawBoard';
@@ -136,11 +137,15 @@ export default function AutoplayPage() {
 
 			{testMsg && <p className='text-sm text-muted-foreground'>{testMsg}</p>}
 
-			<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
+			<CollapsibleCard title='Stats' defaultOpen={true}>
+				<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
+			</CollapsibleCard>
 
 			<LiveDrawBoard picks={manualPicks} />
 
-			<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
+			<CollapsibleCard title='Signals' defaultOpen={false}>
+				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
+			</CollapsibleCard>
 
 			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} />
 
