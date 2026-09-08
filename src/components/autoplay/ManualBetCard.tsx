@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/app';
 import { getEligibleAccounts, placeManualBet } from '@/lib/api';
 import type { AccountGameStatus, BotTicket, EligibleAccount, RecurrenceSignal } from '@/lib/types';
-import { NumberGrid } from './NumberGrid';
+import { NumberGrid, type BoardMarker } from './NumberGrid';
 import {
 	DIFFICULTY_OPTIONS,
 	STRATEGY_OPTIONS,
@@ -148,6 +148,12 @@ export function ManualBetCard({
 	}
 
 	const chips = suggestionChips(recurrence ?? null, spotsCount);
+	const markers: Partial<Record<number, BoardMarker>> = {};
+	for (const c of chips) {
+		for (const n of c.numbers) {
+			if (!selectedSpots.includes(n)) markers[n] = 'suggested';
+		}
+	}
 	const manualAccounts = accountMode === 'manual' ? (eligible.length > 0 ? eligible : accounts.map((a) => ({ accountId: a.accountId, phone: a.phone, balance: a.balance, connected: a.connected }))) : [];
 
 	return (
@@ -175,7 +181,7 @@ export function ManualBetCard({
 
 				<div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
 					<div>
-						<NumberGrid selected={selectedSpots} max={spotsCount} onToggle={toggleNumber} onClear={() => setSelectedSpots([])} />
+						<NumberGrid selected={selectedSpots} max={spotsCount} onToggle={toggleNumber} onClear={() => setSelectedSpots([])} markers={markers} />
 					</div>
 					<div className='space-y-3'>
 						<div className='grid grid-cols-2 gap-2'>
