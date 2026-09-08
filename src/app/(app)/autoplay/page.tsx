@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import {
   refreshTokens,
   testAutoplayRound,
   syncBalances,
+  placeManualBet,
 } from '@/lib/api';
 import type { AutoplayPlacedBet } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
@@ -77,6 +79,12 @@ export default function AutoplayPage() {
   const [syncing, setSyncing] = useState(false);
   const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
   const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
+  const [showAccountSelector, setShowAccountSelector] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [manualStake, setManualStake] = useState('');
+  const [manualBetPlaced, setManualBetPlaced] = useState(false);
+  const [autoMode, setAutoMode] = useState(true); // true = auto, false = manual
+  const [manualAccountSelection, setManualAccountSelection] = useState(false);
 
   useGatewayGameState(setGameState);
 
@@ -412,7 +420,7 @@ export default function AutoplayPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+<div className="mt-4 flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
               <input
                 id="repBet"
                 type="checkbox"
@@ -421,11 +429,39 @@ export default function AutoplayPage() {
                 className="h-4 w-4 accent-blue-600"
               />
               <Label htmlFor="repBet" className="cursor-pointer">
-                Auto-bet recent repetitive tickets (recurrence &amp; pattern-trend picks lead the round)
+                Auto-bet recent repetitive tickets (recurrence & pattern-trend picks lead the round)
               </Label>
               <span className="ml-auto text-xs text-muted-foreground">
                 Chains · overdue/time patterns · carryover
               </span>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                id="manualMode"
+                type="checkbox"
+                checked={!autoMode}
+                onChange={(e) => setAutoMode(!e.target.checked)}
+                className="h-4 w-4 accent-blue-600"
+              />
+              <Label htmlFor="manualMode" className="cursor-pointer">
+                Manual account selection
+              </Label>
+              <span className="text-xs text-muted-foreground">
+                Server selects eligible account auto-matically
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2" style={{ display: autoMode ? 'none' : 'block' }}>
+              <Label>Select Account</Label>
+              <select
+                value={manualAccountSelection ? 'selected' : ''}
+                onChange={(e) => setManualAccountSelection(e.target.value === 'manual')}
+                className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+              >
+                <option value="auto">Auto (server selects)</option>
+                <option value="manual">Manual (select below)</option>
+              </select>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -447,7 +483,7 @@ export default function AutoplayPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
+<div className="mt-4 flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
                 {cfg?.base_tickets?.length ?? 0} ticket(s) saved · Updated {formatTime(cfg?.updated_at)}
               </div>
@@ -455,10 +491,73 @@ export default function AutoplayPage() {
                 {saving ? 'Saving…' : 'Save configuration'}
               </Button>
             </div>
-          </>
-        )}
-      </Card>
 
+          {/* Manual bet section - collapsible card */}
+              <Card title="Manual bet"
+              className="mt-3"
+              >
+            <div className="p-3">
+              <p className="text-sm text-muted-foreground mb-2">
+                Place a bet manually. Stake must be &gt;= 2 ETB. If stake &gt; 2, server selects account with sufficient balance.{" "}
+                <span className="font-medium" onClick={() => setAutoMode(!autoMode)}>
+                  {autoMode ? 'Auto mode' : 'Manual mode'}
+                </span>
+              </p>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <div>
+                  <Label>Stake (ETB)</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    value={manualStake}
+                    onChange={(e) => setManualStake(e.target.value)}
+                    placeholder="2"
+                    defaultValue="2"
+                  />
+                </div>
+                <div>
+                  <Label>Mode</Label>
+                  <select
+                    value={autoMode ? 'auto' : 'manual'}
+                    onChange={(e) => setAutoMode(e.target.value === 'manual')}
+                    className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                  >
+                    <option value="auto">Auto (server selects eligible account)</option>
+                    <option value="manual">Manual (select specific account)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3">
+                <Button
+                  onClick={async () => {
+                    const stakeNum = parseFloat(manualStake) || 2;
+                    setManualBetPlaced(true);
+                    try {
+                      const res = await placeManualBet(stakeNum, selectedAccounts.length > 0 ? selectedAccounts[0] : undefined);
+                      if (res.ok) {
+                        setTestMsg(`Bet placed! Account: ${res.placed?.accountId || 'auto-selected'}`);
+                        setManualBetPlaced(false);
+                        refresh();
+                      } else {
+                        setTestMsg(`Bet failed: ${res.failReason || 'unknown error'}`);
+                        setManualBetPlaced(false);
+                      }
+                    } catch (e) {
+                      setTestMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+                      setManualBetPlaced(false);
+                    }
+                  }}
+                  disabled={saving || testing || !conn?.running}
+                >
+                  {saving || testing ? 'Placing…' : manualBetPlaced ? 'Placed!' : 'Place bet'}
+                </Button>
+              </div>
+            </div>
+        </Card>
+        </>
+        )
+        }
+     </Card>
       <Card title="Bet log (live)">
         {bets.length === 0 ? (
           <Empty label="No bets recorded yet. Start autoplay or run a test round." />

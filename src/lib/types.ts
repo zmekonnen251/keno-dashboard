@@ -254,6 +254,7 @@ export interface AutoplayConfig {
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
+	manual_account_selection: boolean; // true = admin selects account, false = server selects auto
 }
 
 // Live recurrence / pattern-trend signal used to auto-bet recent repetitive
