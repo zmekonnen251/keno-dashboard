@@ -4,10 +4,18 @@ import { Button } from '@/components/ui/button';
 
 export type BoardMarker = 'hot' | 'suggested';
 
-const MARKER_DOT: Record<BoardMarker, string> = {
-	hot: 'bg-red-500',
-	suggested: 'bg-sky-400',
-};
+// Board styles live here (same approach as the extension popup `.ball`
+// styles) so the 10-column grid renders even if the Tailwind build is stale.
+const BOARD_CSS = `
+.keno-board-panel { border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: #141a26; padding: 12px; }
+.keno-board { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
+.keno-tile { position: relative; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: #242c3d; color: #f1f5f9; font-size: 14px; font-weight: 800; font-family: inherit; border: 1px solid rgba(255, 255, 255, 0.06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); cursor: pointer; padding: 0; margin: 0; min-width: 0; }
+.keno-tile:hover { background: #2c3547; }
+.keno-tile.picked { background: #22c55e; color: #ffffff; box-shadow: 0 0 10px rgba(34, 197, 94, 0.45); }
+.keno-dot { position: absolute; top: 4px; right: 4px; height: 6px; width: 6px; border-radius: 9999px; }
+.keno-dot.hot { background: #ef4444; }
+.keno-dot.suggested { background: #38bdf8; }
+`;
 
 /** Keno board styled like the real game: dark tiles, bold white numbers, green picks. */
 export function NumberGrid({
@@ -24,7 +32,8 @@ export function NumberGrid({
 	markers?: Partial<Record<number, BoardMarker>>;
 }) {
 	return (
-		<div className='rounded-xl border border-white/10 bg-[#141a26] p-3'>
+		<div className='keno-board-panel'>
+			<style>{BOARD_CSS}</style>
 			<div className='mb-2 flex items-center justify-between'>
 				<span className='text-xs font-semibold text-slate-300'>
 					{selected.length}/{max} selected
@@ -33,7 +42,7 @@ export function NumberGrid({
 					Clear
 				</Button>
 			</div>
-			<div className='grid grid-cols-10 gap-1.5'>
+			<div className='keno-board'>
 				{Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
 					const active = selected.includes(n);
 					const marker = markers?.[n];
@@ -43,16 +52,10 @@ export function NumberGrid({
 							type='button'
 							onClick={() => onToggle(n)}
 							aria-pressed={active}
-							className={
-								active
-									? 'relative flex aspect-square items-center justify-center rounded-md bg-[#22c55e] text-sm font-extrabold text-white shadow-[0_0_10px_rgba(34,197,94,0.45)]'
-									: 'relative flex aspect-square items-center justify-center rounded-md bg-[#242c3d] text-sm font-extrabold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[#2c3547]'
-							}
+							className={active ? 'keno-tile picked' : 'keno-tile'}
 						>
 							{n}
-							{!active && marker && (
-								<span className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${MARKER_DOT[marker]}`} />
-							)}
+							{!active && marker && <span className={`keno-dot ${marker}`} />}
 						</button>
 					);
 				})}
