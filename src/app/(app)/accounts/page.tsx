@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,6 +141,22 @@ export default function AccountsPage() {
     }
   }
 
+  async function onCheckBalance(id: number, phone: string) {
+    setSyncMsg(`Checking live balance for +${phone}…`);
+    try {
+      const res = await checkBalances(id, true);
+      const row = res.results?.[0];
+      setSyncMsg(
+        row && !row.failed && row.balance != null
+          ? `+${phone}: ${row.balance} ETB (verified from game server).`
+          : `+${phone}: check failed.`
+      );
+      refresh();
+    } catch (e) {
+      setSyncMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   async function onCleanupSpent() {
     if (!data) return;
     const eligible = data.accounts.filter((a) => (a.balance ?? 0) < 2 && a.last_bet_at != null);
@@ -274,7 +290,7 @@ export default function AccountsPage() {
 				<DataTable
 					columns={columns}
 					data={data.accounts}
-					meta={{ onDelete, onRefreshWsToken, onToggleEnabled }}
+					meta={{ onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance }}
 					groupOptions={[
 						{
 							value: 'provider',
@@ -287,6 +303,7 @@ export default function AccountsPage() {
 							onDelete={onDelete}
 							onRefreshWsToken={onRefreshWsToken}
 							onToggleEnabled={onToggleEnabled}
+							onCheckBalance={onCheckBalance}
 						/>
 					)}
 				/>

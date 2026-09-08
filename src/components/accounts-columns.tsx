@@ -18,6 +18,7 @@ import {
 	PowerOff,
 	RefreshCw,
 	Trash2,
+	Wallet,
 	Wifi,
 	WifiOff,
 } from 'lucide-react';
@@ -155,7 +156,7 @@ export function CopyPhoneButton({ phone }: { phone: string }) {
 	);
 }
 
-export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void }) {
+export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void; onCheckBalance: (id: number, phone: string) => void }) {
 	return (
 		<TooltipProvider>
 			<article className='rounded-lg border bg-card p-4 text-sm shadow-sm'>
@@ -184,6 +185,9 @@ export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggl
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => onRefreshWsToken(account.id)}>
 								<RefreshCw /> Refresh WS token
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => onCheckBalance(account.id, account.phone)}>
+								<Wallet /> Check balance
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem variant='destructive' onClick={() => onDelete(account.id)}>
@@ -311,6 +315,18 @@ export const columns = columnHelper.columns([
           }
         >
           Refresh Token
+        </Button>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={ () =>
+             (table.options.meta as { onCheckBalance: (id: number, phone: string) => void }).onCheckBalance(
+              row.original.id,
+              row.original.phone
+            )
+          }
+        >
+          <Wallet className='size-3.5' /> Check
         </Button>
       </div>
 		),

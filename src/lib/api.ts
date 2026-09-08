@@ -207,10 +207,11 @@ export async function getEligibleAccounts(stake?: number): Promise<EligibleAccou
   });
 }
 
-export async function checkBalances(id?: number): Promise<CheckBalancesResponse> {
+export async function checkBalances(id?: number, forceRest = false): Promise<CheckBalancesResponse> {
   const q = typeof id === 'number' ? `?id=${id}` : '';
   return apiFetch<CheckBalancesResponse>(`api/accounts/autoplay/check-balances${q}`, {
     method: 'POST',
+    body: JSON.stringify({ forceRest }),
   });
 }
 
