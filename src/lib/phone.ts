@@ -20,6 +20,14 @@ export interface ParsedAccountFile {
   rejected: number;
 }
 
+// 9-digit local number for copying (strip +251 / leading 0 country prefix).
+// Stored phones look like 2517…/2519…, so this returns the trailing 9 digits.
+export function toLocalPhone(phone: unknown): string {
+  const digits = String(phone ?? '').replace(/\D+/g, '');
+  const withoutCountry = digits.startsWith('251') ? digits.slice(3) : digits.replace(/^0/, '');
+  return withoutCountry.slice(-9);
+}
+
 // Parse .csv / .json text into normalized rows. CSV: phone,password[,token].
 // JSON: {accounts:[{phone|number,password,token?}]} or array of the same.
 export function parseAccountFile(text: string, filename: string): ParsedAccountFile {

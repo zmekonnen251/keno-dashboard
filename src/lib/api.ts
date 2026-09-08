@@ -24,6 +24,7 @@ import type {
   LogsResponse,
   ManualBetResponse,
   EligibleAccountsResponse,
+  CleanupSpentResponse,
 } from './types';
 
 // ---- auth ----
@@ -214,6 +215,12 @@ export async function checkBalances(id?: number): Promise<CheckBalancesResponse>
 
 export async function syncBalances(): Promise<CheckBalancesResponse> {
   return apiFetch<CheckBalancesResponse>('api/accounts/autoplay/sync-balances', {
+    method: 'POST',
+  });
+}
+
+export async function cleanupSpentAccounts(): Promise<CleanupSpentResponse> {
+  return apiFetch<CleanupSpentResponse>('api/accounts/autoplay/cleanup-spent', {
     method: 'POST',
   });
 }

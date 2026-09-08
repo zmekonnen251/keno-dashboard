@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,8 @@ export default function AccountsPage() {
   const [createMsg, setCreateMsg] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanMsg, setCleanMsg] = useState('');
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -125,15 +127,42 @@ export default function AccountsPage() {
     }
   }
 
+  async function onCleanupSpent() {
+    if (!data) return;
+    const eligible = data.accounts.filter((a) => (a.balance ?? 0) < 2 && a.last_bet_at != null);
+    if (eligible.length === 0) return;
+    const ok = window.confirm(
+      `Delete ${eligible.length} spent account(s)?\n\nThese placed at least one bet, are below 2 ETB, and have no unsettled bets. Fresh (never-bet) accounts are never touched.`
+    );
+    if (!ok) return;
+    setCleaning(true);
+    setCleanMsg('');
+    try {
+      const res = await cleanupSpentAccounts();
+      const skipped = res.skippedPending.length > 0 ? ` ${res.skippedPending.length} skipped (bet still pending).` : '';
+      setCleanMsg(`Deleted ${res.deleted} of ${res.candidates} spent account(s).${skipped}`);
+      refresh();
+    } catch (e) {
+      setCleanMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setCleaning(false);
+    }
+  }
+
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No accounts" />;
+
+  const spentIdleCount = data.accounts.filter((a) => (a.balance ?? 0) < 2 && a.last_bet_at != null).length;
 
   return (
 		<div className='space-y-5'>
 			<div className='flex flex-wrap items-center justify-between gap-3'>
 				<h2 className='text-lg font-bold text-foreground'>Accounts</h2>
-				<div className='flex gap-2'>
+				<div className='flex flex-wrap gap-2'>
+					<Button variant='outline' onClick={onCleanupSpent} disabled={cleaning || spentIdleCount === 0}>
+						{cleaning ? 'Deleting…' : `Delete spent idle (${spentIdleCount})`}
+					</Button>
 					<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
 						{syncing ? 'Syncing…' : 'Sync wallets'}
 					</Button>
@@ -145,9 +174,11 @@ export default function AccountsPage() {
 			<p className='text-xs text-muted-foreground'>
 				Balance is the live ToloBirr wallet, written to the database every
 				couple of minutes (and when you click Sync wallets). New accounts start
-				at 2 ETB until the first sync.
+				at 2 ETB until the first sync. “Spent idle” means: placed at least one
+				bet, below 2 ETB, and no unsettled bet — safe to delete in one click.
 			</p>
 			{syncMsg && <p className='text-xs text-muted-foreground'>{syncMsg}</p>}
+			{cleanMsg && <p className='text-xs text-muted-foreground'>{cleanMsg}</p>}
 
 			<div className='grid grid-cols-1 gap-5 lg:grid-cols-2'>
 				<Card title='Create accounts'>

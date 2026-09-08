@@ -7,8 +7,11 @@ import { type Account } from '@/lib/types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { formatTime } from '@/lib/format';
+import { toLocalPhone } from '@/lib/phone';
 import { GATEWAY_URL } from '@/hooks/useGatewayWorker';
 import {
+	Check,
+	Copy,
 	LoaderCircle,
 	MoreVertical,
 	Power,
@@ -115,13 +118,53 @@ export function TestGatewayConnection({ token }: { token?: string | null }) {
 	);
 }
 
+export function CopyPhoneButton({ phone }: { phone: string }) {
+	const [copied, setCopied] = useState(false);
+
+	async function onCopy() {
+		const local = toLocalPhone(phone);
+		try {
+			await navigator.clipboard.writeText(local);
+		} catch {
+			// Fallback for non-secure contexts where the Clipboard API is unavailable.
+			const ta = document.createElement('textarea');
+			ta.value = local;
+			document.body.appendChild(ta);
+			ta.select();
+			try {
+				document.execCommand('copy');
+			} catch {
+				// Ignore — the primary Clipboard API path already failed.
+			}
+			document.body.removeChild(ta);
+		}
+		setCopied(true);
+		window.setTimeout(() => setCopied(false), 1500);
+	}
+
+	return (
+		<Button
+			variant='ghost'
+			size='icon-xs'
+			aria-label='Copy 9-digit phone number'
+			title='Copy 9-digit number (without country code)'
+			onClick={onCopy}
+		>
+			{copied ? <Check /> : <Copy />}
+		</Button>
+	);
+}
+
 export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void }) {
 	return (
 		<TooltipProvider>
 			<article className='rounded-lg border bg-card p-4 text-sm shadow-sm'>
 				<div className='flex items-start justify-between gap-3'>
 					<div className='min-w-0'>
-						<p className='truncate font-mono text-sm font-medium'>+{account.phone}</p>
+						<p className='flex items-center gap-1 truncate font-mono text-sm font-medium'>
+							+{account.phone}
+							<CopyPhoneButton phone={account.phone} />
+						</p>
 						<p className='mt-1 text-xs capitalize text-muted-foreground'>{account.provider}</p>
 					</div>
 					<DropdownMenu>
@@ -186,6 +229,12 @@ const columnHelper = createColumnHelper<DataTableFeatures, Account>();
 export const columns = columnHelper.columns([
 	columnHelper.accessor('phone', {
 		header: 'Phone',
+		cell: ({ row }) => (
+			<span className='inline-flex items-center gap-1 font-mono'>
+				{row.original.phone}
+				<CopyPhoneButton phone={row.original.phone} />
+			</span>
+		),
 	}),
 	columnHelper.accessor('provider', {
 		header: 'Provider',

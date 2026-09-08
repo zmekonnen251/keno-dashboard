@@ -519,3 +519,11 @@ export interface EligibleAccountsResponse {
 	ok: boolean;
 	accounts: EligibleAccount[];
 }
+
+export interface CleanupSpentResponse {
+	ok: boolean;
+	candidates: number;
+	deleted: number;
+	skippedPending: number[];
+	errors?: string[];
+}
