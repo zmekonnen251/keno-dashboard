@@ -1,16 +1,25 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Empty } from '@/components/app';
 import type { AccountGameStatus } from '@/lib/types';
 import { CollapsibleCard } from './CollapsibleCard';
 import { stateTone } from './utils';
 
+// Live view: only accounts with a connected socket. Disconnected workers are
+// not live bets, so they stay out of this card (see the autoplay pool in the
+// config/status overview for the full list).
 export function AccountStatusCard({ accounts, running }: { accounts: AccountGameStatus[]; running: boolean }) {
+	const connected = useMemo(() => accounts.filter((a) => a.connected), [accounts]);
+
 	return (
-		<CollapsibleCard title={`Account game status${running ? ' (live)' : ''}`} defaultOpen={false}>
-			{!accounts || accounts.length === 0 ? (
-				<Empty label='No active workers. Start autoplay to open gateway connections.' />
+		<CollapsibleCard
+			title={`Account game status${running ? ' (live)' : ''} · ${connected.length} connected`}
+			defaultOpen={true}
+		>
+			{connected.length === 0 ? (
+				<Empty label='No connected sockets. Start autoplay to open gateway connections.' />
 			) : (
 				<div className='overflow-x-auto'>
 					<table className='w-full text-xs'>
@@ -25,7 +34,7 @@ export function AccountStatusCard({ accounts, running }: { accounts: AccountGame
 							</tr>
 						</thead>
 						<tbody>
-							{accounts.map((a) => (
+							{connected.map((a) => (
 								<tr key={a.accountId} className='border-b border-border/60'>
 									<td className='px-2 py-2'>
 										<div className='font-medium'>#{a.accountId}</div>
@@ -65,9 +74,7 @@ export function AccountStatusCard({ accounts, running }: { accounts: AccountGame
 										</div>
 									</td>
 									<td className='px-2 py-2'>
-										<div className={a.connected ? 'text-emerald-500' : 'text-muted-foreground'}>
-											{a.connected ? 'connected' : 'offline'}
-										</div>
+										<div className='text-emerald-500'>connected</div>
 										<div className='text-muted-foreground'>{a.lastStatus}</div>
 									</td>
 								</tr>

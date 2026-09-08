@@ -75,6 +75,22 @@ export function DataTable<TData extends RowData>({
 		state: { sorting, pagination, columnFilters, columnVisibility, grouping },
 		autoResetPageIndex: false,
 	});
+	// Mobile cards have no column headers, so header sorting is desktop-only.
+	// This dropdown gives the card layout the same sorting (e.g. by balance).
+	const sortableColumns = useMemo(() => table.getAllColumns().filter((column) => column.getCanSort()), [table]);
+	const sortValue = sorting.length > 0 ? `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}` : 'none';
+	const prettyColumnName = useCallback(
+		(id: string) => id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+		[],
+	);
+	const onMobileSortChange = useCallback((value: string) => {
+		if (value === 'none') {
+			setSorting([]);
+			return;
+		}
+		const sep = value.lastIndexOf(':');
+		setSorting([{ id: value.slice(0, sep), desc: value.slice(sep + 1) === 'desc' }]);
+	}, []);
 
 	return (
 		<div className='space-y-3'>
@@ -100,6 +116,29 @@ export function DataTable<TData extends RowData>({
 						{option.label}
 					</Button>
 				))}
+				{sortableColumns.length > 0 && (
+					<div className='flex items-center gap-2 md:hidden'>
+						<span className='text-sm text-muted-foreground'>Sort</span>
+						<Select value={sortValue} onValueChange={onMobileSortChange}>
+							<SelectTrigger size='sm' aria-label='Sort rows'>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value='none'>Default order</SelectItem>
+								{sortableColumns.map((column) => (
+									<SelectItem key={`${column.id}:asc`} value={`${column.id}:asc`}>
+										{prettyColumnName(column.id)} ↑
+									</SelectItem>
+								))}
+								{sortableColumns.map((column) => (
+									<SelectItem key={`${column.id}:desc`} value={`${column.id}:desc`}>
+										{prettyColumnName(column.id)} ↓
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				)}
 			</div>
       {(isMobile && renderMobileRowCard) ? (
         <div className='space-y-3 md:hidden'>

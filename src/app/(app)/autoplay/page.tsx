@@ -19,8 +19,8 @@ import { SignalPanel } from '@/components/autoplay/SignalPanel';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
 import { LiveDrawBoard } from '@/components/autoplay/LiveDrawBoard';
-import { BetLogCard } from '@/components/autoplay/BetLogCard';
-import { ActiveBettingCard } from '@/components/autoplay/ActiveBettingCard';
+import { LastRoundBetsCard } from '@/components/autoplay/LastRoundBetsCard';
+import { BigWinsCard } from '@/components/autoplay/BigWinsCard';
 import { AccountStatusCard } from '@/components/autoplay/AccountStatusCard';
 
 export default function AutoplayPage() {
@@ -153,11 +153,11 @@ export default function AutoplayPage() {
 				onPicksChange={setManualPicks}
 			/>
 
-			<ActiveBettingCard accounts={accounts} running={conn?.running ?? false} />
-
-			<BetLogCard bets={bets} accounts={accounts} />
-
 			<AccountStatusCard accounts={accounts} running={conn?.running ?? false} />
+
+			<LastRoundBetsCard bets={bets} />
+
+			<BigWinsCard bets={bets} />
 		</div>
 	);
 }
