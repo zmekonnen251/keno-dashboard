@@ -21,9 +21,7 @@ import { CollapsibleCard } from '@/components/autoplay/CollapsibleCard';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
 import { GameView } from '@/components/autoplay/GameView';
-import { LastRoundBetsCard } from '@/components/autoplay/LastRoundBetsCard';
-import { BigWinsCard } from '@/components/autoplay/BigWinsCard';
-import { AccountStatusCard } from '@/components/autoplay/AccountStatusCard';
+import { Modal } from '@/components/ui/modal';
 
 export default function AutoplayPage() {
 	const { data: conn, error, loading, refresh } = useApi(() => autoplayStatus(), []);
@@ -35,6 +33,7 @@ export default function AutoplayPage() {
 	const [gameState, setGameState] = useState<'betting_open' | 'drawing' | 'settled' | 'unknown'>('unknown');
 	const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
 	const [manualPicks, setManualPicks] = useState<number[]>([]);
+	const [showConfig, setShowConfig] = useState(false);
 
 	useGatewayGameState(setGameState);
 
@@ -139,6 +138,9 @@ export default function AutoplayPage() {
 					<Button variant='outline' onClick={onCheckLiveBalances} disabled={checking}>
 						{checking ? 'Checking…' : 'WS balances'}
 					</Button>
+					<Button variant='outline' onClick={() => setShowConfig(true)}>
+						Configure
+					</Button>
 				</div>
 			</div>
 
@@ -176,11 +178,11 @@ export default function AutoplayPage() {
 				onPicksChange={setManualPicks}
 			/>
 
-			<AccountStatusCard accounts={accounts} running={conn?.running ?? false} />
-
-			<LastRoundBetsCard bets={bets} />
-
-			<BigWinsCard bets={bets} />
+			{showConfig && (
+				<Modal title='Autoplay configuration' onClose={() => setShowConfig(false)} wide>
+					<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} />
+				</Modal>
+			)}
 		</div>
 	);
 }

@@ -5,6 +5,7 @@ import type { AutoplayPlacedBet } from '@/lib/types';
 import { paytableWin } from '@/lib/kenoOdds';
 import { notificationPermission, playWinSound, pushWinNotification, requestNotificationPermission } from '@/lib/sound';
 import { isPushActive, pushSupported, subscribePush, unsubscribePush } from '@/lib/push';
+import { useNotifications } from '@/lib/notifications';
 import { useLiveDraw } from '@/lib/useLiveDraw';
 import { BOARD_CSS } from './boardStyles';
 
@@ -30,6 +31,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   const [pushOn, setPushOn] = useState(() => isPushActive());
   const [alerts, setAlerts] = useState<WinAlert[]>([]);
   const celebratedRef = useRef<Set<string>>(new Set());
+  const { notify } = useNotifications();
 
   const newest = useMemo(() => bets.reduce((m, b) => Math.max(m, b.placedAt ?? 0), 0), [bets]);
   const current = useMemo(
@@ -64,12 +66,13 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       const text = `Full match! [${spots.join(',')}] on #${b.accountId} — est. +${est} ETB`;
       if (soundOn) playWinSound();
       if (!pushOn && notifyOn) pushWinNotification('Keno full match!', text);
+      notify({ id: `win-${key}`, kind: 'win', text });
       setAlerts((prev) => [{ id: key, text, at: Date.now() }, ...prev].slice(0, 5));
     }
     if (celebratedRef.current.size > 200) {
       celebratedRef.current = new Set([...celebratedRef.current].slice(-100));
     }
-  }, [winners, soundOn, notifyOn, pushOn]);
+  }, [winners, soundOn, notifyOn, pushOn, notify]);
 
   async function onToggleNotifications() {
     if (pushOn || notifyOn) {

@@ -5,6 +5,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
+import { NotificationsBell } from './notifications-bell';
 
 export default function Header() {
   const { sites, siteId, setSiteId, siteName } = useSite();
@@ -32,6 +33,7 @@ export default function Header() {
             ))}
           </select>
         </label>
+        <NotificationsBell />
         <Button
           variant="ghost"
           size="icon-sm"
