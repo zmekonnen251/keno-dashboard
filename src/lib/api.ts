@@ -111,12 +111,17 @@ export async function refreshSession(id: number) {
 }
 
 // ---- accounts ----
-export async function getAccounts(provider = 'fungames'): Promise<AccountsResponse> {
-  return apiFetch<AccountsResponse>(`api/accounts?provider=${encodeURIComponent(provider)}`);
+export async function getAccounts(provider = 'fungames', includeDeleted = false): Promise<AccountsResponse> {
+  const q = `?provider=${encodeURIComponent(provider)}${includeDeleted ? '&includeDeleted=true' : ''}`;
+  return apiFetch<AccountsResponse>(`api/accounts${q}`);
 }
 
 export async function deleteAccount(id: number) {
   return apiFetch(`api/accounts/${id}`, { method: 'DELETE' });
+}
+
+export async function restoreAccount(id: number) {
+  return apiFetch<{ ok: boolean; id: number; restored: boolean }>(`api/accounts/${id}/restore`, { method: 'POST' });
 }
 
 // Enable/disable an account for autoplay. Disabled accounts are excluded from

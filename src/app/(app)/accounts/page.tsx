@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances } from '@/lib/api';
+import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances, restoreAccount } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { AccountMobileCard, columns } from '@/components/accounts-columns';
 
 export default function AccountsPage() {
-  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames', showDeleted), [showDeleted]);
   const [createCount, setCreateCount] = useState('5');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
@@ -87,7 +88,18 @@ export default function AccountsPage() {
   }
 
   async function onDelete(id: number) {
+    const acc = data?.accounts.find((a) => a.id === id);
+    const balance = acc != null && typeof acc.balance === 'number' ? ` (${acc.balance.toFixed(2)} ETB)` : '';
+    const ok = window.confirm(
+      `Delete +${acc?.phone ?? id}${balance}?\n\nThis only hides the account (soft-delete) — balance, tokens and history are kept and it can be restored from "Show deleted".`
+    );
+    if (!ok) return;
     await deleteAccount(id);
+    refresh();
+  }
+
+  async function onRestore(id: number) {
+    await restoreAccount(id);
     refresh();
   }
 
