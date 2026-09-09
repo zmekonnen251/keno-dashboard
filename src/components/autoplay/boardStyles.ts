@@ -14,4 +14,11 @@ div.keno-tile { cursor: default; }
 .keno-dot { position: absolute; top: 4px; right: 4px; height: 6px; width: 6px; border-radius: 9999px; }
 .keno-dot.hot { background: #ef4444; }
 .keno-dot.suggested { background: #38bdf8; }
+/* Desktop: the board shares the row with the tickets (2-col grid), so keep
+   tiles compact enough that the whole board fits without scrolling. */
+@media (min-width: 1024px) {
+  .keno-board-panel { padding: 10px; }
+  .keno-board { gap: 5px; }
+  .keno-tile { font-size: 12px; border-radius: 5px; }
+}
 `;

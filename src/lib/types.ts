@@ -347,6 +347,16 @@ export interface AccountGameStatus {
 	balance: number;
 	deleted: boolean;
 	updatedAt: number;
+	// Gateway round truth + bet-lifecycle counters (mirrors the server
+	// AccountGameStatus). Optional so older cached payloads still parse.
+	lastPhase?: string | null;
+	lastRoundId?: string | null;
+	bettingOpen?: boolean;
+	sent?: number;
+	acked?: number;
+	failed?: number;
+	settledWon?: number;
+	settledLost?: number;
 }
 
 export interface AccountBalanceResult {

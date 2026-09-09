@@ -21,7 +21,10 @@ interface WinAlert {
 function statusLabel(p: AutoplayPlacedBet): { text: string; tone: string } {
   if (p.status === 'won') return { text: 'Won', tone: '#4ade80' };
   if (p.status === 'lost') return { text: 'Lost', tone: '#64748b' };
-  return { text: 'Waiting', tone: '#facc15' };
+  if (p.status === 'failed' || p.ok === false) return { text: 'Failed', tone: '#f87171' };
+  // Sent to the socket but not yet acknowledged by the game server — never
+  // shown as a win/loss until the gateway settles it.
+  return { text: 'Sent', tone: '#facc15' };
 }
 
 export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: number[] }) {
@@ -39,12 +42,18 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
     [bets, newest],
   );
 
+  // Celebrate ONLY gateway-settled wins. Pending ("Sent") tickets are frames
+  // written to a socket — the game server may never have accepted them — so
+  // matching them against the live draw locally invents phantom wins for
+  // bets that never landed (and phantom push notifications with them).
   const winners = useMemo(() => {
     const set = new Set<number>();
     const full: AutoplayPlacedBet[] = [];
     for (const b of current) {
+      if (b.status !== 'won') continue;
       const spots = b.spots || [];
-      if (spots.length > 0 && spots.every((n) => drawn.includes(n))) {
+      const ref = b.drawnSpots && b.drawnSpots.length > 0 ? b.drawnSpots : drawn;
+      if (spots.length > 0 && spots.every((n) => ref.includes(n))) {
         full.push(b);
         for (const n of spots) set.add(n);
       }
@@ -165,16 +174,17 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
         )}
       </div>
 
-      {/* Tickets strip (horizontal wrap) + full-width board */}
-      <div className='space-y-3 p-3'>
-        <div>
+      {/* Tickets + board: stacked on mobile, side-by-side on desktop so the
+          drawn digits on top stay visible without scrolling past a full-width board */}
+      <div className='grid grid-cols-1 gap-3 p-3 lg:grid-cols-2'>
+        <div className='min-w-0'>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
             My Tickets {current.length > 0 ? `(${current.length})` : ''}
           </div>
           {current.length === 0 ? (
             <p className='py-4 text-center text-xs italic text-slate-500'>No bets placed in the current game yet.</p>
           ) : (
-            <div className='flex flex-wrap gap-2'>
+            <div className='flex flex-wrap gap-2 lg:max-h-[480px] lg:overflow-y-auto lg:pr-1'>
               {current.map((p) => {
                 const st = statusLabel(p);
                 const isWinner = winners.tickets.some((w) => w.accountId === p.accountId && w.requestId === p.requestId);
@@ -201,6 +211,11 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                         {isWinner ? 'WINNER' : st.text}
                       </span>
                     </div>
+                    {p.status === 'failed' && p.failReason && (
+                      <div className='mt-1 truncate text-[11px] text-red-400/90' title={p.failReason}>
+                        {p.failReason}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -208,7 +223,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           )}
         </div>
 
-        <div>
+        <div className='min-w-0'>
           <div className='keno-board-panel'>
             <div className='keno-board'>
               {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
