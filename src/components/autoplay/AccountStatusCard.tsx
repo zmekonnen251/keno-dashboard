@@ -102,11 +102,21 @@ export function AccountStatusCard({ accounts, running }: { accounts: AccountGame
 											<span className='text-muted-foreground'>—</span>
 										)}
 									</td>
-									<td className='px-2 py-2'>
-										<div className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
-											{typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance} ETB
-										</div>
-									</td>
+								<td className='px-2 py-2'>
+									<div className={a.balance < 2 ? 'font-semibold text-red-500' : ''}>
+										{typeof a.balance === 'number' ? a.balance.toFixed(2) : a.balance} ETB
+									</div>
+									<div
+										className='text-muted-foreground'
+										title={
+											a.balanceLive
+												? 'Confirmed by a gateway BALANCE frame — this is the real wallet.'
+												: 'DB seed — no BALANCE frame seen yet on this stream; the real wallet may differ (e.g. empty).'
+										}
+									>
+										{a.balanceLive ? 'live' : 'cached'}
+									</div>
+								</td>
 									<td className='px-2 py-2'>
 										<div className='text-emerald-500'>connected</div>
 										<div className='text-muted-foreground'>{a.lastStatus}</div>

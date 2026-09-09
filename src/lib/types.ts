@@ -357,6 +357,7 @@ export interface AccountGameStatus {
 	failed?: number;
 	settledWon?: number;
 	settledLost?: number;
+	balanceLive?: boolean;
 }
 
 export interface AccountBalanceResult {
