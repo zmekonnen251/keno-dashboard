@@ -20,7 +20,7 @@ import { SignalPanel } from '@/components/autoplay/SignalPanel';
 import { CollapsibleCard } from '@/components/autoplay/CollapsibleCard';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
-import { LiveDrawBoard } from '@/components/autoplay/LiveDrawBoard';
+import { GameView } from '@/components/autoplay/GameView';
 import { LastRoundBetsCard } from '@/components/autoplay/LastRoundBetsCard';
 import { BigWinsCard } from '@/components/autoplay/BigWinsCard';
 import { AccountStatusCard } from '@/components/autoplay/AccountStatusCard';
@@ -159,7 +159,7 @@ export default function AutoplayPage() {
 				<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
 			</CollapsibleCard>
 
-			<LiveDrawBoard picks={manualPicks} />
+			<GameView bets={bets} picks={manualPicks} />
 
 			<CollapsibleCard title='Signals' defaultOpen={false}>
 				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />

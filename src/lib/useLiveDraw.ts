@@ -1,16 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Card, Empty } from '@/components/app';
 import { getAccounts } from '@/lib/api';
 import { GATEWAY_URL } from '@/hooks/useGatewayWorker';
-import { BOARD_CSS } from './boardStyles';
 
-// Live draw board: streams the current keno draw straight from the gateway
-// over ONE observer WebSocket (any account ws_token — the draw is global, so
-// we only watch, never bet here). Drawn digits light up gold like the real
-// game; numbers from your manual ticket that get drawn turn green.
+export type LiveDrawStatus = 'connecting' | 'live' | 'waiting';
+
 function parseDrawnSpots(data: unknown): number[] | null {
 	if (!data || typeof data !== 'object') return null;
 	const msg = data as { type?: unknown; payload?: unknown };
@@ -21,8 +16,10 @@ function parseDrawnSpots(data: unknown): number[] | null {
 	return raw.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n >= 1 && n <= 80);
 }
 
-export function LiveDrawBoard({ picks }: { picks?: number[] }) {
-	const [status, setStatus] = useState<'connecting' | 'live' | 'waiting'>('connecting');
+// One observer WebSocket (any account ws_token — the draw is global, we only
+// watch). Rotates to the next token if a socket drops.
+export function useLiveDraw() {
+	const [status, setStatus] = useState<LiveDrawStatus>('connecting');
 	const [observer, setObserver] = useState('');
 	const [drawn, setDrawn] = useState<number[]>([]);
 	const [updatedAt, setUpdatedAt] = useState<number | null>(null);
@@ -101,48 +98,5 @@ export function LiveDrawBoard({ picks }: { picks?: number[] }) {
 		};
 	}, []);
 
-	const done = drawn.length >= 20;
-	const hits = (picks ?? []).filter((n) => drawn.includes(n));
-
-	return (
-		<Card
-			title='Live draw'
-			actions={
-				<Badge variant='outline'>
-					{status === 'live' ? `live · ${drawn.length}/20` : status === 'connecting' ? 'connecting…' : 'waiting for token'}
-				</Badge>
-			}
-		>
-			<style>{BOARD_CSS}</style>
-			{status === 'waiting' && drawn.length === 0 ? (
-				<Empty label='No observer token — import an account with a WS token to watch the live draw.' />
-			) : (
-				<>
-					<div className='keno-board-panel'>
-						<div className='keno-board'>
-							{Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
-								const isDrawn = drawn.includes(n);
-								const isHit = isDrawn && (picks ?? []).includes(n);
-								return (
-									<div key={n} className={isHit ? 'keno-tile hit' : isDrawn ? 'keno-tile drawn' : 'keno-tile'}>
-										{n}
-									</div>
-								);
-							})}
-						</div>
-					</div>
-					<p className='mt-2 text-xs text-muted-foreground'>
-						{done ? (
-							<>Draw complete — {drawn.length} numbers drawn.</>
-						) : (
-							<>Drawing… {drawn.length}/20 drawn.</>
-						)}{' '}
-						{picks && picks.length > 0 && <>Your ticket: {hits.length} hit{hits.length === 1 ? '' : 's'}.</>}{' '}
-						{observer && <>Watching via +{observer}.</>}{' '}
-						{updatedAt && <>Updated {new Date(updatedAt).toLocaleTimeString()}.</>}
-					</p>
-				</>
-			)}
-		</Card>
-	);
+	return { status, observer, drawn, updatedAt };
 }
