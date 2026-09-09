@@ -115,6 +115,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -123,3 +124,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar */
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 3px;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: rgba(0, 0, 0, 0.3);
+	}

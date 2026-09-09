@@ -163,7 +163,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       </div>
 
       {/* Tickets + board */}
-      <div className='grid grid-cols-1 gap-3 p-3 md:grid-cols-[290px,1fr]'>
+      <div className='grid grid-cols-1 gap-3 p-3 md:grid-cols-2 '>
         <div>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
             My Tickets {current.length > 0 ? current.length : ''}
@@ -178,7 +178,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                 return (
                   <div
                     key={`${p.accountId}-${p.requestId}-${p.placedAt}`}
-                    className={`rounded-lg border p-2.5 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/[0.03]'}`}
+                    className={`rounded-lg border p-2.5 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/3'}`}
                   >
                     <div className='flex flex-wrap gap-1'>
                       {(p.spots || []).map((n) => (
