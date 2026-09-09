@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card } from '@/components/app';
 import { getEligibleAccounts, placeManualBet } from '@/lib/api';
+import { CollapsibleCard } from './CollapsibleCard';
 import type { AccountGameStatus, BotTicket, EligibleAccount, RecurrenceSignal } from '@/lib/types';
 import { NumberGrid, type BoardMarker } from './NumberGrid';
 import {
@@ -163,7 +163,7 @@ export function ManualBetCard({
 	const manualAccounts = accountMode === 'manual' ? (eligible.length > 0 ? eligible : accounts.map((a) => ({ accountId: a.accountId, phone: a.phone, balance: a.balance, connected: a.connected }))) : [];
 
 	return (
-		<Card title='Manual play — pick a ticket, set stake, place bet'>
+		<CollapsibleCard title='Manual play — pick a ticket, set stake, place bet' defaultOpen={false}>
 			<div className='space-y-4'>
 				<p className='text-sm text-muted-foreground'>
 					Click a suggested ticket (repetitive / recurring / chain / trend) or tap the number grid like the real keno
@@ -333,12 +333,12 @@ export function ManualBetCard({
 							Selected: {selectedSpots.length > 0 ? `[${selectedSpots.join(',')}]` : '—'} · {stakeNum} ETB
 						</div>
 
-						<Button onClick={onPlaceBet} disabled={placing || !running}>
-							{placing ? 'Placing…' : 'Place bet'}
-						</Button>
-					</div>
+					<Button onClick={onPlaceBet} disabled={placing || !running}>
+						{placing ? 'Placing…' : 'Place bet'}
+					</Button>
 				</div>
 			</div>
-		</Card>
+		</div>
+		</CollapsibleCard>
 	);
 }

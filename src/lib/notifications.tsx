@@ -7,6 +7,8 @@ export interface AppNotification {
   kind: 'win' | 'info' | 'error';
   text: string;
   at: number;
+  // Optional account phone for win notifications (enables copy button).
+  phone?: string;
 }
 
 interface NotificationCenter {

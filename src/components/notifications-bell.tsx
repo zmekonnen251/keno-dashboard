@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CopyPhoneButton } from '@/components/accounts-columns';
 import { useNotifications } from '@/lib/notifications';
 
 const KIND_DOT: Record<string, string> = {
@@ -65,10 +66,16 @@ export function NotificationsBell() {
                 notifications.map((n) => (
                   <div key={n.id} className='flex items-start gap-2.5 border-b border-border/60 px-4 py-2.5 last:border-0'>
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${KIND_DOT[n.kind] || 'bg-sky-500'}`} />
-                    <div className='min-w-0'>
+                    <div className='min-w-0 flex-1'>
                       <p className='text-xs text-foreground'>{n.text}</p>
-                      <p className='mt-0.5 font-mono text-[10px] text-muted-foreground'>
+                      <p className='mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground'>
                         {new Date(n.at).toLocaleString()}
+                        {n.phone && (
+                          <span className='inline-flex items-center gap-0.5 text-[11px]'>
+                            +{n.phone}
+                            <CopyPhoneButton phone={n.phone} />
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

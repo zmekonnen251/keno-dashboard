@@ -8,6 +8,7 @@ import { Card, Empty, ErrorBox, Loading } from '@/components/app';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BetTable } from '@/components/autoplay/BetTable';
 import { AccountStatusCard } from '@/components/autoplay/AccountStatusCard';
+import { CopyPhoneButton } from '@/components/accounts-columns';
 
 const levelColor: Record<string, string> = {
   error: 'text-red-600 dark:text-red-400',
@@ -67,10 +68,16 @@ export default function LogsPage() {
                 {notifications.map((n) => (
                   <div key={n.id} className="flex items-start gap-2.5 rounded px-1 py-1.5 hover:bg-muted">
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${KIND_DOT[n.kind] || 'bg-sky-500'}`} />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs text-foreground">{n.text}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                      <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
                         {new Date(n.at).toLocaleString()}
+                        {n.phone && (
+                          <span className="inline-flex items-center gap-0.5 text-[11px]">
+                            +{n.phone}
+                            <CopyPhoneButton phone={n.phone} />
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

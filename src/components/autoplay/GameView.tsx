@@ -7,6 +7,7 @@ import { notificationPermission, playWinSound, pushWinNotification, requestNotif
 import { isPushActive, pushSupported, subscribePush, unsubscribePush } from '@/lib/push';
 import { useNotifications } from '@/lib/notifications';
 import { useLiveDraw } from '@/lib/useLiveDraw';
+import { CopyPhoneButton } from '@/components/accounts-columns';
 import { BOARD_CSS } from './boardStyles';
 
 // "Current game" = bets placed within one round window of the newest bet.
@@ -16,6 +17,7 @@ interface WinAlert {
   id: string;
   text: string;
   at: number;
+  phone: string;
 }
 
 function statusLabel(p: AutoplayPlacedBet): { text: string; tone: string } {
@@ -75,8 +77,8 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       const text = `Full match! [${spots.join(',')}] on #${b.accountId} — est. +${est} ETB`;
       if (soundOn) playWinSound();
       if (!pushOn && notifyOn) pushWinNotification('Keno full match!', text);
-      notify({ id: `win-${key}`, kind: 'win', text });
-      setAlerts((prev) => [{ id: key, text, at: Date.now() }, ...prev].slice(0, 5));
+      notify({ id: `win-${key}`, kind: 'win', text, phone: b.phone || undefined });
+      setAlerts((prev) => [{ id: key, text, at: Date.now(), phone: b.phone || '' }, ...prev].slice(0, 5));
     }
     if (celebratedRef.current.size > 200) {
       celebratedRef.current = new Set([...celebratedRef.current].slice(-100));
@@ -147,10 +149,17 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
         <div className='space-y-1.5 border-b border-white/10 px-4 py-2'>
           {alerts.map((a) => (
             <div key={a.id} className='flex items-center justify-between gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-200'>
-              <span>
-                🎉 {a.text} <span className='font-mono font-normal text-emerald-300/70'>{new Date(a.at).toLocaleTimeString()}</span>
+              <span className='min-w-0'>
+                🎉 {a.text}{' '}
+                {a.phone && (
+                  <span className='inline-flex items-center gap-0.5 font-mono font-normal text-emerald-300'>
+                    +{a.phone}
+                    <CopyPhoneButton phone={a.phone} />
+                  </span>
+                )}{' '}
+                <span className='font-mono font-normal text-emerald-300/70'>{new Date(a.at).toLocaleTimeString()}</span>
               </span>
-              <button onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))} className='text-emerald-300/60 hover:text-emerald-200'>
+              <button onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))} className='shrink-0 text-emerald-300/60 hover:text-emerald-200'>
                 ✕
               </button>
             </div>
