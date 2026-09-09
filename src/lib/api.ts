@@ -19,6 +19,7 @@ import type {
   AutoplayTestRoundResponse,
   CheckBalancesResponse,
   CreateAccountsResponse,
+  CreationJobStatus,
   UploadResponse,
   ClientsResponse,
   LogsResponse,
@@ -111,17 +112,12 @@ export async function refreshSession(id: number) {
 }
 
 // ---- accounts ----
-export async function getAccounts(provider = 'fungames', includeDeleted = false): Promise<AccountsResponse> {
-  const q = `?provider=${encodeURIComponent(provider)}${includeDeleted ? '&includeDeleted=true' : ''}`;
-  return apiFetch<AccountsResponse>(`api/accounts${q}`);
+export async function getAccounts(provider = 'fungames'): Promise<AccountsResponse> {
+  return apiFetch<AccountsResponse>(`api/accounts?provider=${encodeURIComponent(provider)}`);
 }
 
 export async function deleteAccount(id: number) {
   return apiFetch(`api/accounts/${id}`, { method: 'DELETE' });
-}
-
-export async function restoreAccount(id: number) {
-  return apiFetch<{ ok: boolean; id: number; restored: boolean }>(`api/accounts/${id}/restore`, { method: 'POST' });
 }
 
 // Enable/disable an account for autoplay. Disabled accounts are excluded from
@@ -137,6 +133,16 @@ export async function createAccounts(count: number): Promise<CreateAccountsRespo
   return apiFetch<CreateAccountsResponse>('api/accounts/create', {
     method: 'POST',
     body: JSON.stringify({ count }),
+  });
+}
+
+export async function creationStatus(): Promise<{ ok: boolean; job: CreationJobStatus | null }> {
+  return apiFetch<{ ok: boolean; job: CreationJobStatus | null }>('api/accounts/create/status');
+}
+
+export async function stopCreation(): Promise<{ ok: boolean; stopped: boolean; job: CreationJobStatus | null }> {
+  return apiFetch<{ ok: boolean; stopped: boolean; job: CreationJobStatus | null }>('api/accounts/create/stop', {
+    method: 'POST',
   });
 }
 

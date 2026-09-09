@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances, restoreAccount } from '@/lib/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getAccounts, deleteAccount, createAccounts, creationStatus, stopCreation, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances } from '@/lib/api';
+import { ApiError } from '@/lib/api-client';
+import type { CreationJobStatus } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +14,12 @@ import { DataTable } from '@/components/ui/data-table';
 import { AccountMobileCard, columns } from '@/components/accounts-columns';
 
 export default function AccountsPage() {
-  const [showDeleted, setShowDeleted] = useState(false);
-  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames', showDeleted), [showDeleted]);
+  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
   const [createCount, setCreateCount] = useState('5');
-  const [creating, setCreating] = useState(false);
-  const [createMsg, setCreateMsg] = useState('');
+  const [job, setJob] = useState<CreationJobStatus | null>(null);
+  const [jobMsg, setJobMsg] = useState('');
+  const jobRunning = job?.running === true;
+  const lastMadeRef = useRef(0);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [checking, setChecking] = useState(false);
@@ -49,19 +52,68 @@ export default function AccountsPage() {
     }).catch(() => setPreview(null));
   }
 
+  const pollJob = useCallback(async () => {
+    try {
+      const res = await creationStatus();
+      setJob(res.job);
+      if (res.job && res.job.made !== lastMadeRef.current) {
+        lastMadeRef.current = res.job.made;
+        refresh();
+      }
+      if (res.job && !res.job.running) refresh();
+    } catch {
+      // Status is best-effort; the next tick retries.
+    }
+  }, [refresh]);
+
+  // Resume progress after a reload (jobs are in-memory on the server and
+  // survive dashboard reloads). Initial fetch mirrors useSites: state only
+  // updates in the promise continuation. Interval polling is the
+  // subscription for later ticks — fast while running, slow idle otherwise.
+  useEffect(() => {
+    creationStatus()
+      .then((res) => {
+        setJob(res.job);
+        if (res.job) lastMadeRef.current = res.job.made;
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    const t = setInterval(() => void pollJob(), jobRunning ? 2500 : 10000);
+    return () => clearInterval(t);
+  }, [jobRunning, pollJob]);
+
   async function onCreate() {
-    setCreating(true);
-    setCreateMsg('Creating accounts…');
+    setJobMsg('');
     try {
       const res = await createAccounts(parseInt(createCount || '0', 10) || 1);
-      setCreateMsg(res.timedOut
-        ? `Created ${res.created} so far (request timed out; check again shortly).`
-        : `Created ${res.created} account(s).`);
+      lastMadeRef.current = res.job?.made ?? 0;
+      setJob(res.job);
+      setJobMsg(
+        res.job
+          ? `Job started: 0/${res.job.target} accounts. Each account registers, spins/claims, then fetches its gateway ws_token in the same pass — takes as long as needed.`
+          : 'Job started.'
+      );
       refresh();
     } catch (e) {
-      setCreateMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setCreating(false);
+      if (e instanceof ApiError && e.status === 409) {
+        // A job is already running — attach to it instead of erroring out.
+        setJobMsg('A creation job is already running — showing its live progress.');
+        await pollJob();
+      } else {
+        setJobMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+      }
+    }
+  }
+
+  async function onStopCreate() {
+    try {
+      const res = await stopCreation();
+      setJob(res.job);
+      setJobMsg('Stop requested — the worker finishes its current account then exits.');
+      refresh();
+    } catch (e) {
+      setJobMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -88,18 +140,7 @@ export default function AccountsPage() {
   }
 
   async function onDelete(id: number) {
-    const acc = data?.accounts.find((a) => a.id === id);
-    const balance = acc != null && typeof acc.balance === 'number' ? ` (${acc.balance.toFixed(2)} ETB)` : '';
-    const ok = window.confirm(
-      `Delete +${acc?.phone ?? id}${balance}?\n\nThis only hides the account (soft-delete) — balance, tokens and history are kept and it can be restored from "Show deleted".`
-    );
-    if (!ok) return;
     await deleteAccount(id);
-    refresh();
-  }
-
-  async function onRestore(id: number) {
-    await restoreAccount(id);
     refresh();
   }
 
@@ -228,8 +269,11 @@ export default function AccountsPage() {
 			<div className='grid grid-cols-1 gap-5 lg:grid-cols-2'>
 				<Card title='Create accounts'>
 					<p className='mb-3 text-xs text-muted-foreground'>
-						Register new ToloBirr accounts (phone + access token). No spinning
-						is performed here.
+						Register new ToloBirr accounts in the background: each account
+						registers, spins/claims, then fetches its gateway ws_token in the
+						same pass. The worker runs until it hits the exact requested
+						count — however long that takes. Missing tokens are backfilled
+						every 3 min.
 					</p>
 					<div className='flex items-end gap-2'>
 						<div className='w-28'>
@@ -241,14 +285,46 @@ export default function AccountsPage() {
 								max={100}
 								value={createCount}
 								onChange={(e) => setCreateCount(e.target.value)}
+								disabled={jobRunning}
 							/>
 						</div>
-						<Button onClick={onCreate} disabled={creating}>
-							{creating ? 'Creating…' : 'Create accounts'}
+						<Button onClick={onCreate} disabled={jobRunning}>
+							{jobRunning ? 'Running…' : 'Create accounts'}
 						</Button>
+						{jobRunning && (
+							<Button variant='outline' onClick={onStopCreate}>
+								Stop
+							</Button>
+						)}
 					</div>
-					{createMsg && (
-						<p className='mt-2 text-xs text-muted-foreground'>{createMsg}</p>
+					{job && (
+						<div className='mt-3 space-y-1.5'>
+							<div className='h-2 w-full overflow-hidden rounded-full bg-muted'>
+								<div
+									className='h-full rounded-full bg-green-500 transition-all'
+									style={{ width: `${job.target > 0 ? Math.min(100, Math.round((job.made / job.target) * 100)) : 0}%` }}
+								/>
+							</div>
+							<p className='text-xs text-muted-foreground'>
+								{job.running
+									? `Creating… ${job.made}/${job.target} accounts`
+									: job.stopped
+										? `Stopped at ${job.made}/${job.target} accounts`
+										: `Done: ${job.made}/${job.target} accounts`}
+								{` • ${job.wsTokens ?? 0} ws_token${(job.wsTokens ?? 0) === 1 ? '' : 's'} • ${job.attempts} attempts`}
+								{!job.running && job.startedAt && job.finishedAt
+									? ` • ${Math.max(1, Math.round((job.finishedAt - job.startedAt) / 1000))}s total`
+									: ''}
+							</p>
+							{job.errors.length > 0 && (
+								<p className='text-xs text-red-600 dark:text-red-400'>
+									{job.errors.slice(0, 3).join(' | ')}
+								</p>
+							)}
+						</div>
+					)}
+					{jobMsg && (
+						<p className='mt-2 text-xs text-muted-foreground'>{jobMsg}</p>
 					)}
 				</Card>
 

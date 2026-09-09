@@ -370,12 +370,22 @@ export interface SpinResponse {
 	errors: string[];
 }
 
-export interface CreateAccountsResponse {
-	requested: number;
-	created: number;
-	accounts: { phone: string; id: number }[];
+export interface CreationJobStatus {
+	running: boolean;
+	target: number;
+	made: number;
+	attempts: number;
 	errors: string[];
-	timedOut?: boolean;
+	startedAt: number | null;
+	finishedAt: number | null;
+	stopped: boolean;
+	wsTokens?: number;
+}
+
+export interface CreateAccountsResponse {
+	ok: boolean;
+	started: boolean;
+	job: CreationJobStatus | null;
 }
 
 export interface UploadResponse {
