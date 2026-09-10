@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, StatCard, Empty, ErrorBox, PrettyNumbers } from '@/components/app';
+import { Card, StatCard, Empty, ErrorBox, PrettyNumbers, Picks } from '@/components/app';
 import { formatTime, winRate } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 
@@ -72,7 +72,18 @@ export default function OverviewPage() {
         <Card title="Current prediction" actions={currentPrediction && <Badge className="bg-violet-100 text-violet-700">confident</Badge>}>
           {currentPrediction ? (
             <div className="space-y-3">
-              <PrettyNumbers nums={currentPrediction.numbers || []} />
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pick numbers</div>
+                <PrettyNumbers nums={currentPrediction.numbers || []} />
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Predicted ticket</div>
+                <Picks nums={currentPrediction.ticket || (currentPrediction.numbers || []).slice(0, 3)} tone="violet" />
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Whole draw prediction</div>
+                <Picks nums={currentPrediction.fullDraw || (currentPrediction.numbers || []).slice(0, 20)} tone="emerald" />
+              </div>
               <div className="text-xs text-muted-foreground">
                 Generated {formatTime(currentPrediction.generatedAt)}
               </div>

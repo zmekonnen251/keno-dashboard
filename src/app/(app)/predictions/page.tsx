@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, StatCard, Empty, ErrorBox, Loading, PrettyNumbers } from '@/components/app';
+import { Card, StatCard, Empty, ErrorBox, Loading, PrettyNumbers, Picks } from '@/components/app';
 import { formatTime, winRate } from '@/lib/format';
 
 export default function PredictionsPage() {
@@ -51,8 +51,19 @@ export default function PredictionsPage() {
         <Card title="Current prediction">
           {prediction ? (
             <div className="space-y-3">
-              <PrettyNumbers nums={prediction.numbers} />
-              <div className="text-xs text-muted-foreground">Generated {formatTime(prediction.generatedAt)}</div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pick numbers</div>
+                <PrettyNumbers nums={prediction.numbers} />
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Predicted ticket</div>
+                <Picks nums={prediction.ticket || prediction.numbers.slice(0, 3)} tone="violet" />
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Whole draw prediction</div>
+                <Picks nums={prediction.fullDraw || prediction.numbers.slice(0, 20)} tone="emerald" />
+              </div>
+              <div className="text-xs text-muted-foreground">Generated {formatTime(prediction.generatedAt)} · conf {Math.round((prediction.confidence ?? 0) * 100)}%</div>
             </div>
           ) : (
             <Empty label="No prediction" />
@@ -70,6 +81,8 @@ export default function PredictionsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Picks</TableHead>
+                  <TableHead>Ticket</TableHead>
+                  <TableHead>Whole draw</TableHead>
                   <TableHead>Hit</TableHead>
                   <TableHead>Generated</TableHead>
                 </TableRow>
@@ -78,6 +91,8 @@ export default function PredictionsPage() {
                 {recent.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell><PrettyNumbers nums={r.numbers} /></TableCell>
+                    <TableCell><Picks nums={r.ticket || r.numbers.slice(0, 3)} tone="violet" /></TableCell>
+                    <TableCell><Picks nums={r.fullDraw || r.numbers.slice(0, 20)} tone="emerald" /></TableCell>
                     <TableCell>{r.hit == null ? '—' : (r.hit ? '✓' : '✗')}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatTime(r.createdAt)}</TableCell>
                   </TableRow>

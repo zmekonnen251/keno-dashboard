@@ -81,6 +81,33 @@ export function PrettyNumbers({ nums }: { nums: number[] }) {
   );
 }
 
+// Colored number chips for prediction sub-views (ticket / whole draw).
+export function Picks({
+  nums,
+  tone = 'default',
+}: {
+  nums: number[];
+  tone?: 'default' | 'violet' | 'emerald';
+}) {
+  const toneClass = {
+    default: 'bg-muted text-foreground',
+    violet: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
+    emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  }[tone];
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {(nums || []).map((n, i) => (
+        <span
+          key={i}
+          className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-semibold ${toneClass}`}
+        >
+          {n}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function Empty({ label }: { label: string }) {
   return <div className="py-8 text-center text-sm text-muted-foreground">{label}</div>;
 }

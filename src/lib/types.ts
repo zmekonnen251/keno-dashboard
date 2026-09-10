@@ -97,6 +97,10 @@ export interface PatternsResponse {
 export interface Prediction {
 	siteId: string;
 	numbers: number[];
+	// Small betting-ticket pick (top 3).
+	ticket?: number[];
+	// Predicted whole draw (top 20).
+	fullDraw?: number[];
 	confidence: number;
 	reasoning: string[];
 	timeContext: string | null;
@@ -109,6 +113,8 @@ export interface RecentPrediction {
 	id: number;
 	type: string;
 	numbers: number[];
+	ticket?: number[];
+	fullDraw?: number[];
 	confidence: number;
 	reasoning: string[];
 	timeContext: string | null;
@@ -434,6 +440,21 @@ export interface LogEntry {
 
 export interface LogsResponse {
 	logs: LogEntry[];
+}
+
+// An ML triplet alert (repetitive sequential grouping like 1,2,3 detected by
+// the Python service, POSTed to the server and polled by the dashboard).
+export interface MlAlert {
+	draw: number[];
+	summary: { draw: number[]; has_triplet: boolean };
+	source: string;
+	timestamp: number;
+	receivedAt: string;
+}
+
+export interface MlAlertsResponse {
+	count: number;
+	alerts: MlAlert[];
 }
 
 // ---- Ticket strategy types (mirrors extension BotTicket) ----

@@ -23,6 +23,7 @@ import type {
   UploadResponse,
   ClientsResponse,
   LogsResponse,
+  MlAlertsResponse,
   ManualBetResponse,
   EligibleAccountsResponse,
   CleanupSpentResponse,
@@ -92,6 +93,10 @@ export async function getClients(): Promise<ClientsResponse> {
 
 export async function getLogs(limit = 200): Promise<LogsResponse> {
   return apiFetch<LogsResponse>(`api/logs?limit=${limit}`);
+}
+
+export async function getMlAlerts(limit = 50): Promise<MlAlertsResponse> {
+  return apiFetch<MlAlertsResponse>(`api/ml/alerts/recent?limit=${limit}`);
 }
 
 // ---- sessions ----
