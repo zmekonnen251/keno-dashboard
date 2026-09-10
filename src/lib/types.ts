@@ -445,6 +445,7 @@ export interface LogsResponse {
 // An ML triplet alert (repetitive sequential grouping like 1,2,3 detected by
 // the Python service, POSTed to the server and polled by the dashboard).
 export interface MlAlert {
+	id: number;
 	draw: number[];
 	summary: { draw: number[]; has_triplet: boolean };
 	source: string;
