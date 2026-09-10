@@ -609,3 +609,52 @@ export interface LiveBalancesResponse {
 	stored: number;
 	accounts: LiveBalanceEntry[];
 }
+
+// Rain (free-bet) claiming accounts. Mirrors server/src/api/rainRoutes.ts
+// toApiAccount(): the ws_token is never echoed back, only masked.
+export type RainProvider = 'fungames' | 'phoenixbet';
+
+export interface RainAccount {
+	id: number;
+	name: string;
+	provider: RainProvider;
+	gateway_host: string;
+	ws_token_masked: string | null;
+	is_enabled: boolean;
+	status: string;
+	connected: boolean;
+	lastError: string | null;
+	connectedAt: number | null;
+	claimedThisSession: number;
+	lastRainId: string | null;
+	lastSlot: number | null;
+	lastWager: number | null;
+	lastRainAt: number | null;
+	rain_count: number;
+	last_claimed_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface RainAccountsResponse {
+	ok: boolean;
+	count: number;
+	accounts: RainAccount[];
+}
+
+export interface RainClaimRecord {
+	id: number;
+	account_id: number;
+	rain_id: string;
+	message_id: string;
+	slot_index: number;
+	wager_amount: number;
+	created_at: string;
+}
+
+export interface RainClaimsResponse {
+	ok: boolean;
+	accountId: number;
+	count: number;
+	claims: RainClaimRecord[];
+}

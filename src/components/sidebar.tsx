@@ -15,6 +15,7 @@ import {
   Handshake,
   ScrollText,
   BellRing,
+  CloudRain,
   LogOut,
   Moon,
   Sun,
@@ -48,6 +49,7 @@ const NAV = [
   { href: '/accounts', label: 'Accounts', icon: Users },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },
 ];

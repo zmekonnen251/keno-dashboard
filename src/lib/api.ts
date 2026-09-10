@@ -28,6 +28,9 @@ import type {
   EligibleAccountsResponse,
   CleanupSpentResponse,
   LiveBalancesResponse,
+  RainAccountsResponse,
+  RainClaimsResponse,
+  RainProvider,
 } from './types';
 
 // ---- auth ----
@@ -245,6 +248,49 @@ export async function cleanupSpentAccounts(): Promise<CleanupSpentResponse> {
 
 export async function getLiveBalances(): Promise<LiveBalancesResponse> {
   return apiFetch<LiveBalancesResponse>('api/accounts/autoplay/balances-live');
+}
+
+// ---- rain claiming ----
+export async function getRainAccounts(): Promise<RainAccountsResponse> {
+  return apiFetch<RainAccountsResponse>('api/rain/accounts');
+}
+
+export async function createRainAccount(input: {
+  name: string;
+  ws_token: string;
+  provider: RainProvider;
+}) {
+  return apiFetch('api/rain/accounts', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateRainAccount(
+  id: number,
+  patch: Partial<{
+    name: string;
+    ws_token: string;
+    provider: RainProvider;
+    is_enabled: boolean;
+  }>,
+) {
+  return apiFetch(`api/rain/accounts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteRainAccount(id: number) {
+  return apiFetch(`api/rain/accounts/${id}`, { method: 'DELETE' });
+}
+
+export async function refreshRainAccount(id: number) {
+  return apiFetch(`api/rain/accounts/${id}/refresh`, { method: 'POST' });
+}
+
+export async function getRainClaims(id: number): Promise<RainClaimsResponse> {
+  return apiFetch<RainClaimsResponse>(`api/rain/accounts/${id}/claims`);
 }
 
 // ---- proxies ----

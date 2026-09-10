@@ -66,3 +66,24 @@
         "timestamp": 1788645881334
     }
 }
+
+{"type":"CHAT","payload":{"type":"claim_rain","message_id":"6aa2de8753110383c17a721f","rain_id":"6aa2de8741c2e81d457d631f","slot":26}}
+
+{"type":"FREE_BET","payload":{"type":"free_bet_updated","free_bet":{"id":"6aa2e0d541c2e81d457d6340","player_id":"01a08bac-a972-7756-8ffc-3f27ae57ace0","wager_amount":10.0,"won_amount":0.0,"given_count":1,"pending_bet_count":0,"closed_bet_count":0,"game_data":{},"granted_at":1789059285987,"expires_at":1789145685987,"source":{"Campaign":{"engagement":{"kind":"RAIN","rain_id":"6aa2de8741c2e81d457d631f","slot_index":26},"campaign_id":"6a85b332e71edc677e1b2dc5"}}}}}
+
+{"type":"CHAT","payload":{"type":"chat_updated","message":{"id":"6aa2de8753110383c17a721f","content":{"type":"rain","text":"Free bets for everyone! 😊","rain_id":"6aa2de8741c2e81d457d631f","slot_count":30,"wager_amount":10.0,"claim_info":[{"slot_index":18,"player_id":"019ee5a1-1448-75c8-8d4e-1830c47e46b5"},{"slot_index":19,"player_id":"019fd88a-c5c1-70ff-ad8a-c3e78ceb70c7"},{"slot_index":20,"player_id":"019e2bef-409c-7662-9dbc-f9d1a57f35d7"},{"slot_index":29,"player_id":"019e46a6-77b9-727d-936f-790f81cf8515"}],"source_type":"campaign","campaign_id":"6a85b332e71edc677e1b2dc5","claim_deadline_ms":1789059581341},"sender":{"type":"operator"},"reactions":{},"timestamp":1789058695300}}}
+
+now we will add a new functionality on keno-server/dashboard/mobile, it is for claiming rains(free bets) using web socket, from the admin dashboard/mobile app the admin will add the ws_token and the name of the rain account(we will create a separate table for account rain claiming accounts) the fields will be name ,ws_token,number of rains claimed,rains,..etc . the websocket url is the same that we are using for the auto play. this is the type of message we watch(observe from the websocket connection) --> {"type":"CHAT","payload":{"type":"chat_updated","message":{"id":"6aa2de8753110383c17a721f","content":{"type":"rain","text":"Free bets for everyone! 😊","rain_id":"6aa2de8741c2e81d457d631f","slot_count":30,"wager_amount":10.0,"claim_info":[{"slot_index":18,"player_id":"019ee5a1-1448-75c8-8d4e-1830c47e46b5"},{"slot_index":19,"player_id":"019fd88a-c5c1-70ff-ad8a-c3e78ceb70c7"},{"slot_index":20,"player_id":"019e2bef-409c-7662-9dbc-f9d1a57f35d7"},{"slot_index":29,"player_id":"019e46a6-77b9-727d-936f-790f81cf8515"}],"source_type":"campaign","campaign_id":"6a85b332e71edc677e1b2dc5","claim_deadline_ms":1789059581341},"sender":{"type":"operator"},"reactions":{},"timestamp":1789058695300}}}
+ --->we will take from this message the rain_id,message_id,slot_count,wager_amount(the value of the rain),and the slot_indexes from the claim_info, then for claiming the rain(for sending the claim request) we will use --->
+    {
+    "type":"CHAT",
+    "payload":{
+        "type":"claim_rain",
+        "message_id":${message_id},
+        "rain_id":${rain_id},
+        "slot":{slot_index}
+        }
+    } 
+    ===> the slot index is number b/n 1-slot_count and we will exclude the slot_index that already claimed by others by checking the slot_indexes we get from the message
+
+    the rainClaimer socket is always should be live(connected) for each rain claiming accounts
