@@ -13,6 +13,12 @@ import { parseAccountFile } from '@/lib/phone';
 import { DataTable } from '@/components/ui/data-table';
 import { AccountMobileCard, columns } from '@/components/accounts-columns';
 
+function fmtDur(ms: number): string {
+	const s = Math.max(0, Math.round(ms / 1000));
+	const m = Math.floor(s / 60);
+	return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
 export default function AccountsPage() {
   const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
   const [createCount, setCreateCount] = useState('5');
@@ -312,8 +318,8 @@ export default function AccountsPage() {
 										? `Stopped at ${job.made}/${job.target} accounts`
 										: `Done: ${job.made}/${job.target} accounts`}
 								{` • ${job.wsTokens ?? 0} ws_token${(job.wsTokens ?? 0) === 1 ? '' : 's'} • ${job.attempts} attempts`}
-								{!job.running && job.startedAt && job.finishedAt
-									? ` • ${Math.max(1, Math.round((job.finishedAt - job.startedAt) / 1000))}s total`
+								{job.startedAt
+									? ` • ${job.running ? 'elapsed' : 'took'} ${fmtDur(job.durationMs ?? (job.finishedAt ? job.finishedAt - job.startedAt : Date.now() - job.startedAt))}`
 									: ''}
 							</p>
 							{job.errors.length > 0 && (

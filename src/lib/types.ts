@@ -395,6 +395,7 @@ export interface CreationJobStatus {
 	errors: string[];
 	startedAt: number | null;
 	finishedAt: number | null;
+	durationMs?: number;
 	stopped: boolean;
 	wsTokens?: number;
 }
