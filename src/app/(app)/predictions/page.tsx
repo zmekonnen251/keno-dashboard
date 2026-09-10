@@ -71,6 +71,43 @@ export default function PredictionsPage() {
         </Card>
         <Card title="Accuracy">
           <StatCard label="Win rate" value={winRate({ total: accuracy?.total, wins: accuracy?.wins })} />
+          {accuracy?.total !== undefined && accuracy.total > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {accuracy.wins} wins / {accuracy.total} evaluated predictions
+            </p>
+          )}
+        </Card>
+        <Card title="ML model accuracy">
+          {(() => {
+            const ms = data.mlStatus;
+            const m = ms && siteId ? ms.metrics?.[siteId] : undefined;
+            if (!ms || !ms.reachable) {
+              return (
+                <p className="text-xs text-muted-foreground">
+                  ML microservice not reachable — predictions currently use the heuristic engine.
+                </p>
+              );
+            }
+            if (!m) {
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Model trained ({ms.trainedRows ?? 0} draws) — holdout metrics appear after the next retrain.
+                </p>
+              );
+            }
+            return (
+              <div className="space-y-1.5">
+                <StatCard label="Holdout win rate (≥4/10 picks)" value={`${Math.round(m.pick10_win_rate_ge4 * 100)}%`} />
+                <div className="space-y-0.5 text-xs text-muted-foreground">
+                  <p>≥3: {Math.round(m.pick10_win_rate_ge3 * 100)}% · ≥2: {Math.round(m.pick10_win_rate_ge2 * 100)}% · ≥1: {Math.round(m.pick10_win_rate_ge1 * 100)}%</p>
+                  <p>{m.holdout_samples} held-out draws · avg {m.mean_pick10_hits.toFixed(2)}/10 picks · ticket avg {m.mean_ticket3_hits.toFixed(2)}/3</p>
+                  {ms.lastTrainAt?.[siteId] && (
+                    <p>Last retrain: {formatTime(ms.lastTrainAt[siteId])}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </Card>
       </div>
 

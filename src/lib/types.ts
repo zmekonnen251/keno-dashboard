@@ -128,11 +128,32 @@ export interface AccuracyStats {
 	winRate: number;
 }
 
+export interface MlTrainMetrics {
+	holdout_samples: number;
+	mean_pick10_hits: number;
+	mean_ticket3_hits: number;
+	mean_full20_hits: number;
+	pick10_win_rate_ge4: number;
+	pick10_win_rate_ge3: number;
+	pick10_win_rate_ge2: number;
+	pick10_win_rate_ge1: number;
+	top_k?: number;
+}
+
+export interface MlStatus {
+	configured: boolean;
+	reachable: boolean | null;
+	trainedRows: number | null;
+	metrics: { [siteId: string]: MlTrainMetrics };
+	lastTrainAt: { [siteId: string]: string };
+}
+
 export interface PredictionsResponse {
 	siteId: string;
 	prediction: Prediction | null;
 	recent: RecentPrediction[];
 	accuracy: AccuracyStats | null;
+	mlStatus?: MlStatus | null;
 }
 
 export interface RepetitiveAnalysis {
@@ -157,6 +178,7 @@ export interface DashboardResponse {
 	currentPrediction: Prediction | null;
 	overduePatterns: PatternSuggestion[];
 	accuracy: AccuracyStats | null;
+	mlStatus?: MlStatus | null;
 	hourlyTrends: HourlyTrend[];
 	currentTimeStats: TimeWindowStats | null;
 }

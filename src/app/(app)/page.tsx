@@ -42,7 +42,8 @@ export default function OverviewPage() {
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No data" />;
 
-  const { currentPrediction, liveRound, recentDraws, accuracy, hourlyTrends, currentTimeStats, totalDraws } = data;
+  const { currentPrediction, liveRound, recentDraws, accuracy, mlStatus, hourlyTrends, currentTimeStats, totalDraws } = data;
+  const mlMetric = mlStatus && mlStatus.reachable ? mlStatus.metrics?.[siteId] : undefined;
 
   return (
     <div className="space-y-5">
@@ -56,6 +57,7 @@ export default function OverviewPage() {
         <StatCard
           label="Prediction accuracy"
           value={winRate(accuracy)}
+          sub={mlMetric ? `ML holdout ≥4/10: ${Math.round(mlMetric.pick10_win_rate_ge4 * 100)}% (${mlMetric.holdout_samples} draws)` : undefined}
           tone={accuracy && accuracy.winRate >= 50 ? 'positive' : 'negative'}
         />
         <StatCard label="Hour" value={data.currentContext.hour} sub={data.currentContext.dayName} />
