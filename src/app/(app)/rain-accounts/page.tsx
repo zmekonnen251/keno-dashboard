@@ -88,12 +88,13 @@ function AccountForm({
   onCancel,
 }: {
   initial: RainAccount | null;
-  onSave: (input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean }) => void;
+  onSave: (input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? 'fungames_shamo');
   const [wsToken, setWsToken] = useState('');
+  const [accessToken, setAccessToken] = useState('');
   const [enabled, setEnabled] = useState(initial?.is_enabled ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -109,6 +110,7 @@ function AccountForm({
         ws_token: wsToken.trim(),
         provider,
         is_enabled: enabled,
+        ...(accessToken.trim() ? { access_token: accessToken.trim() } : {}),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -145,6 +147,17 @@ function AccountForm({
           ws_token {initial && <span className="font-normal text-muted-foreground">(blank keeps the current token)</span>}
         </Label>
         <Input id="rain-token" value={wsToken} onChange={(e) => setWsToken(e.target.value)} placeholder={initial ? '••••••••' : 'gateway ws token'} />
+      </div>
+      <div>
+        <Label htmlFor="rain-access-token">
+          access_token {initial && <span className="font-normal text-muted-foreground">(blank keeps the current token; needed for future cash-out)</span>}
+        </Label>
+        {initial && (
+          <p className="mb-1 text-xs text-muted-foreground">
+            Current: {initial.has_access_token ? <code className="font-mono">{initial.access_token_masked}</code> : 'not set'}
+          </p>
+        )}
+        <Input id="rain-access-token" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder={initial ? '••••••••' : 'optional account access token'} />
       </div>
       <div>
         <Label htmlFor="rain-enabled">Enabled</Label>
@@ -363,16 +376,24 @@ export default function RainAccountsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
 
-  async function onAdd(input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean }) {
+  // Poll the list while the page is open so worker balances (BALANCE frames)
+  // and connect/disconnect state stay live without a page reload.
+  useEffect(() => {
+    const timer = setInterval(() => { refresh(); }, 10000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  async function onAdd(input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) {
     await createRainAccount(input);
     setAdding(false);
     refresh();
   }
 
-  async function onEdit(acc: RainAccount, input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean }) {
+  async function onEdit(acc: RainAccount, input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) {
     await updateRainAccount(acc.id, {
       name: input.name,
       ...(input.ws_token ? { ws_token: input.ws_token } : {}),
+      ...(input.access_token ? { access_token: input.access_token } : {}),
       provider: input.provider,
       is_enabled: input.is_enabled,
     });
@@ -474,6 +495,8 @@ export default function RainAccountsPage() {
                   <TableHead>Provider</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Token</TableHead>
+                  <TableHead>Balance</TableHead>
+                  <TableHead>Access token</TableHead>
                   <TableHead>Claims</TableHead>
                   <TableHead>Last claimed</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -503,6 +526,19 @@ export default function RainAccountsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{acc.ws_token_masked ?? '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className={acc.balanceLive ? 'text-emerald-600 dark:text-emerald-400' : ''}>
+                          {acc.balance.toFixed(2)} ETB
+                        </span>
+                        {acc.balanceLive && (
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">live</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {acc.has_access_token ? acc.access_token_masked : '—'}
+                    </TableCell>
                     <TableCell>{acc.rain_count}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {acc.last_claimed_at ? formatTime(acc.last_claimed_at) : '—'}

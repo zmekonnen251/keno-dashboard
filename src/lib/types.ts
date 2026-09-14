@@ -120,6 +120,8 @@ export interface RecentPrediction {
 	timeContext: string | null;
 	createdAt: string;
 	hit: number | null;
+	// The actual draw results the prediction was checked against (set with hit).
+	evaluatedDraw?: number[];
 }
 
 export interface AccuracyStats {
@@ -153,6 +155,10 @@ export interface PredictionsResponse {
 	prediction: Prediction | null;
 	recent: RecentPrediction[];
 	accuracy: AccuracyStats | null;
+	// The most recently completed draw recorded for the site, so the UI can
+	// show a prediction next to its ground-truth context.
+	currentDraw: number[] | null;
+	currentDrawAt: string | null;
 	mlStatus?: MlStatus | null;
 }
 
@@ -622,6 +628,8 @@ export interface RainAccount {
 	provider: RainProvider;
 	gateway_host: string;
 	ws_token_masked: string | null;
+	access_token_masked: string | null;
+	has_access_token: boolean;
 	is_enabled: boolean;
 	status: string;
 	connected: boolean;
@@ -632,6 +640,9 @@ export interface RainAccount {
 	lastSlot: number | null;
 	lastWager: number | null;
 	lastRainAt: number | null;
+	// Live wallet balance (BALANCE frames) merged over the persisted value.
+	balance: number;
+	balanceLive: boolean;
 	rain_count: number;
 	last_claimed_at: string | null;
 	created_at: string;

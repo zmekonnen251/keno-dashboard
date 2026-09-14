@@ -264,6 +264,7 @@ export async function createRainAccount(input: {
   name: string;
   ws_token: string;
   provider: RainProvider;
+  access_token?: string;
 }) {
   return apiFetch('api/rain/accounts', {
     method: 'POST',
@@ -278,6 +279,7 @@ export async function updateRainAccount(
     ws_token: string;
     provider: RainProvider;
     is_enabled: boolean;
+    access_token: string | null;
   }>,
 ) {
   return apiFetch(`api/rain/accounts/${id}`, {

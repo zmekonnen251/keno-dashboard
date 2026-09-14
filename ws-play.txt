@@ -87,3 +87,45 @@ now we will add a new functionality on keno-server/dashboard/mobile, it is for c
     ===> the slot index is number b/n 1-slot_count and we will exclude the slot_index that already claimed by others by checking the slot_indexes we get from the message
 
     the rainClaimer socket is always should be live(connected) for each rain claiming accounts
+
+    you have to filter the rain/free-bets that is not used by checking the "pending_bet_count" or "pending_bet_count", pending_bet_count=0 or closed_bet_count=1 means the free bet is used, for collecting the account balance check the won_amount 
+    {
+    "id": "6aa818fc41c2e81d457dd23a",
+    "player_id": "20923fd7052cb546beb9a3ac76fd078e4255337249bd83a99f31d220a59443d1",
+    "wager_amount": 10,
+    "won_amount": 0,
+    "given_count": 1,
+    "pending_bet_count": 0,
+    "closed_bet_count": 1,
+    "game_data": {
+        "min_cashout_odd": 1
+    },
+    "granted_at": 1789401340692,
+    "expires_at": 1789487740692,
+    "source": {
+        "Campaign": {
+            "engagement": {
+                "kind": "RAIN",
+                "rain_id": "6aa818fc41c2e81d457dd231",
+                "slot_index": 37
+            },
+            "campaign_id": "6a8d956c00f3fa8afd5e3360"
+        }
+    }
+}
+
+and for clearing and claiming the used free bets use the message --->
+{
+    "type": "FREE_BET",
+    "payload": {
+        "type": "claim",
+        "free_bet_id": ${free_bet_id}
+    }
+} ==>eg...
+{
+    "type": "FREE_BET",
+    "payload": {
+        "type": "claim",
+        "free_bet_id": "6aa851ff41c2e81d457dd905"
+    }
+} 
