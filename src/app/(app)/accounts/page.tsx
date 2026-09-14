@@ -20,7 +20,7 @@ function fmtDur(ms: number): string {
 }
 
 export default function AccountsPage() {
-  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames'), []);
+  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames_tolobirr'), []);
   const [createCount, setCreateCount] = useState('5');
   const [job, setJob] = useState<CreationJobStatus | null>(null);
   const [jobMsg, setJobMsg] = useState('');

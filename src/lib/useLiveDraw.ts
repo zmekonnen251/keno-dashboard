@@ -76,7 +76,7 @@ export function useLiveDraw() {
 
 		(async () => {
 			try {
-				const res = await getAccounts('fungames');
+				const res = await getAccounts('fungames_tolobirr');
 				if (cancelled) return;
 				tokens = res.accounts
 					.filter((a) => a.ws_token)

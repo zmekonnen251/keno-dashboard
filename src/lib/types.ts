@@ -611,8 +611,10 @@ export interface LiveBalancesResponse {
 }
 
 // Rain (free-bet) claiming accounts. Mirrors server/src/api/rainRoutes.ts
-// toApiAccount(): the ws_token is never echoed back, only masked.
-export type RainProvider = 'fungames' | 'phoenixbet';
+// toApiAccount(): the ws_token is never echoed back, only masked. Rain
+// accounts play the shamo-hosted fungames game, so the plain 'fungames'
+// (draws/autoplay/tolobirr) id never appears here.
+export type RainProvider = 'fungames_shamo' | 'phoenixbet';
 
 export interface RainAccount {
 	id: number;
@@ -657,4 +659,89 @@ export interface RainClaimsResponse {
 	accountId: number;
 	count: number;
 	claims: RainClaimRecord[];
+}
+
+// One rain free-bet in the ledger (server rain_free_bets). status evolves:
+// available → claiming → bet_placed → won/lost (or failed/expired).
+export type RainFreeBetStatus =
+	| 'available'
+	| 'claiming'
+	| 'bet_placed'
+	| 'won'
+	| 'lost'
+	| 'failed'
+	| 'expired';
+
+export interface RainFreeBet {
+	id: number;
+	account_id: number;
+	account_name?: string;
+	account_enabled?: boolean;
+	free_bet_id: string;
+	player_id: string | null;
+	wager_amount: number;
+	won_amount: number;
+	given_count: number;
+	pending_bet_count: number;
+	closed_bet_count: number;
+	min_cashout_odd: number | null;
+	granted_at: string | null;
+	expires_at: string | null;
+	source_kind: 'campaign' | 'p2p_rain' | null;
+	campaign_id: string | null;
+	giver_player_id: string | null;
+	rain_id: string | null;
+	slot_index: number | null;
+	status: RainFreeBetStatus;
+	request_id: string | null;
+	chosen_spots: number[] | null;
+	bet_placed_at: string | null;
+	error: string | null;
+	last_seen_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface RainFreeBetsResponse {
+	ok: boolean;
+	count: number;
+	bets: RainFreeBet[];
+}
+
+export interface RainAutoplayConfig {
+	id: 1;
+	enabled: boolean;
+	provider: RainProvider;
+	tickets_per_round: number;
+	spots_mode: 'prediction' | 'manual';
+	manual_spots: number[];
+	round_interval: number;
+	updated_at: string;
+}
+
+export interface RainAutoplayConfigResponse {
+	ok: boolean;
+	config: RainAutoplayConfig;
+}
+
+export interface RainAutoplayStatus {
+	running: boolean;
+	intervalMs: number;
+	lastRoundAt: number | null;
+	lastRoundDurationMs: number | null;
+	lastRoundPlayed: number;
+	totalPlayed: number;
+	lastError: string | null;
+	pendingAcks: number;
+}
+
+export interface RainAutoplayStatusResponse {
+	ok: boolean;
+	status: RainAutoplayStatus;
+	config: RainAutoplayConfig;
+}
+
+export interface PlayRainFreeBetResponse {
+	ok: boolean;
+	result: { ok: boolean; found: boolean; request_id?: string; error?: string };
 }

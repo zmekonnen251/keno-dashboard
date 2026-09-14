@@ -18,7 +18,7 @@ const STORAGE_KEY = 'keno-dashboard-site';
 
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [sites, setSites] = useState<ProviderSummary[]>([]);
-  const [siteId, setSiteIdState] = useState('fungames');
+  const [siteId, setSiteIdState] = useState('fungames_tolobirr');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

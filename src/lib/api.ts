@@ -31,6 +31,11 @@ import type {
   RainAccountsResponse,
   RainClaimsResponse,
   RainProvider,
+  RainAutoplayConfig,
+  RainAutoplayConfigResponse,
+  RainAutoplayStatusResponse,
+  RainFreeBetsResponse,
+  PlayRainFreeBetResponse,
 } from './types';
 
 // ---- auth ----
@@ -120,7 +125,7 @@ export async function refreshSession(id: number) {
 }
 
 // ---- accounts ----
-export async function getAccounts(provider = 'fungames'): Promise<AccountsResponse> {
+export async function getAccounts(provider = 'fungames_tolobirr'): Promise<AccountsResponse> {
   return apiFetch<AccountsResponse>(`api/accounts?provider=${encodeURIComponent(provider)}`);
 }
 
@@ -291,6 +296,40 @@ export async function refreshRainAccount(id: number) {
 
 export async function getRainClaims(id: number): Promise<RainClaimsResponse> {
   return apiFetch<RainClaimsResponse>(`api/rain/accounts/${id}/claims`);
+}
+
+// ---- rain autoplay (clock-driven free-bet rounds) ----
+export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigResponse> {
+  return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config');
+}
+
+export async function setRainAutoplayConfig(
+  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval'>>,
+): Promise<RainAutoplayConfigResponse> {
+  return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function rainAutoplayStart() {
+  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/autoplay/start', { method: 'POST' });
+}
+
+export async function rainAutoplayStop() {
+  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/autoplay/stop', { method: 'POST' });
+}
+
+export async function getRainAutoplayStatus(): Promise<RainAutoplayStatusResponse> {
+  return apiFetch<RainAutoplayStatusResponse>('api/rain/autoplay/status');
+}
+
+export async function getRainFreeBets(): Promise<RainFreeBetsResponse> {
+  return apiFetch<RainFreeBetsResponse>('api/rain/free-bets');
+}
+
+export async function playRainFreeBet(id: number): Promise<PlayRainFreeBetResponse> {
+  return apiFetch<PlayRainFreeBetResponse>(`api/rain/free-bets/${id}/play`, { method: 'POST' });
 }
 
 // ---- proxies ----

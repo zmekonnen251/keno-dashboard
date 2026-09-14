@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getRainAccounts,
   createRainAccount,
@@ -8,11 +8,20 @@ import {
   deleteRainAccount,
   refreshRainAccount,
   getRainClaims,
+  setRainAutoplayConfig,
+  rainAutoplayStart,
+  rainAutoplayStop,
+  getRainAutoplayStatus,
+  getRainFreeBets,
+  playRainFreeBet,
 } from '@/lib/api';
 import type {
   RainAccount,
   RainProvider,
   RainClaimRecord,
+  RainAutoplayConfig,
+  RainFreeBet,
+  RainAutoplayStatus,
 } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -36,15 +45,25 @@ import { Modal } from '@/components/ui/modal';
 import { formatTime } from '@/lib/format';
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
-  fungames: 'gateway.fungames.live',
+  fungames_shamo: 'gateway.fungames.live',
   phoenixbet: 'gateway.phoenixbet.io',
 };
 
-const PROVIDERS: RainProvider[] = ['fungames', 'phoenixbet'];
+const PROVIDERS: RainProvider[] = ['fungames_shamo', 'phoenixbet'];
+
+const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
+  available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
+  claiming: { label: 'Claiming', cls: 'bg-amber-500 text-black' },
+  bet_placed: { label: 'Bet placed', cls: 'bg-sky-600 text-white' },
+  won: { label: 'Won', cls: 'bg-emerald-600 text-white' },
+  lost: { label: 'Lost', cls: 'bg-zinc-600 text-white' },
+  failed: { label: 'Failed', cls: 'bg-rose-600 text-white' },
+  expired: { label: 'Expired', cls: 'bg-muted text-muted-foreground' },
+};
 
 function ProviderBadge({ provider }: { provider: RainProvider }) {
   return (
-    <Badge className={provider === 'phoenixbet' ? 'bg-fuchsia-600 text-white' : ''} variant={provider === 'fungames' ? 'default' : 'secondary'}>
+    <Badge className={provider === 'phoenixbet' ? 'bg-fuchsia-600 text-white' : ''} variant={provider === 'fungames_shamo' ? 'default' : 'secondary'}>
       {provider}
     </Badge>
   );
@@ -73,7 +92,7 @@ function AccountForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
-  const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? 'fungames');
+  const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? 'fungames_shamo');
   const [wsToken, setWsToken] = useState('');
   const [enabled, setEnabled] = useState(initial?.is_enabled ?? true);
   const [busy, setBusy] = useState(false);
@@ -150,12 +169,197 @@ function AccountForm({
   );
 }
 
+// Clock-driven rain autoplay: a single config row gates the engine on the
+// server, which plays eligible rain free-bets each round.
+function AutoplayCard() {
+  const [config, setConfig] = useState<RainAutoplayConfig | null>(null);
+  const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // The status endpoint also returns the current config, so a single poll loop
+  // keeps both alive without seeding state synchronously inside the effect.
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const res = await getRainAutoplayStatus();
+        if (!alive) return;
+        setStatus(res.status);
+        setConfig((c) => (c ? { ...c, ...res.config } : res.config));
+      } catch (e) {
+        if (!alive) return;
+        setMsg(e instanceof Error ? e.message : String(e));
+      }
+    };
+    void tick();
+    const timer = setInterval(() => { void tick(); }, 10000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  async function save() {
+    if (!config) return;
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await setRainAutoplayConfig({
+        enabled: config.enabled,
+        provider: config.provider,
+        tickets_per_round: config.tickets_per_round,
+        spots_mode: config.spots_mode,
+        manual_spots: config.manual_spots,
+        round_interval: config.round_interval,
+      });
+      setConfig(res.config);
+      setMsg('Autoplay config saved.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function start() {
+    setMsg('');
+    try {
+      await rainAutoplayStart();
+      const res = await getRainAutoplayStatus();
+      setStatus(res.status);
+      setConfig((c) => (c ? { ...c, ...res.config } : res.config));
+      setMsg('Rain autoplay engine started.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function stop() {
+    setMsg('');
+    try {
+      await rainAutoplayStop();
+      const res = await getRainAutoplayStatus();
+      setStatus(res.status);
+      setConfig((c) => (c ? { ...c, ...res.config } : res.config));
+      setMsg('Rain autoplay engine stopped.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <Card
+      title="Rain Autoplay"
+      actions={
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold ${status?.running ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+            Engine: {status?.running ? 'RUNNING' : 'IDLE'}
+          </span>
+          <Button variant="outline" size="sm" onClick={start}>Start</Button>
+          <Button variant="outline" size="sm" onClick={stop}>Stop</Button>
+        </div>
+      }
+    >
+      {msg && <p className="mb-3 text-xs text-muted-foreground">{msg}</p>}
+      {!config ? (
+        <Loading rows={2} />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <Label htmlFor="rain-auto-enabled">Enabled</Label>
+            <Select value={String(config.enabled)} onValueChange={(v) => setConfig({ ...config, enabled: v === 'true' })}>
+              <SelectTrigger id="rain-auto-enabled"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Enabled — run rounds when started</SelectItem>
+                <SelectItem value="false">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-provider">Provider</Label>
+            <Select value={config.provider} onValueChange={(v) => setConfig({ ...config, provider: v as RainProvider })}>
+              <SelectTrigger id="rain-auto-provider"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PROVIDERS.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-tickets">Tickets per round</Label>
+            <Input
+              id="rain-auto-tickets"
+              type="number"
+              min={0}
+              max={50}
+              value={config.tickets_per_round}
+              onChange={(e) => setConfig({ ...config, tickets_per_round: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>
+            <Input
+              id="rain-auto-interval"
+              type="number"
+              min={5}
+              max={3600}
+              value={config.round_interval}
+              onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-spots-mode">Chosen spots source</Label>
+            <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v === 'prediction' ? 'prediction' : 'manual' })}>
+              <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual spots below</SelectItem>
+                <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-manual-spots">Manual spots (1–80, comma-separated)</Label>
+            <Input
+              id="rain-auto-manual-spots"
+              value={config.manual_spots.join(', ')}
+              onChange={(e) =>
+                setConfig({
+                  ...config,
+                  manual_spots: e.target.value.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 1 && n <= 80).slice(0, 20),
+                })
+              }
+              disabled={config.spots_mode !== 'manual'}
+            />
+          </div>
+        </div>
+      )}
+      {status && (
+        <div className="mt-3 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+          <span>Rounds played total: <b>{status.totalPlayed}</b></span>
+          <span>Last round: <b>{status.lastRoundPlayed}</b> bet{status.lastRoundPlayed === 1 ? '' : 's'}</span>
+          <span>Last round at: <b>{status.lastRoundAt ? formatTime(new Date(status.lastRoundAt).toISOString()) : '—'}</b></span>
+          <span>Pending acks: <b>{status.pendingAcks}</b></span>
+          {status.lastError && <span className="text-rose-600 dark:text-rose-400 sm:col-span-2 lg:col-span-4">Last error: {status.lastError}</span>}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end">
+        <Button onClick={save} disabled={busy || !config}>{busy ? 'Saving…' : 'Save config'}</Button>
+      </div>
+    </Card>
+  );
+}
+
 export default function RainAccountsPage() {
   const { data, error, loading, refresh } = useApi(() => getRainAccounts(), []);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<RainAccount | null>(null);
   const [claims, setClaims] = useState<{ account: RainAccount; rows: RainClaimRecord[] } | null>(null);
   const [claimsLoading, setClaimsLoading] = useState(false);
+  const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
+  const [freeBetsLoading, setFreeBetsLoading] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
 
@@ -210,6 +414,38 @@ export default function RainAccountsPage() {
     }
   }
 
+  async function onShowFreeBets() {
+    setFreeBetsLoading(true);
+    setFreeBets(null);
+    try {
+      const res = await getRainFreeBets();
+      setFreeBets(res.bets);
+    } catch (e) {
+      setFreeBets([]);
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFreeBetsLoading(false);
+    }
+  }
+
+  async function onPlayFreeBet(bet: RainFreeBet) {
+    setPlayingId(bet.id);
+    setMsg('');
+    try {
+      const res = await playRainFreeBet(bet.id);
+      if (!res.result.ok) {
+        setMsg(res.result.error || 'Failed to place bet.');
+      } else {
+        setMsg(`Bet placed for ${bet.free_bet_id} (row #${bet.id}).`);
+      }
+      await onShowFreeBets();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPlayingId(null);
+    }
+  }
+
   if (loading) return <Loading />;
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No rain accounts" />;
@@ -219,11 +455,14 @@ export default function RainAccountsPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-foreground">Rain Accounts</h2>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => void onShowFreeBets()}>Free bets</Button>
           <Button variant="outline" onClick={refresh}>Refresh</Button>
           <Button onClick={() => setAdding(true)}>Add account</Button>
         </div>
       </div>
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
+
+      <AutoplayCard />
 
       <Card title={`Rain-claiming accounts (${data.count})`}>
         {data.accounts.length ? (
@@ -332,6 +571,73 @@ export default function RainAccountsPage() {
             </div>
           ) : (
             <Empty label="No claims recorded yet." />
+          )}
+        </Modal>
+      )}
+
+      {freeBets && (
+        <Modal title="Rain free bets (ledger)" onClose={() => setFreeBets(null)} wide>
+          {freeBetsLoading ? (
+            <Loading rows={3} />
+          ) : freeBets.length ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Free bet</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Wager</TableHead>
+                    <TableHead>Closed</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Spots</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {freeBets.map((b) => {
+                    const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
+                    const playable = b.status === 'available' || b.status === 'failed';
+                    return (
+                      <TableRow key={b.id}>
+                        <TableCell className="whitespace-nowrap">
+                          <span className="font-medium">{b.account_name ?? `#${b.account_id}`}</span>
+                          {!b.account_enabled && <span className="ml-1 text-[10px] text-muted-foreground">(disabled)</span>}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{b.free_bet_id}</TableCell>
+                        <TableCell className="text-xs">
+                          {b.source_kind === 'p2p_rain'
+                            ? <>Rain{b.rain_id ? ` #${b.rain_id}` : ''}{b.slot_index != null ? ` slot ${b.slot_index}` : ''}</>
+                            : b.source_kind === 'campaign'
+                              ? `Campaign${b.campaign_id ? ` ${b.campaign_id}` : ''}`
+                              : '—'}
+                        </TableCell>
+                        <TableCell>+{b.wager_amount} ETB</TableCell>
+                        <TableCell>{b.closed_bet_count}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{b.expires_at ? formatTime(b.expires_at) : '—'}</TableCell>
+                        <TableCell className="font-mono text-xs">{b.chosen_spots?.length ? b.chosen_spots.join(', ') : '—'}</TableCell>
+                        <TableCell>
+                          <Badge className={s.cls} title={b.error ?? undefined}>{s.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!playable || playingId === b.id}
+                            onClick={() => void onPlayFreeBet(b)}
+                          >
+                            {playingId === b.id ? '…' : 'Play'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <Empty label="No free bets in the ledger yet. They appear as rain accounts receive FREE_BET frames." />
           )}
         </Modal>
       )}
