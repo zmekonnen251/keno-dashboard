@@ -87,9 +87,16 @@ function SitePredictionCard({ siteId }: { siteId: string }) {
           {evaluated ? (
             <div className="space-y-1.5">
               <MatchChips picks={evaluated.numbers} actual={evaluated.evaluatedDraw} />
+              {evaluated.ticket?.length ? (
+                <MatchChips picks={evaluated.ticket} actual={evaluated.evaluatedDraw} />
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {evaluated.hit ? 'Won' : 'Lost'} ·{' '}
-                {evaluated.numbers.filter((n) => evaluated.evaluatedDraw?.includes(n)).length}/{evaluated.numbers.length} of the picks were on the draw ·{' '}
+                {evaluated.numbers.filter((n) => evaluated.evaluatedDraw?.includes(n)).length}/{evaluated.numbers.length} of the 10 picks were on the draw · ticket{' '}
+                {evaluated.ticket?.length
+                  ? `${evaluated.ticket.filter((n) => evaluated.evaluatedDraw?.includes(n)).length}/${evaluated.ticket.length}`
+                  : '—'}
+                {' · '}
                 {formatTime(evaluated.createdAt)}
               </p>
             </div>
@@ -232,6 +239,7 @@ export default function PredictionsPage() {
                       <span className={r.hit ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
                         {r.hit ? '✓' : '✗'}
                         {r.evaluatedDraw ? ` ${r.numbers.filter((n) => r.evaluatedDraw?.includes(n)).length}/${r.numbers.length}` : ''}
+                        {r.evaluatedDraw && r.ticket?.length ? ` · ticket ${r.ticket.filter((n) => r.evaluatedDraw?.includes(n)).length}/${r.ticket.length}` : ''}
                       </span>
                     )}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatTime(r.createdAt)}</TableCell>

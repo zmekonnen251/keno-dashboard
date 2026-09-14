@@ -129,3 +129,7 @@ and for clearing and claiming the used free bets use the message --->
         "free_bet_id": "6aa851ff41c2e81d457dd905"
     }
 } 
+
+
+shamo automation
+mulasport_session={"token":"6f476a66d4802a916632a45c152049ad2188746a","tgUserId":""}
