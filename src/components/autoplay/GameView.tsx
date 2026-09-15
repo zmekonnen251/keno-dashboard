@@ -218,14 +218,14 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           {current.length === 0 ? (
             <p className='py-4 text-center text-xs italic text-slate-500'>No bets placed in the current game yet.</p>
           ) : (
-            <div className='flex flex-wrap gap-2 lg:max-h-[480px] lg:overflow-y-auto lg:pr-1'>
+            <div className='flex flex-wrap gap-2 lg:max-h-120 lg:overflow-y-auto lg:pr-1'>
               {current.map((p) => {
                 const st = statusLabel(p);
                 const isWinner = winners.tickets.some((w) => w.accountId === p.accountId && w.requestId === p.requestId);
                 return (
                   <div
                     key={`${p.accountId}-${p.requestId}-${p.placedAt}`}
-                    className={`min-w-44 flex-1 rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/[0.03]'}`}
+                    className={`min-w-44 flex-1 rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/3'}`}
                   >
                     <div className='flex flex-wrap gap-1'>
                       {(p.spots || []).map((n) => (

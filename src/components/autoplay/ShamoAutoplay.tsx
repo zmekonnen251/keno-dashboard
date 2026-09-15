@@ -45,6 +45,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const [accounts, setAccounts] = useState<RainAccount[]>([]);
   const [playHistory, setPlayHistory] = useState<RainFreeBet[] | null>(null);
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
+  const [showFreeBets, setShowFreeBets] = useState(false);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
   const [bettingPrediction, setBettingPrediction] = useState(false);
   const [checkingAll, setCheckingAll] = useState(false);
@@ -206,6 +207,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   }
 
   function onShowFreeBets() {
+    setShowFreeBets(true);
     setFreeBetsLoading(true);
     setFreeBets(null);
     void getRainFreeBets()
@@ -218,6 +220,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const liveBalance = accounts.some((a) => a.balanceLive);
   const connected = accounts.filter((a) => a.connected).length;
   const availableFb = (freeBets ?? []).filter((b) => b.status === 'available' || b.status === 'failed').length;
+  const ledgerBets = freeBets ?? [];
 
   return (
     <div className="space-y-5">
@@ -404,11 +407,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         </Modal>
       )}
 
-      {freeBets && (
-        <Modal title="Rain free bets (ledger)" onClose={() => setFreeBets(null)} wide>
-          {freeBetsLoading ? (
+      {showFreeBets && (
+        <Modal title="Rain free bets (ledger)" onClose={() => setShowFreeBets(false)} wide>
+          {freeBetsLoading || freeBets === null ? (
             <Loading rows={3} />
-          ) : freeBets.length ? (
+          ) : ledgerBets.length ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -423,7 +426,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {freeBets.map((b) => {
+                  {ledgerBets.map((b) => {
                     const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
                     const playable = b.status === 'available' || b.status === 'failed';
                     return (
