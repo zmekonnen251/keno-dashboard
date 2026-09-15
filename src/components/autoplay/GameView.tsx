@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AutoplayPlacedBet } from '@/lib/types';
 import { paytableWin } from '@/lib/kenoOdds';
 import { notificationPermission, playWinSound, pushWinNotification, requestNotificationPermission } from '@/lib/sound';
-import { isPushActive, pushSupported, subscribePush, unsubscribePush } from '@/lib/push';
+import { isPushActive, pushSupported, subscribePush, unsubscribePush, rePostSubscription } from '@/lib/push';
+import { getNotifyPref, setNotifyPref, getSoundPref, setSoundPref } from '@/lib/notifyPrefs';
 import { useNotifications } from '@/lib/notifications';
 import { useLiveDraw } from '@/lib/useLiveDraw';
 import { CopyPhoneButton } from '@/components/accounts-columns';
@@ -31,12 +32,26 @@ function statusLabel(p: AutoplayPlacedBet): { text: string; tone: string } {
 
 export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: number[] }) {
   const { status, observer, drawn, updatedAt } = useLiveDraw();
-  const [soundOn, setSoundOn] = useState(true);
-  const [notifyOn, setNotifyOn] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => getSoundPref());
+  const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
   const [alerts, setAlerts] = useState<WinAlert[]>([]);
   const celebratedRef = useRef<Set<string>>(new Set());
   const { notify } = useNotifications();
+
+  // On mount: silently re-post the existing browser push subscription to the
+  // server (idempotent) so server-delivered Chrome notifications keep working
+  // after a page reload. If the user had notifications enabled previously,
+  // this makes them work again immediately.
+  useEffect(() => {
+    if (!getNotifyPref() && !isPushActive()) return;
+    void (async () => {
+      const ok = await rePostSubscription();
+      setPushOn(ok);
+      setNotifyOn(true);
+      setNotifyPref(true);
+    })();
+  }, []);
 
   const newest = useMemo(() => bets.reduce((m, b) => Math.max(m, b.placedAt ?? 0), 0), [bets]);
   const current = useMemo(
@@ -90,15 +105,25 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       await unsubscribePush();
       setPushOn(false);
       setNotifyOn(false);
+      setNotifyPref(false);
       return;
     }
     if (pushSupported() && (await subscribePush())) {
       setPushOn(true);
       setNotifyOn(true);
+      setNotifyPref(true);
       return;
     }
     const perm = await requestNotificationPermission();
-    setNotifyOn(perm === 'granted');
+    const granted = perm === 'granted';
+    setNotifyOn(granted);
+    setNotifyPref(granted);
+  }
+
+  function onToggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundPref(next);
   }
 
   const done = drawn.length >= 20;
@@ -118,7 +143,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
         </div>
         <div className='flex items-center gap-2 text-xs'>
           <button
-            onClick={() => setSoundOn((v) => !v)}
+            onClick={onToggleSound}
             className={`rounded-md border px-2 py-1 font-bold ${soundOn ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'}`}
             title='Toggle win sound'
           >

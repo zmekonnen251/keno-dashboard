@@ -22,9 +22,22 @@ import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
 import { PredictionBetCard } from '@/components/autoplay/PredictionBetCard';
 import { GameView } from '@/components/autoplay/GameView';
+import { LastDrawsBoards } from '@/components/autoplay/LastDrawsBoards';
+import { ShamoAutoplay } from '@/components/autoplay/ShamoAutoplay';
+import { useSite } from '@/components/site-provider';
 import { Modal } from '@/components/ui/modal';
 
+// Site-gated autoplay: the tolobirr (real-money gateway) autoplay is shown for
+// the default site, while fungames_shamo is driven by rain free-bets.
 export default function AutoplayPage() {
+	const { siteId, siteName } = useSite();
+	if (siteId === 'fungames_shamo') {
+		return <ShamoAutoplay siteName={siteName} />;
+	}
+	return <TolobirrAutoplay />;
+}
+
+function TolobirrAutoplay() {
 	const { data: conn, error, loading, refresh } = useApi(() => autoplayStatus(), []);
 	const [testing, setTesting] = useState(false);
 	const [testMsg, setTestMsg] = useState('');
@@ -163,6 +176,8 @@ export default function AutoplayPage() {
 			</CollapsibleCard>
 
 			<GameView bets={bets} picks={manualPicks} />
+
+			<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />
 
 			<CollapsibleCard title='Signals' defaultOpen={false}>
 				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
