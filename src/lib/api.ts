@@ -36,6 +36,10 @@ import type {
   RainAutoplayStatusResponse,
   RainFreeBetsResponse,
   PlayRainFreeBetResponse,
+  RainCashBetsResponse,
+  RainManualBetResponse,
+  RainTestRoundResponse,
+  RainWsTokensResponse,
   TicketPlan,
 } from './types';
 
@@ -358,8 +362,11 @@ export async function getRainFreeBets(): Promise<RainFreeBetsResponse> {
   return apiFetch<RainFreeBetsResponse>('api/rain/free-bets');
 }
 
-export async function playRainFreeBet(id: number): Promise<PlayRainFreeBetResponse> {
-  return apiFetch<PlayRainFreeBetResponse>(`api/rain/free-bets/${id}/play`, { method: 'POST' });
+export async function playRainFreeBet(id: number, spots?: number[]): Promise<PlayRainFreeBetResponse> {
+  return apiFetch<PlayRainFreeBetResponse>(`api/rain/free-bets/${id}/play`, {
+    method: 'POST',
+    body: spots && spots.length ? JSON.stringify({ spots }) : undefined,
+  });
 }
 
 // Manual "Bet Prediction" for rain: plays the latest prediction's preferred
@@ -368,6 +375,35 @@ export async function rainBetPrediction(): Promise<{ ok: boolean; result: { ok: 
   return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/rain/bet-prediction', {
     method: 'POST',
   });
+}
+
+// Forced test round: the engine immediately plays as many eligible free-bets
+// as the current config allows, whether or not it is running.
+export async function rainTestRound(): Promise<RainTestRoundResponse> {
+  return apiFetch<RainTestRoundResponse>('api/rain/autoplay/test-round', { method: 'POST' });
+}
+
+// Manual CASH wager through a rain account. Spots are the keno numbers
+// (1–10 of 1–80), stake is the amount to bet.
+export async function rainManualCashBet(
+  accountId: number,
+  spots: number[],
+  stake: number,
+): Promise<RainManualBetResponse> {
+  return apiFetch<RainManualBetResponse>('api/rain/autoplay/manual-bet', {
+    method: 'POST',
+    body: JSON.stringify({ account_id: accountId, spots, stake }),
+  });
+}
+
+// Recent manual CASH wagers across all rain accounts (newest first).
+export async function getRainCashBets(limit = 100): Promise<RainCashBetsResponse> {
+  return apiFetch<RainCashBetsResponse>(`api/rain/cash-bets?limit=${limit}`);
+}
+
+// Raw ws_tokens for the live-drawing observer (admin-only). Never rendered.
+export async function getRainWsTokens(): Promise<RainWsTokensResponse> {
+  return apiFetch<RainWsTokensResponse>('api/rain/accounts/ws-tokens');
 }
 
 // ---- proxies ----

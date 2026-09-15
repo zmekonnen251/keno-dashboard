@@ -779,3 +779,66 @@ export interface PlayRainFreeBetResponse {
 	ok: boolean;
 	result: { ok: boolean; found: boolean; request_id?: string; error?: string };
 }
+
+// A manual CASH wager placed through a rain account (server Mirrors
+// server/src/rain/rainClaimer.ts RainCashBet). `status` is one of
+// won / lost / failed; `winAmount` is null while pending and on failed bets.
+export type RainCashBetStatus = 'won' | 'lost' | 'failed';
+
+export interface RainCashBet {
+	accountId: number;
+	phone: string;
+	accountName: string;
+	spots: number[];
+	stake: number;
+	requestId: string;
+	status: RainCashBetStatus;
+	winAmount: number | null;
+	matched: number | null;
+	drawnSpots: number[];
+	failReason?: string;
+	placedAt: number;
+	settledAt: number;
+}
+
+export interface RainCashBetsResponse {
+	ok: boolean;
+	count: number;
+	bets: RainCashBet[];
+}
+
+export interface RainManualBetResponse {
+	ok: boolean;
+	result: {
+		ok: boolean;
+		requestId: string;
+		balance: number | null;
+		error?: string;
+	};
+}
+
+export interface RainTestRoundResponse {
+	ok: boolean;
+	result: {
+		ok: boolean;
+		played: number;
+		bets: { accountId: number; freeBetId: string; requestId: string }[];
+	};
+}
+
+// Raw (unmasked) ws_tokens for enabled rain accounts — used only by the
+// live-drawing observer, never displayed.
+export interface RainWsToken {
+	id: number;
+	name: string;
+	phone: string;
+	provider: RainProvider;
+	gateway_host: string;
+	ws_token: string | null;
+}
+
+export interface RainWsTokensResponse {
+	ok: boolean;
+	count: number;
+	tokens: RainWsToken[];
+}

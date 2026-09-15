@@ -9,8 +9,10 @@ import {
   refreshRainAccount,
   checkAllRainStatus,
   getRainFreeBets,
+  getRainCashBets,
   playRainFreeBet,
   rainBetPrediction,
+  rainTestRound,
 } from '@/lib/api';
 import { isPushActive, pushSupported, subscribePush, unsubscribePush, rePostSubscription } from '@/lib/push';
 import { getNotifyPref, setNotifyPref } from '@/lib/notifyPrefs';
@@ -19,11 +21,15 @@ import type {
   RainAutoplayConfig,
   RainAutoplayStatus,
   RainFreeBet,
+  RainCashBet,
 } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, Empty, Loading, StatCard, TableCell, TableRow } from '@/components/app';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
+import { NumberGrid } from './NumberGrid';
+import { RainLiveView } from './RainLiveView';
+import { RainManualBetCard } from './RainManualBetCard';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
@@ -45,13 +51,18 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const [accounts, setAccounts] = useState<RainAccount[]>([]);
   const [playHistory, setPlayHistory] = useState<RainFreeBet[] | null>(null);
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
+  const [cashBets, setCashBets] = useState<RainCashBet[]>([]);
   const [showFreeBets, setShowFreeBets] = useState(false);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
   const [bettingPrediction, setBettingPrediction] = useState(false);
+  const [testingRound, setTestingRound] = useState(false);
   const [checkingAll, setCheckingAll] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [pickBet, setPickBet] = useState<RainFreeBet | null>(null);
+  const [pickSpots, setPickSpots] = useState<number[]>([]);
+  const [pickSpotsCount, setPickSpotsCount] = useState<2 | 3>(3);
   const [msg, setMsg] = useState('');
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
@@ -111,8 +122,31 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       setAccounts(accRes.accounts);
       setPlayHistory(betRes.bets.filter((b) => (b.chosen_spots?.length ?? 0) > 0));
       setFreeBets(betRes.bets);
+      void getRainCashBets(100)
+        .then((res) => setCashBets(res.bets))
+        .catch(() => {});
     } catch {
       /* keep the last lists */
+    }
+  }
+
+  async function onTestRound() {
+    setTestingRound(true);
+    setMsg('');
+    try {
+      const res = await rainTestRound();
+      if (!res.ok) {
+        setMsg('Test round failed — is the claimer running with eligible free-bets?');
+      } else {
+        setMsg(res.result.played > 0
+          ? `Test round played ${res.result.played} free-bet${res.result.played === 1 ? '' : 's'}.`
+          : 'Test round completed — no eligible free-bets to play.');
+      }
+      void refreshAccountsAndBets();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTestingRound(false);
     }
   }
 
@@ -188,17 +222,31 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
     }
   }
 
-  async function onPlayFreeBet(bet: RainFreeBet) {
-    setPlayingId(bet.id);
+  function onPlayFreeBet(bet: RainFreeBet) {
+    const existing = (bet.chosen_spots ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= 80);
+    const count: 2 | 3 = existing.length === 2 ? 2 : 3;
+    setPickSpotsCount(count);
+    setPickSpots(existing.length ? existing.slice(0, count) : []);
+    setPickBet(bet);
+    setMsg('');
+  }
+
+  async function onPlayWithSpots() {
+    if (!pickBet || pickSpots.length < 2) {
+      setMsg('Pick at least 2 numbers before playing the free bet.');
+      return;
+    }
+    setPlayingId(pickBet.id);
     setMsg('');
     try {
-      const res = await playRainFreeBet(bet.id);
+      const res = await playRainFreeBet(pickBet.id, pickSpots);
       if (!res.result.ok) {
         setMsg(res.result.error || 'Failed to place bet.');
       } else {
-        setMsg(`Bet placed for ${bet.free_bet_id} (row #${bet.id}).`);
+        setMsg(`Bet placed for ${pickBet.free_bet_id} (row #${pickBet.id}) · [${pickSpots.join(', ')}].`);
       }
       void refreshAccountsAndBets();
+      setPickBet(null);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -234,6 +282,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
           )}
           <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
             {bettingPrediction ? '…' : 'Bet prediction'}
+          </Button>
+          <Button variant="outline" disabled={testingRound} onClick={() => void onTestRound()}>
+            {testingRound ? '…' : 'Test round'}
           </Button>
           <Button variant="outline" disabled={checkingAll} onClick={() => void onCheckAll()}>
             {checkingAll ? '…' : 'Check all rains'}
@@ -293,6 +344,10 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
 
       <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
+
+      <RainManualBetCard accounts={accounts} onMessage={setMsg} onSettled={() => void refreshAccountsAndBets()} />
+
+      <RainLiveView bets={cashBets} picks={cfg?.spots_mode === 'manual' ? cfg?.manual_spots : undefined} />
 
       <Card title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
         {playHistory === null ? (
@@ -404,6 +459,66 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       {showConfig && (
         <Modal title="Rain autoplay configuration" onClose={() => setShowConfig(false)} wide>
           <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} />
+        </Modal>
+      )}
+
+      {pickBet && (
+        <Modal
+          title={`Play free bet — ${pickBet.free_bet_id}`}
+          onClose={() => {
+            if (playingId === pickBet.id) return;
+            setPickBet(null);
+          }}
+          wide
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Pick the ticket numbers for this free-bet wager (wager{' '}
+              <span className="font-semibold text-foreground">+{pickBet.wager_amount} ETB</span> on{' '}
+              <span className="font-mono">{pickBet.account_name ?? `#${pickBet.account_id}`}</span>). Existing picks are
+              pre-selected — adjust them or keep as-is.
+            </p>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Spots</label>
+              <select
+                value={String(pickSpotsCount)}
+                onChange={(e) => {
+                  const v = e.target.value === '2' ? 2 : 3;
+                  setPickSpotsCount(v);
+                  setPickSpots((prev) => prev.slice(0, v));
+                }}
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+              >
+                <option value="2">2 numbers</option>
+                <option value="3">3 numbers</option>
+              </select>
+            </div>
+            <NumberGrid
+              selected={pickSpots}
+              max={pickSpotsCount}
+              onToggle={(n) =>
+                setPickSpots((prev) => {
+                  if (prev.includes(n)) return prev.filter((x) => x !== n);
+                  if (prev.length >= pickSpotsCount) return [...prev.slice(1), n];
+                  return [...prev, n].sort((a, b) => a - b);
+                })
+              }
+              onClear={() => setPickSpots([])}
+            />
+            <div className="flex items-center justify-between">
+              <span className="rounded-lg border border-border px-3 py-2 font-mono text-xs">
+                Selected: {pickSpots.length > 0 ? `[${pickSpots.join(',')}]` : '—'}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setPickBet(null)} disabled={playingId === pickBet.id}>
+                  Cancel
+                </Button>
+                <Button onClick={() => void onPlayWithSpots()} disabled={playingId === pickBet.id || pickSpots.length < 2}>
+                  {playingId === pickBet.id ? 'Playing…' : 'Play free bet'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
 

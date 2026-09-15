@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAccounts } from '@/lib/api';
+import { getAccounts, getRainWsTokens } from '@/lib/api';
 import { GATEWAY_URL } from '@/hooks/useGatewayWorker';
 
 export type LiveDrawStatus = 'connecting' | 'live' | 'waiting';
+
+// Which account pool feeds the observer socket. The shamo site is the rain
+// accounts pool (their ws_tokens are raw gateway tokens, fetched from the
+// admin-only ws-tokens endpoint); the tolobirr site is the autoplay accounts.
+export type DrawTokenSource = 'tolobirr' | 'shamo';
 
 function parseDrawnSpots(data: unknown): number[] | null {
 	if (!data || typeof data !== 'object') return null;
@@ -18,7 +23,7 @@ function parseDrawnSpots(data: unknown): number[] | null {
 
 // One observer WebSocket (any account ws_token — the draw is global, we only
 // watch). Rotates to the next token if a socket drops.
-export function useLiveDraw() {
+export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 	const [status, setStatus] = useState<LiveDrawStatus>('connecting');
 	const [observer, setObserver] = useState('');
 	const [drawn, setDrawn] = useState<number[]>([]);
@@ -76,11 +81,19 @@ export function useLiveDraw() {
 
 		(async () => {
 			try {
-				const res = await getAccounts('fungames_tolobirr');
-				if (cancelled) return;
-				tokens = res.accounts
-					.filter((a) => a.ws_token)
-					.map((a) => ({ phone: a.phone, ws_token: a.ws_token as string }));
+				if (tokenSource === 'shamo') {
+					const res = await getRainWsTokens();
+					if (cancelled) return;
+					tokens = res.tokens
+						.filter((t) => t.ws_token)
+						.map((t) => ({ phone: t.phone || t.name, ws_token: t.ws_token as string }));
+				} else {
+					const res = await getAccounts('fungames_tolobirr');
+					if (cancelled) return;
+					tokens = res.accounts
+						.filter((a) => a.ws_token)
+						.map((a) => ({ phone: a.phone, ws_token: a.ws_token as string }));
+				}
 				connect();
 			} catch {
 				if (!cancelled) setStatus('waiting');
@@ -96,7 +109,7 @@ export function useLiveDraw() {
 				// Ignore close errors on unmount.
 			}
 		};
-	}, []);
+	}, [tokenSource]);
 
 	return { status, observer, drawn, updatedAt };
 }
