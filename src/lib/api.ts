@@ -36,6 +36,7 @@ import type {
   RainAutoplayStatusResponse,
   RainFreeBetsResponse,
   PlayRainFreeBetResponse,
+  TicketPlan,
 } from './types';
 
 // ---- auth ----
@@ -224,6 +225,29 @@ export async function placeManualBet(
   });
 }
 
+// Manual "Bet Prediction": the engine picks the latest prediction's preferred
+// ticket and places it at the given stake (optionally on a specific account).
+export async function placePredictionBet(
+  stake: number,
+  accountId?: number,
+): Promise<ManualBetResponse> {
+  return apiFetch<ManualBetResponse>('api/accounts/autoplay/manual-bet-prediction', {
+    method: 'POST',
+    body: JSON.stringify({ stake, accountId }),
+  });
+}
+
+export async function getTicketPlan(siteId: string): Promise<{ siteId: string; ticketPlan: TicketPlan }> {
+  return apiFetch<{ siteId: string; ticketPlan: TicketPlan }>(`api/predictions/${siteId}/ticket-plan`);
+}
+
+export async function setTicketPlan(siteId: string, ticketPlan: TicketPlan): Promise<{ siteId: string; ticketPlan: TicketPlan }> {
+  return apiFetch<{ siteId: string; ticketPlan: TicketPlan }>(`api/predictions/${siteId}/ticket-plan`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ticketPlan }),
+  });
+}
+
 export async function getEligibleAccounts(stake?: number): Promise<EligibleAccountsResponse> {
   const q = stake !== undefined ? `?min_balance=${stake}` : '';
   return apiFetch<EligibleAccountsResponse>(`api/accounts/autoplay/eligible${q}`, {
@@ -296,6 +320,10 @@ export async function refreshRainAccount(id: number) {
   return apiFetch(`api/rain/accounts/${id}/refresh`, { method: 'POST' });
 }
 
+export async function checkAllRainStatus(): Promise<{ ok: boolean; reconnected: number }> {
+  return apiFetch<{ ok: boolean; reconnected: number }>('api/rain/accounts/check-status', { method: 'POST' });
+}
+
 export async function getRainClaims(id: number): Promise<RainClaimsResponse> {
   return apiFetch<RainClaimsResponse>(`api/rain/accounts/${id}/claims`);
 }
@@ -332,6 +360,14 @@ export async function getRainFreeBets(): Promise<RainFreeBetsResponse> {
 
 export async function playRainFreeBet(id: number): Promise<PlayRainFreeBetResponse> {
   return apiFetch<PlayRainFreeBetResponse>(`api/rain/free-bets/${id}/play`, { method: 'POST' });
+}
+
+// Manual "Bet Prediction" for rain: plays the latest prediction's preferred
+// ticket on one eligible free bet (wager = the free bet's own amount).
+export async function rainBetPrediction(): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
+  return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/rain/bet-prediction', {
+    method: 'POST',
+  });
 }
 
 // ---- proxies ----

@@ -133,3 +133,11 @@ and for clearing and claiming the used free bets use the message --->
 
 shamo automation
 mulasport_session={"token":"6f476a66d4802a916632a45c152049ad2188746a","tgUserId":""}
+[
+  {
+    "phone": "949912843",
+    "password": "254813",
+    "lsToken": "55d1d97ad43a38782a063f839d9ddbc044d22d50",
+    "wsToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiI2OTkzMTgxZjcxN2E0NGY3MWUzNTAyM2IiLCJzdWIiOiI5YjI3MWMyNjUxODc4NTQxNDYwYmI4YWY2YTAyNzgwMDAyNjg4NmU5YjgzYTk2MTMyMDhkMjQyYjI0YTRkNmIyIiwiYXVkIjoiZmFzdC1rZW5vIiwiaWF0IjoxNzg5NDI5Nzk2LCJleHAiOjE3ODk0NDA1OTYsImRhdGEiOnsiYmFsYW5jZSI6MC4wLCJuYW1lIjoiMjUxOTQ5OTEyODQzIiwidGltZXN0YW1wIjoxNzg5NDI5Nzk2NTI1fX0.SUhWr2J1SB7qbrPPthF4hYST87cX-KTnxtrw1Sx6zsstTtSYZ9LtpjBxfTjME-bdAYziSQw3IfSWJYmKO5aI7Y6XxD9ClYQ3BKAm3bczbKGDzrY68_Fb5aZJo9vE_Ig-jpmuBflPrO_r_Gxgr0JaRc6WB3ZRJGkdSfTOzln15DLQF5PIJ-BCaI3hiblJCoUomWsD-qfQFlQbkV4nHCWU0b9ZAIxU9L2ytcEfVVdBKz5LDN703M37bA5SsGV3A0uxwE9nmohF-g1opjSqyXb1Z9GOChDWpVqzCvdh98S6p5rtF2-BiBhA-hXvZYsYb2w-desjsn76iIwwBUb_jahM1w"
+  }
+]

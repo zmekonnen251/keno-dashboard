@@ -93,6 +93,19 @@ export interface PatternsResponse {
 	patterns: PatternSuggestion[];
 }
 
+// A betting ticket generated per the site's ticket plan.
+export interface PredictionTicket {
+	digits: number;
+	numbers: number[];
+	// null until the prediction is evaluated against a real draw; true only on
+	// a full match (every ticket number landed on the draw).
+	won: boolean | null;
+}
+
+// How many tickets of each digit-count to generate per prediction:
+// e.g. {2:3, 3:3, 4:1} = 3 two-digit, 3 three-digit, 1 four-digit ticket.
+export type TicketPlan = Record<number, number>;
+
 // A prediction as returned by predictionEngine.getLatestPrediction.
 export interface Prediction {
 	siteId: string;
@@ -101,6 +114,8 @@ export interface Prediction {
 	ticket?: number[];
 	// Predicted whole draw (top 20).
 	fullDraw?: number[];
+	// Digit-based betting tickets from the site's ticket plan.
+	tickets: PredictionTicket[];
 	confidence: number;
 	reasoning: string[];
 	timeContext: string | null;
@@ -115,6 +130,7 @@ export interface RecentPrediction {
 	numbers: number[];
 	ticket?: number[];
 	fullDraw?: number[];
+	tickets: PredictionTicket[];
 	confidence: number;
 	reasoning: string[];
 	timeContext: string | null;
@@ -128,6 +144,8 @@ export interface AccuracyStats {
 	total: number;
 	wins: number;
 	winRate: number;
+	// Full-match accuracy broken down by ticket digit-count (e.g. 2/3/4).
+	tickets?: Record<string, { total: number; wins: number; winRate: number }>;
 }
 
 export interface MlTrainMetrics {
@@ -160,6 +178,8 @@ export interface PredictionsResponse {
 	currentDraw: number[] | null;
 	currentDrawAt: string | null;
 	mlStatus?: MlStatus | null;
+	// Per-site ticket generation plan ({digits -> count}).
+	ticketPlan?: TicketPlan;
 }
 
 export interface RepetitiveAnalysis {
@@ -285,6 +305,9 @@ export interface AutoplayConfig {
 	digit_count: 2 | 3;
 	base_tickets: number[][] | null;
 	repetitive_auto_bet: boolean;
+	// Auto-bet the generated prediction tickets each round (0 = all of them).
+	prediction_ticket_betting: boolean;
+	prediction_tickets_per_round: number;
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
@@ -724,7 +747,7 @@ export interface RainAutoplayConfig {
 	enabled: boolean;
 	provider: RainProvider;
 	tickets_per_round: number;
-	spots_mode: 'prediction' | 'manual';
+	spots_mode: 'prediction' | 'prediction_tickets' | 'manual';
 	manual_spots: number[];
 	round_interval: number;
 	updated_at: string;

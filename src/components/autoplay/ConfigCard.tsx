@@ -28,6 +28,8 @@ export function ConfigCard({
 	const [ticketsText, setTicketsText] = useState('');
 	const [repBet, setRepBet] = useState(true);
 	const [manualAccountSelection, setManualAccountSelection] = useState(false);
+	const [predTicketBetting, setPredTicketBetting] = useState(false);
+	const [predTicketsPerRound, setPredTicketsPerRound] = useState('');
 	const [saving, setSaving] = useState(false);
 
 	function onLoadCurrent() {
@@ -39,6 +41,8 @@ export function ConfigCard({
 		setTicketsText(ticketsToText(cfg?.base_tickets));
 		setRepBet(cfg?.repetitive_auto_bet ?? true);
 		setManualAccountSelection(cfg?.manual_account_selection ?? false);
+		setPredTicketBetting(cfg?.prediction_ticket_betting ?? false);
+		setPredTicketsPerRound(String(cfg?.prediction_tickets_per_round ?? 0));
 		setLoaded(true);
 		onSaved('');
 	}
@@ -52,6 +56,8 @@ export function ConfigCard({
 		setTicketsText('1,2,3\n8,9,10\n58,59,60\n71,72,73\n77,78,79\n78,79,80');
 		setRepBet(true);
 		setManualAccountSelection(false);
+		setPredTicketBetting(false);
+		setPredTicketsPerRound('');
 		setLoaded(true);
 		onSaved('');
 	}
@@ -69,6 +75,8 @@ export function ConfigCard({
 				base_tickets: textToTickets(ticketsText),
 				repetitive_auto_bet: repBet,
 				manual_account_selection: manualAccountSelection,
+				prediction_ticket_betting: predTicketBetting,
+				prediction_tickets_per_round: predTicketsPerRound !== '' ? parseInt(predTicketsPerRound, 10) : 0,
 			});
 			onSaved('Configuration saved.');
 			onRefresh();
@@ -180,6 +188,33 @@ export function ConfigCard({
 							Manual account selection
 						</Label>
 						<span className='ml-auto text-xs text-muted-foreground'>Off = server auto-selects an eligible account</span>
+					</div>
+
+					<div className='mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5'>
+						<input
+							id='predTicketBetting'
+							type='checkbox'
+							checked={predTicketBetting}
+							onChange={(e) => setPredTicketBetting(e.target.checked)}
+							className='h-4 w-4 accent-blue-600'
+						/>
+						<Label htmlFor='predTicketBetting' className='cursor-pointer'>
+							Prediction-ticket betting — bet one {mode === 'C' ? digitCount : 3}-spot prediction ticket per account each round
+						</Label>
+						<label htmlFor='predTicketsPerRound' className='ml-auto flex items-center gap-2 text-xs text-muted-foreground'>
+							tickets/account
+							<Input
+								id='predTicketsPerRound'
+								type='number'
+								min='0'
+								value={predTicketsPerRound}
+								onChange={(e) => setPredTicketsPerRound(e.target.value)}
+								className='w-24'
+							/>
+						</label>
+						<span className='w-full text-[11px] text-muted-foreground'>
+							0 = all tickets from the site ticket plan (editable on the Predictions page)
+						</span>
 					</div>
 
 					<div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>

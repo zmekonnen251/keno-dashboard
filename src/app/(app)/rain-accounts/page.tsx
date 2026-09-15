@@ -7,6 +7,7 @@ import {
   updateRainAccount,
   deleteRainAccount,
   refreshRainAccount,
+  checkAllRainStatus,
   getRainClaims,
   setRainAutoplayConfig,
   rainAutoplayStart,
@@ -14,6 +15,7 @@ import {
   getRainAutoplayStatus,
   getRainFreeBets,
   playRainFreeBet,
+  rainBetPrediction,
 } from '@/lib/api';
 import type {
   RainAccount,
@@ -189,6 +191,27 @@ function AutoplayCard() {
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [manualDraft, setManualDraft] = useState('');
+  const [draftSynced, setDraftSynced] = useState(false);
+
+  // Keep the manual-spots text box as the raw string the user typed, so commas
+  // and spaces aren't re-canonicalized (and dropped) on every keystroke. The
+  // draft is parsed into an array only when saving.
+  useEffect(() => {
+    if (config && !draftSynced) {
+      setManualDraft(config.manual_spots.join(', '));
+      setDraftSynced(true);
+    }
+  }, [config, draftSynced]);
+
+  function parseManualSpots(text: string): number[] {
+    return text
+      .split(/[,;\n\r]+/)
+      .flatMap((part) => part.trim().split(/\s+/))
+      .map((s) => Number(s))
+      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80)
+      .slice(0, 20);
+  }
 
   // The status endpoint also returns the current config, so a single poll loop
   // keeps both alive without seeding state synchronously inside the effect.
@@ -223,7 +246,7 @@ function AutoplayCard() {
         provider: config.provider,
         tickets_per_round: config.tickets_per_round,
         spots_mode: config.spots_mode,
-        manual_spots: config.manual_spots,
+        manual_spots: parseManualSpots(manualDraft),
         round_interval: config.round_interval,
       });
       setConfig(res.config);
@@ -324,25 +347,23 @@ function AutoplayCard() {
           </div>
           <div>
             <Label htmlFor="rain-auto-spots-mode">Chosen spots source</Label>
-            <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v === 'prediction' ? 'prediction' : 'manual' })}>
+            <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v as RainAutoplayConfig['spots_mode'] })}>
               <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="manual">Manual spots below</SelectItem>
                 <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
+                <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="rain-auto-manual-spots">Manual spots (1–80, comma-separated)</Label>
+            <Label htmlFor="rain-auto-manual-spots">Manual spots / ticket (1–80, comma or space separated)</Label>
             <Input
+              type="text"
               id="rain-auto-manual-spots"
-              value={config.manual_spots.join(', ')}
-              onChange={(e) =>
-                setConfig({
-                  ...config,
-                  manual_spots: e.target.value.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n >= 1 && n <= 80).slice(0, 20),
-                })
-              }
+              value={manualDraft}
+              onChange={(e) => setManualDraft(e.target.value)}
+              placeholder="e.g. 5, 12, 23, 40"
               disabled={config.spots_mode !== 'manual'}
             />
           </div>
@@ -372,14 +393,29 @@ export default function RainAccountsPage() {
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
+  const [playHistory, setPlayHistory] = useState<RainFreeBet[] | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [bettingPrediction, setBettingPrediction] = useState(false);
+  const [checkingAll, setCheckingAll] = useState(false);
   const [msg, setMsg] = useState('');
 
+  // Played-ticket history (chosen_spots present) used by the card + the poll.
+  async function loadPlayHistory() {
+    try {
+      const res = await getRainFreeBets();
+      setPlayHistory(res.bets.filter((b) => (b.chosen_spots?.length ?? 0) > 0));
+    } catch {
+      /* keep the last list */
+    }
+  }
+
   // Poll the list while the page is open so worker balances (BALANCE frames)
-  // and connect/disconnect state stay live without a page reload.
+  // and connect/disconnect state stay live without a page reload. The played-ticket
+  // history is refreshed on the same cadence so win/loss verdicts appear live.
   useEffect(() => {
-    const timer = setInterval(() => { refresh(); }, 10000);
+    void loadPlayHistory();
+    const timer = setInterval(() => { refresh(); void loadPlayHistory(); }, 10000);
     return () => clearInterval(timer);
   }, [refresh]);
 
@@ -414,10 +450,30 @@ export default function RainAccountsPage() {
       await refreshRainAccount(acc.id);
       setMsg(`Reconnect sent for "${acc.name}".`);
       refresh();
+      void loadPlayHistory();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function onCheckAll() {
+    setCheckingAll(true);
+    setMsg('');
+    try {
+      const res = await checkAllRainStatus();
+      refresh();
+      void loadPlayHistory();
+      await new Promise((r) => setTimeout(r, 1500)); // let sockets come up
+      refresh();
+      setMsg(res.reconnected > 0
+        ? `Reconnected ${res.reconnected} rain account${res.reconnected === 1 ? '' : 's'} — statuses re-checked.`
+        : 'No enabled rain accounts to check.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCheckingAll(false);
     }
   }
 
@@ -449,6 +505,23 @@ export default function RainAccountsPage() {
     }
   }
 
+  async function onBetPrediction() {
+    setBettingPrediction(true);
+    setMsg('');
+    try {
+      const res = await rainBetPrediction();
+      if (!res.ok || !res.result?.ok) {
+        setMsg(res.result?.error || 'Prediction bet failed.');
+      } else {
+        setMsg('Prediction bet placed on an eligible rain free-bet (wager = the free-bet amount).');
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBettingPrediction(false);
+    }
+  }
+
   async function onPlayFreeBet(bet: RainFreeBet) {
     setPlayingId(bet.id);
     setMsg('');
@@ -477,6 +550,12 @@ export default function RainAccountsPage() {
         <h2 className="text-lg font-bold text-foreground">Rain Accounts</h2>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => void onShowFreeBets()}>Free bets</Button>
+          <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
+            {bettingPrediction ? '…' : 'Bet prediction'}
+          </Button>
+          <Button variant="outline" disabled={checkingAll} onClick={() => void onCheckAll()}>
+            {checkingAll ? '…' : 'Check all rains'}
+          </Button>
           <Button variant="outline" onClick={refresh}>Refresh</Button>
           <Button onClick={() => setAdding(true)}>Add account</Button>
         </div>
@@ -484,6 +563,56 @@ export default function RainAccountsPage() {
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
 
       <AutoplayCard />
+
+      <Card title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
+        {playHistory === null ? (
+          <Loading rows={2} />
+        ) : playHistory.length === 0 ? (
+          <Empty label="No tickets placed yet — click 'Bet prediction', use a free bet's Play button, or start prediction-ticket autoplay. Placed tickets and their status appear here." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Ticket spots</TableHead>
+                  <TableHead>Wager</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Result</TableHead>
+                  <TableHead>Placed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {playHistory.map((b) => {
+                  const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
+                  return (
+                    <TableRow key={b.id}>
+                      <TableCell className="whitespace-nowrap">{b.account_name ?? `#${b.account_id}`}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.chosen_spots?.join(', ') ?? '—'}</TableCell>
+                      <TableCell>+{b.wager_amount} ETB</TableCell>
+                      <TableCell>
+                        <Badge className={s.cls} title={b.error ?? undefined}>{s.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {b.status === 'won' ? (
+                          <span className="text-emerald-600 dark:text-emerald-400">+{b.won_amount} ETB</span>
+                        ) : b.status === 'lost' || b.status === 'failed' || b.status === 'expired' ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">pending</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {b.bet_placed_at ? formatTime(b.bet_placed_at) : formatTime(b.updated_at)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Card>
 
       <Card title={`Rain-claiming accounts (${data.count})`}>
         {data.accounts.length ? (
@@ -550,7 +679,7 @@ export default function RainAccountsPage() {
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => onShowClaims(acc)}>Claims</Button>
                         <Button variant="outline" size="sm" disabled={busyId === acc.id} onClick={() => onReconnect(acc)}>
-                          {busyId === acc.id ? '…' : 'Reconnect'}
+                          {busyId === acc.id ? '…' : 'Check status'}
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => setEditing(acc)}>Edit</Button>
                         <Button variant="destructive" size="sm" onClick={() => onDelete(acc)}>Delete</Button>
@@ -621,8 +750,6 @@ export default function RainAccountsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Free bet</TableHead>
-                    <TableHead>Source</TableHead>
                     <TableHead>Wager</TableHead>
                     <TableHead>Closed</TableHead>
                     <TableHead>Expires</TableHead>
@@ -640,14 +767,6 @@ export default function RainAccountsPage() {
                         <TableCell className="whitespace-nowrap">
                           <span className="font-medium">{b.account_name ?? `#${b.account_id}`}</span>
                           {!b.account_enabled && <span className="ml-1 text-[10px] text-muted-foreground">(disabled)</span>}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{b.free_bet_id}</TableCell>
-                        <TableCell className="text-xs">
-                          {b.source_kind === 'p2p_rain'
-                            ? <>Rain{b.rain_id ? ` #${b.rain_id}` : ''}{b.slot_index != null ? ` slot ${b.slot_index}` : ''}</>
-                            : b.source_kind === 'campaign'
-                              ? `Campaign${b.campaign_id ? ` ${b.campaign_id}` : ''}`
-                              : '—'}
                         </TableCell>
                         <TableCell>+{b.wager_amount} ETB</TableCell>
                         <TableCell>{b.closed_bet_count}</TableCell>

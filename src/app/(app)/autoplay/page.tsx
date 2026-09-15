@@ -20,6 +20,7 @@ import { SignalPanel } from '@/components/autoplay/SignalPanel';
 import { CollapsibleCard } from '@/components/autoplay/CollapsibleCard';
 import { ConfigCard } from '@/components/autoplay/ConfigCard';
 import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
+import { PredictionBetCard } from '@/components/autoplay/PredictionBetCard';
 import { GameView } from '@/components/autoplay/GameView';
 import { Modal } from '@/components/ui/modal';
 
@@ -177,6 +178,8 @@ export default function AutoplayPage() {
 				onRefresh={refresh}
 				onPicksChange={setManualPicks}
 			/>
+
+			<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} />
 
 			{showConfig && (
 				<Modal title='Autoplay configuration' onClose={() => setShowConfig(false)} wide>

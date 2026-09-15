@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getPredictions, generatePrediction } from '@/lib/api';
+import { getPredictions, generatePrediction, getTicketPlan, setTicketPlan } from '@/lib/api';
 import { useSite } from '@/components/site-provider';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Card, StatCard, Empty, ErrorBox, Loading, PrettyNumbers, Picks } from '@/components/app';
 import { formatTime, winRate } from '@/lib/format';
+import type { TicketPlan, PredictionTicket, AccuracyStats } from '@/lib/types';
 
 // Chips that highlight which predicted numbers actually landed on a checked
 // draw — so a "Won ✓" prediction can be eyeballed against the real result.
@@ -36,7 +37,122 @@ function MatchChips({ picks, actual }: { picks: number[]; actual?: number[] | nu
   );
 }
 
+// One generated ticket with its full-match result (won = every number landed).
+function TicketBadges({ tickets }: { tickets?: PredictionTicket[] }) {
+  if (!tickets?.length) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tickets.map((t, i) => (
+        <span
+          key={i}
+          title={t.won == null ? 'pending result' : t.won ? 'full match — won' : 'no full match'}
+          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium ${
+            t.won == null
+              ? 'border-border text-muted-foreground'
+              : t.won
+                ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                : 'border-border text-muted-foreground'
+          }`}
+        >
+          {t.numbers.join(',')}
+          {t.won == null ? null : t.won ? ' ✓' : ' ✗'}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const CORE_SITES = ['fungames_tolobirr', 'fungames_shamo'] as const;
+
+// Digit-count -> ticket count editor for the per-site generation plan.
+function TicketPlanEditor({ siteId, plan }: { siteId: string; plan: TicketPlan }) {
+  const [draft, setDraft] = useState<TicketPlan>({ ...plan });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await setTicketPlan(siteId, Object.fromEntries(
+        Object.entries(draft).map(([k, v]) => [Number(k), Math.max(0, Number(v) || 0)]),
+      ));
+      setDraft({ ...res.ticketPlan });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const digitCounts = [...new Set([2, 3, 4, ...Object.keys(draft).map(Number)])]
+    .filter((d) => d >= 1 && d <= 6)
+    .sort((a, b) => a - b);
+
+  return (
+    <Card title="Ticket plan (per prediction)">
+      <p className="mb-2 text-xs text-muted-foreground">
+        How many betting tickets of each digit-count to generate. Tickets are placed on a full match
+        (every number on the draw); accuracy is tracked per type.
+      </p>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {digitCounts.map((digits) => (
+          <label key={digits} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {digits}-digit
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={draft[digits] ?? 0}
+              onChange={(e) => setDraft((d) => ({ ...d, [digits]: Math.max(0, Number(e.target.value) || 0) }))}
+              className="w-14 rounded border border-input bg-background px-1.5 py-1 text-center text-sm text-foreground"
+            />
+          </label>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={onSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save plan'}
+        </Button>
+        {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+      </div>
+    </Card>
+  );
+}
+
+function AccuracyCard({ accuracy }: { accuracy: AccuracyStats | null }) {
+  const digits = Object.keys(accuracy?.tickets ?? {}).map(Number).sort((a, b) => a - b);
+  return (
+    <Card title="Accuracy">
+      <StatCard label="Win rate (≥4/10 picks)" value={winRate({ total: accuracy?.total, wins: accuracy?.wins })} />
+      {accuracy?.total !== undefined && accuracy.total > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {accuracy.wins} wins / {accuracy.total} evaluated predictions
+        </p>
+      )}
+      {digits.length > 0 && (
+        <div className="mt-2 border-t border-border pt-2">
+          <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Full-match ticket accuracy
+          </div>
+          <div className="space-y-1 text-xs">
+            {digits.map((d) => {
+              const s = accuracy!.tickets![String(d)];
+              return (
+                <div key={d} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{d}-digit tickets</span>
+                  <span className={s.wins > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
+                    {s.wins}/{s.total} won · {Math.round(s.winRate * 100)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 // Per-site summary comparing the prediction against the recorded draw: the
 // context draw it was generated from, the ticket/whole-draw picks, and the last
@@ -89,6 +205,9 @@ function SitePredictionCard({ siteId }: { siteId: string }) {
               <MatchChips picks={evaluated.numbers} actual={evaluated.evaluatedDraw} />
               {evaluated.ticket?.length ? (
                 <MatchChips picks={evaluated.ticket} actual={evaluated.evaluatedDraw} />
+              ) : null}
+              {evaluated.tickets?.length ? (
+                <TicketBadges tickets={evaluated.tickets} />
               ) : null}
               <p className="text-xs text-muted-foreground">
                 {evaluated.hit ? 'Won' : 'Lost'} ·{' '}
@@ -159,6 +278,12 @@ export default function PredictionsPage() {
                 <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Whole draw prediction</div>
                 <Picks nums={prediction.fullDraw || prediction.numbers.slice(0, 20)} tone="emerald" />
               </div>
+              {prediction.tickets?.length > 0 && (
+                <div>
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Generated betting tickets</div>
+                  <TicketBadges tickets={prediction.tickets} />
+                </div>
+              )}
               <div className="text-xs text-muted-foreground">Generated {formatTime(prediction.generatedAt)} · conf {Math.round((prediction.confidence ?? 0) * 100)}%</div>
               {currentDraw && (
                 <div className="rounded border border-border p-2">
@@ -174,14 +299,8 @@ export default function PredictionsPage() {
             <Empty label="No prediction" />
           )}
         </Card>
-        <Card title="Accuracy">
-          <StatCard label="Win rate" value={winRate({ total: accuracy?.total, wins: accuracy?.wins })} />
-          {accuracy?.total !== undefined && accuracy.total > 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {accuracy.wins} wins / {accuracy.total} evaluated predictions
-            </p>
-          )}
-        </Card>
+        <AccuracyCard accuracy={accuracy} />
+        <TicketPlanEditor siteId={siteId} plan={data.ticketPlan ?? { 2: 3, 3: 3, 4: 1 }} />
         <Card title="ML model accuracy">
           {(() => {
             const ms = data.mlStatus;
@@ -225,6 +344,7 @@ export default function PredictionsPage() {
                   <TableHead>Picks</TableHead>
                   <TableHead>Ticket</TableHead>
                   <TableHead>Whole draw</TableHead>
+                  <TableHead>Generated tickets</TableHead>
                   <TableHead>Hit</TableHead>
                   <TableHead>Generated</TableHead>
                 </TableRow>
@@ -235,6 +355,7 @@ export default function PredictionsPage() {
                     <TableCell><PrettyNumbers nums={r.numbers} /></TableCell>
                     <TableCell><Picks nums={r.ticket || r.numbers.slice(0, 3)} tone="violet" /></TableCell>
                     <TableCell><Picks nums={r.fullDraw || r.numbers.slice(0, 20)} tone="emerald" /></TableCell>
+                    <TableCell><TicketBadges tickets={r.tickets} /></TableCell>
                     <TableCell>{r.hit == null ? '—' : (
                       <span className={r.hit ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
                         {r.hit ? '✓' : '✗'}
