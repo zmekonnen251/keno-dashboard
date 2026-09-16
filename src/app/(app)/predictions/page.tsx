@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getPredictions, generatePrediction, getTicketPlan, setTicketPlan } from '@/lib/api';
+import { getPredictions, generatePrediction, generateSequencePrediction, getTicketPlan, setTicketPlan } from '@/lib/api';
 import { useSite } from '@/components/site-provider';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, StatCard, Empty, ErrorBox, Loading, PrettyNumbers, Picks } from '@/components/app';
+import { SequenceMatchDisplay } from '@/components/app/SequenceMatchDisplay';
 import { formatTime, winRate } from '@/lib/format';
 import type { TicketPlan, PredictionTicket, AccuracyStats } from '@/lib/types';
 
@@ -235,11 +236,23 @@ export default function PredictionsPage() {
   const { siteId } = useSite();
   const { data, error, loading, refresh } = useApi(() => getPredictions(siteId), [siteId]);
   const [generating, setGenerating] = useState(false);
+  const [useSequenceMatch, setUseSequenceMatch] = useState(false);
+  const [lookbackN, setLookbackN] = useState(3);
 
   async function onGenerate() {
     setGenerating(true);
     try {
-      await generatePrediction(siteId);
+      await generatePrediction(siteId, { useSequenceMatch, lookback_n: lookbackN });
+      refresh();
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function onGenerateSequence() {
+    setGenerating(true);
+    try {
+      await generateSequencePrediction(siteId, { lookback_n: lookbackN });
       refresh();
     } finally {
       setGenerating(false);
@@ -259,8 +272,40 @@ export default function PredictionsPage() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={refresh}>Refresh</Button>
           <Button onClick={onGenerate} disabled={generating}>{generating ? 'Generating…' : 'Generate'}</Button>
+          <Button variant="outline" onClick={onGenerateSequence} disabled={generating}>
+            {generating ? 'Sequence…' : 'Sequence Match'}
+          </Button>
         </div>
       </div>
+
+      {/* Sequence Matching Controls */}
+      <Card title="Sequence Matching Settings">
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={useSequenceMatch}
+                onChange={(e) => setUseSequenceMatch(e.target.checked)}
+                className="rounded border-input"
+              />
+              Enable sequence matching
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground">Lookback window:</label>
+            <select
+              value={lookbackN}
+              onChange={(e) => setLookbackN(Number(e.target.value))}
+              className="rounded border border-input bg-background px-2 py-1 text-sm"
+            >
+              <option value={2}>2 draws</option>
+              <option value={3}>3 draws</option>
+              <option value={5}>5 draws</option>
+            </select>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card title="Current prediction">
@@ -285,6 +330,11 @@ export default function PredictionsPage() {
                 </div>
               )}
               <div className="text-xs text-muted-foreground">Generated {formatTime(prediction.generatedAt)} · conf {Math.round((prediction.confidence ?? 0) * 100)}%</div>
+              {prediction.useSequenceMatch && (
+                <div className="text-xs text-violet-600 dark:text-violet-400 font-medium">
+                  Using sequence matching analysis
+                </div>
+              )}
               {currentDraw && (
                 <div className="rounded border border-border p-2">
                   <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Latest completed draw (context)</div>
@@ -333,6 +383,7 @@ export default function PredictionsPage() {
             );
           })()}
         </Card>
+        <SequenceMatchDisplay sequenceMatch={prediction?.sequenceMatch || null} />
       </div>
 
       {recent && recent.length ? (

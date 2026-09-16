@@ -96,8 +96,18 @@ export async function getDashboard(siteId: string): Promise<DashboardResponse> {
   return apiFetch<DashboardResponse>(`api/dashboard/${siteId}`);
 }
 
-export async function generatePrediction(siteId: string) {
-  return apiFetch(`api/predictions/${siteId}/generate`, { method: 'POST' });
+export async function generatePrediction(siteId: string, options?: { useSequenceMatch?: boolean; lookback_n?: number }) {
+  return apiFetch(`api/predictions/${siteId}/generate`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
+}
+
+export async function generateSequencePrediction(siteId: string, options?: { lookback_n?: number; similarity_threshold?: number }) {
+  return apiFetch(`api/predictions/${siteId}/generate-sequence`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
 }
 
 export async function getClients(): Promise<ClientsResponse> {

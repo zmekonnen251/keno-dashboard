@@ -121,6 +121,36 @@ export interface Prediction {
 	timeContext: string | null;
 	sources: Record<string, unknown>;
 	generatedAt: string;
+	// Sequence matching data when using the historical look-ahead engine
+	sequenceMatch?: SequenceMatchData | null;
+	useSequenceMatch?: boolean;
+}
+
+// Sequence matching data from the ML service
+export interface SequenceMatchData {
+	site_id: string;
+	numbers: number[];
+	tickets: Record<string, number[][]>;
+	confidence: number;
+	detected_mode: string;
+	reasoning: string[];
+	similarity_details: {
+		matches_count: number;
+		lookback_n: number;
+		historical_analyzed: number;
+		top_matches: Array<{
+			similarity: number;
+			continuation: number[];
+			time_delta_hours: number;
+		}>;
+		time_loops: Array<{
+			loop_pattern: string;
+			occurrences: number;
+			avg_similarity: number;
+		}>;
+	};
+	generated_at: number;
+	draws_used: number;
 }
 
 // Recent prediction row (predictionEngine.getRecentPredictions).
