@@ -3,17 +3,21 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/sidebar';
 import Header from '@/components/header';
 import { NotificationProvider } from '@/lib/notifications';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SiteProvider>
       <NotificationProvider>
         <SidebarProvider defaultOpen>
-          <AppSidebar />
+          <div className="hidden sm:block">
+            <AppSidebar />
+          </div>
           <div className="flex min-w-0 flex-1 flex-col">
             <Header />
-            <main className="flex-1 overflow-y-auto p-4 sm:p-5">{children}</main>
+            <main className="flex-1 overflow-y-auto p-4 sm:p-5 pb-20 sm:pb-5">{children}</main>
           </div>
+          <MobileBottomNav />
         </SidebarProvider>
       </NotificationProvider>
     </SiteProvider>

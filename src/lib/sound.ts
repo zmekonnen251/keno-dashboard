@@ -44,6 +44,48 @@ export function playWinSound(): void {
 	}
 }
 
+// Short beep when a number is drawn during the drawing phase
+export function playDrawSound(): void {
+	const ac = audio();
+	if (!ac) return;
+	try {
+		const osc = ac.createOscillator();
+		const gain = ac.createGain();
+		osc.type = 'sine';
+		osc.frequency.value = 880; // A5
+		const t = ac.currentTime;
+		gain.gain.setValueAtTime(0.1, t);
+		gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+		osc.connect(gain);
+		gain.connect(ac.destination);
+		osc.start(t);
+		osc.stop(t + 0.15);
+	} catch {
+		// Audio unavailable — stay silent.
+	}
+}
+
+// Soft chime when betting opens
+export function playBettingOpenSound(): void {
+	const ac = audio();
+	if (!ac) return;
+	try {
+		const osc = ac.createOscillator();
+		const gain = ac.createGain();
+		osc.type = 'sine';
+		osc.frequency.value = 660; // E5
+		const t = ac.currentTime;
+		gain.gain.setValueAtTime(0.2, t);
+		gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+		osc.connect(gain);
+		gain.connect(ac.destination);
+		osc.start(t);
+		osc.stop(t + 0.4);
+	} catch {
+		// Audio unavailable — stay silent.
+	}
+}
+
 export type NotifyPermission = 'granted' | 'denied' | 'default' | 'unsupported';
 
 export function notificationPermission(): NotifyPermission {

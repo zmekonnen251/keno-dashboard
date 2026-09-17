@@ -2,25 +2,61 @@
 
 import { useSite } from './site-provider';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, ChevronDown } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { NotificationsBell } from './notifications-bell';
+import { useState } from 'react';
 
 export default function Header() {
   const { sites, siteId, setSiteId, siteName } = useSite();
   const { resolvedTheme, setTheme } = useTheme();
+  const [showMobileSiteSelector, setShowMobileSiteSelector] = useState(false);
 
   return (
     <header className="flex items-center justify-between gap-3 border-b border-border bg-sidebar px-3 py-3 sm:px-5">
       <div className="flex min-w-0 items-center gap-2">
-        <SidebarTrigger />
+        <div className="hidden sm:block">
+          <SidebarTrigger />
+        </div>
         <div className="min-w-0">
           <h1 className="truncate text-base font-semibold">{siteName}</h1>
           <p className="text-xs text-muted-foreground">Live site: {siteId}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* Mobile site selector */}
+        <div className="sm:hidden relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMobileSiteSelector(!showMobileSiteSelector)}
+            className="flex items-center gap-1"
+          >
+            <span className="text-xs">Site</span>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+          {showMobileSiteSelector && (
+            <div className="absolute right-0 top-full mt-2 z-50 bg-background border border-border rounded-lg shadow-lg p-2 min-w-[200px]">
+              {sites.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setSiteId(s.id);
+                    setShowMobileSiteSelector(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted ${
+                    s.id === siteId ? 'bg-muted font-medium' : ''
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop site selector */}
         <label className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
           <span className="text-xs uppercase tracking-wide">Site</span>
           <select

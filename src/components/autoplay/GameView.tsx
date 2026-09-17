@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AutoplayPlacedBet } from '@/lib/types';
 import { paytableWin } from '@/lib/kenoOdds';
-import { notificationPermission, playWinSound, pushWinNotification, requestNotificationPermission } from '@/lib/sound';
+import { notificationPermission, playWinSound, playDrawSound, playBettingOpenSound, pushWinNotification, requestNotificationPermission } from '@/lib/sound';
 import { isPushActive, pushSupported, subscribePush, unsubscribePush, rePostSubscription } from '@/lib/push';
 import { getNotifyPref, setNotifyPref, getSoundPref, setSoundPref } from '@/lib/notifyPrefs';
 import { useNotifications } from '@/lib/notifications';
@@ -13,12 +13,21 @@ import { BOARD_CSS } from './boardStyles';
 
 // "Current game" = bets placed within one round window of the newest bet.
 const ROUND_WINDOW_MS = 30000;
+const ROUND_DURATION_MS = 30000; // 30 seconds per round
+const BETTING_WINDOW_MS = 20000; // 20 seconds for betting
+const DRAWING_DURATION_MS = 10000; // 10 seconds for drawing
 
 interface WinAlert {
   id: string;
   text: string;
   at: number;
   phone: string;
+}
+
+interface GameState {
+  phase: 'betting_open' | 'drawing' | 'settled' | 'unknown';
+  timer: number;
+  roundNumber?: number;
 }
 
 function statusLabel(p: AutoplayPlacedBet): { text: string; tone: string } {
@@ -38,6 +47,79 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   const [alerts, setAlerts] = useState<WinAlert[]>([]);
   const celebratedRef = useRef<Set<string>>(new Set());
   const { notify } = useNotifications();
+  const [gameState, setGameState] = useState<GameState>({
+    phase: 'unknown',
+    timer: 0,
+  });
+  const [lastPhaseChange, setLastPhaseChange] = useState<number>(Date.now());
+
+  // Enhanced game state detection with timer
+  useEffect(() => {
+    const updateGameState = () => {
+      const now = Date.now();
+      const timeSinceUpdate = updatedAt ? now - new Date(updatedAt).getTime() : Infinity;
+
+      let newPhase: GameState['phase'] = 'unknown';
+      let timer = 0;
+
+      if (status === 'live' && drawn.length === 0) {
+        // Live but no numbers drawn yet - betting phase
+        newPhase = 'betting_open';
+        timer = Math.max(0, BETTING_WINDOW_MS - timeSinceUpdate);
+      } else if (status === 'live' && drawn.length > 0 && drawn.length < 20) {
+        // Drawing in progress
+        newPhase = 'drawing';
+        timer = Math.max(0, DRAWING_DURATION_MS - (drawn.length * (DRAWING_DURATION_MS / 20)));
+      } else if (drawn.length >= 20) {
+        // Draw complete
+        newPhase = 'settled';
+        timer = Math.max(0, ROUND_DURATION_MS - (timeSinceUpdate % ROUND_DURATION_MS));
+      } else {
+        newPhase = 'unknown';
+        timer = 0;
+      }
+
+      // Detect phase changes and play sounds
+      if (newPhase !== gameState.phase && soundOn) {
+        if (newPhase === 'betting_open' && gameState.phase !== 'betting_open') {
+          playBettingOpenSound();
+        } else if (newPhase === 'drawing' && gameState.phase !== 'drawing') {
+          playDrawSound();
+        }
+        setLastPhaseChange(now);
+      }
+
+      setGameState({ phase: newPhase, timer, roundNumber: Math.floor(now / ROUND_DURATION_MS) });
+    };
+
+    updateGameState();
+    const interval = setInterval(updateGameState, 1000);
+    return () => clearInterval(interval);
+  }, [status, drawn, updatedAt, gameState.phase, soundOn]);
+
+  // Format timer as MM:SS
+  const formatTimer = (ms: number) => {
+    const seconds = Math.ceil(ms / 1000);
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Get phase color and label
+  const getPhaseInfo = (phase: GameState['phase']) => {
+    switch (phase) {
+      case 'betting_open':
+        return { color: 'text-emerald-400', label: 'BETTING OPEN', bgColor: 'bg-emerald-500/20' };
+      case 'drawing':
+        return { color: 'text-amber-400', label: 'DRAWING', bgColor: 'bg-amber-500/20' };
+      case 'settled':
+        return { color: 'text-blue-400', label: 'SETTLED', bgColor: 'bg-blue-500/20' };
+      default:
+        return { color: 'text-slate-400', label: 'UNKNOWN', bgColor: 'bg-slate-500/20' };
+    }
+  };
+
+  const phaseInfo = getPhaseInfo(gameState.phase);
 
   // On mount: silently re-post the existing browser push subscription to the
   // server (idempotent) so server-delivered Chrome notifications keep working
@@ -132,15 +214,40 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
     <div className='overflow-hidden rounded-xl border border-white/10 bg-[#0b0f19] text-slate-100'>
       <style>{BOARD_CSS}</style>
 
-      {/* Header */}
+      {/* Enhanced Header with Game State and Timer */}
       <div className='flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5'>
-        <div className='flex items-center gap-2 text-sm font-extrabold tracking-wider'>
-          <span className={status === 'live' ? 'text-emerald-400' : 'text-slate-400'}>●</span>
-          GAME
-          <span className='rounded bg-white/5 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-300'>
-            {done ? `${drawn.length} drawn` : `drawing ${drawn.length}/20`}
-          </span>
+        <div className='flex items-center gap-3'>
+          {/* Game Status Indicator */}
+          <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${phaseInfo.bgColor}`}>
+            <span className={`h-2 w-2 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
+            <span className={`text-xs font-bold uppercase tracking-wider ${phaseInfo.color}`}>
+              {phaseInfo.label}
+            </span>
+          </div>
+
+          {/* Timer */}
+          {gameState.timer > 0 && (
+            <div className='flex items-center gap-2'>
+              <div className='rounded bg-white/5 px-3 py-1.5 font-mono text-sm font-bold text-white'>
+                {formatTimer(gameState.timer)}
+              </div>
+              {gameState.roundNumber && (
+                <span className='text-xs text-slate-400'>Round #{gameState.roundNumber}</span>
+              )}
+            </div>
+          )}
+
+          {/* Draw Progress */}
+          <div className='flex items-center gap-2'>
+            <span className={`rounded bg-white/5 px-2 py-0.5 font-mono text-[10px] font-bold ${done ? 'text-slate-300' : 'text-amber-300'}`}>
+              {done ? `${drawn.length}/20` : `${drawn.length}/20`}
+            </span>
+            <span className={`text-xs font-medium ${status === 'live' ? 'text-emerald-400' : 'text-slate-400'}`}>
+              {status === 'live' ? '● LIVE' : '● OFFLINE'}
+            </span>
+          </div>
         </div>
+
         <div className='flex items-center gap-2 text-xs'>
           <button
             onClick={onToggleSound}
@@ -192,19 +299,33 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
         </div>
       )}
 
-      {/* Drawn balls */}
+      {/* Drawn balls with enhanced visual feedback */}
       <div className='flex flex-wrap items-center gap-1.5 border-b border-white/10 px-4 py-2.5'>
         {drawn.length === 0 ? (
-          <span className='text-xs italic text-slate-500'>Waiting for the draw…</span>
+          <div className='flex items-center gap-2'>
+            <span className='text-xs italic text-slate-500'>Waiting for the draw…</span>
+            {gameState.phase === 'betting_open' && (
+              <span className='text-xs text-emerald-400 animate-pulse'>Betting open</span>
+            )}
+          </div>
         ) : (
-          drawn.map((n) => (
-            <span
-              key={n}
-              className='flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-xs font-extrabold text-white shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-            >
-              {n}
-            </span>
-          ))
+          <>
+            {drawn.map((n, i) => (
+              <span
+                key={n}
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold text-white shadow-lg transition-all duration-300 ${
+                  i === drawn.length - 1 ? 'scale-110 bg-emerald-400 ring-2 ring-emerald-300' : 'bg-emerald-500'
+                }`}
+              >
+                {n}
+              </span>
+            ))}
+            {drawn.length < 20 && (
+              <span className='text-xs text-slate-500 italic ml-2'>
+                {20 - drawn.length} remaining...
+              </span>
+            )}
+          </>
         )}
       </div>
 
@@ -216,7 +337,9 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
             My Tickets {current.length > 0 ? `(${current.length})` : ''}
           </div>
           {current.length === 0 ? (
-            <p className='py-4 text-center text-xs italic text-slate-500'>No bets placed in the current game yet.</p>
+            <p className='py-4 text-center text-xs italic text-slate-500'>
+              {gameState.phase === 'betting_open' ? 'Betting open — place your tickets now!' : 'No bets placed in the current game yet.'}
+            </p>
           ) : (
             <div className='flex flex-wrap gap-2 lg:max-h-120 lg:overflow-y-auto lg:pr-1'>
               {current.map((p) => {
@@ -225,13 +348,13 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                 return (
                   <div
                     key={`${p.accountId}-${p.requestId}-${p.placedAt}`}
-                    className={`min-w-44 flex-1 rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/3'}`}
+                    className={`min-w-44 flex-1 rounded-lg border p-2 transition-all ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/3'}`}
                   >
                     <div className='flex flex-wrap gap-1'>
                       {(p.spots || []).map((n) => (
                         <span
                           key={n}
-                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold ${drawn.includes(n) ? 'bg-emerald-500 text-white' : 'bg-black/40 text-slate-300'}`}
+                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold transition-all ${drawn.includes(n) ? 'bg-emerald-500 text-white scale-110' : 'bg-black/40 text-slate-300'}`}
                         >
                           {n}
                         </span>
