@@ -1,0 +1,452 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card } from '@/components/app';
+import { setRainTicketConfig, getRainTicketConfig, getRainTicketPreview } from '@/lib/api';
+import { Plus, Trash2, Sparkles, Cpu, Layers, ListOrdered, CheckCircle, Zap } from 'lucide-react';
+import type { BotTicket, RainTicketConfig, RainAutoplayConfig } from '@/lib/types';
+
+interface RainTicketConfigCardProps {
+  config?: (RainAutoplayConfig & { tickets?: BotTicket[] }) | null;
+  onSaved?: (msg: string) => void;
+  onRefresh?: () => void;
+}
+
+export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketConfigCardProps) {
+  const [tickets, setTickets] = useState<BotTicket[]>([]);
+  const [newSpots, setNewSpots] = useState<number>(2);
+  const [newStrategy, setNewStrategy] = useState<'cluster' | 'standard' | 'pattern'>('cluster');
+  const [newStake, setNewStake] = useState<number>(2);
+  const [newFreeBet, setNewFreeBet] = useState<boolean>(true);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [previewPicks, setPreviewPicks] = useState<Record<string, number[]>>({});
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await getRainTicketConfig();
+        if (res.ok && res.config?.tickets?.length) {
+          setTickets(res.config.tickets);
+        } else if (config?.tickets?.length) {
+          setTickets(config.tickets);
+        } else {
+          // Default tickets
+          const defaults: BotTicket[] = [
+            { id: '1', spots: 2, strategy: 'cluster', stake: 2, enabled: true, useFreeBet: true },
+            { id: '2', spots: 2, strategy: 'standard', stake: 2, enabled: true, useFreeBet: true },
+            { id: '3', spots: 3, strategy: 'cluster', stake: 2, enabled: true, useFreeBet: true },
+            { id: '4', spots: 3, strategy: 'standard', stake: 2, enabled: true, useFreeBet: true },
+          ];
+          setTickets(defaults);
+        }
+        setLoaded(true);
+      } catch (e) {
+        setLoaded(true);
+      }
+    };
+    loadConfig();
+  }, [config?.tickets]);
+
+  const saveTickets = async (updatedTickets: BotTicket[]) => {
+    setSaving(true);
+    onSaved?.('');
+    try {
+      const res = await setRainTicketConfig({ tickets: updatedTickets });
+      if (res.ok) {
+        setTickets(updatedTickets);
+        onSaved?.('Ticket configuration saved.');
+        onRefresh?.();
+      }
+    } catch (e) {
+      onSaved?.(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddTicket = () => {
+    const newId = String(Date.now());
+    const updated = [
+      ...tickets,
+      {
+        id: newId,
+        spots: newSpots,
+        strategy: newStrategy,
+        stake: newStake,
+        enabled: true,
+        useFreeBet: newFreeBet,
+      },
+    ];
+    saveTickets(updated);
+  };
+
+  const handleDeleteTicket = (id: string) => {
+    const updated = tickets.filter((t) => t.id !== id);
+    saveTickets(updated);
+  };
+
+  const handleToggleTicket = (id: string) => {
+    const updated = tickets.map((t) =>
+      t.id === id ? { ...t, enabled: !t.enabled } : t,
+    );
+    saveTickets(updated);
+  };
+
+  const handleUpdateTicketValue = (
+    id: string,
+    field: 'spots' | 'stake' | 'strategy' | 'useFreeBet',
+    value: any,
+  ) => {
+    const updated = tickets.map((t) => {
+      if (t.id === id) {
+        return { ...t, [field]: value };
+      }
+      return t;
+    });
+    saveTickets(updated);
+  };
+
+  const handleGeneratePreview = async () => {
+    if (!config) return;
+    setGenerating(true);
+    try {
+      // Call server to generate preview for all tickets
+      const res = await getRainTicketPreview(tickets, config.provider, config.tickets_per_round);
+      if (res.ok && res.previews) {
+        setPreviewPicks(res.previews);
+        onSaved?.('Preview generated for all tickets.');
+      }
+    } catch (e) {
+      onSaved?.('Error generating preview: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const activeCount = tickets.filter((t) => t.enabled).length;
+  const totalCost = tickets.reduce((sum, t) => (t.enabled ? sum + t.stake : sum), 0);
+
+  return (
+    <Card title="Rain Auto-Bet Ticket Queue (like Extension)">
+      {!loaded ? (
+        <div className="text-center py-8 text-slate-500">Loading ticket queue...</div>
+      ) : (
+        <>
+          {/* Queue Statistics Bar */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+                Configured Tickets
+              </span>
+              <span className="text-base font-extrabold text-white font-mono">{tickets.length}</span>
+            </div>
+            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+                Active Tickets
+              </span>
+              <span className="text-base font-extrabold text-emerald-400 font-mono">{activeCount} Playable</span>
+            </div>
+            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+                Total Round Cost
+              </span>
+              <span className="text-base font-extrabold text-blue-300 font-mono">{totalCost} ETB</span>
+            </div>
+          </div>
+
+          {/* Form to Add New Ticket */}
+          <div className="bg-white/5 border border-white/10 p-3 rounded-xl mb-4">
+            <span className="block text-[10px] text-slate-300 font-black uppercase tracking-wider mb-3">
+              Create & Append Ticket
+            </span>
+            <div className="grid grid-cols-5 gap-2 items-end">
+              <div>
+                <Label className="text-[10px] text-slate-400">Spots</Label>
+                <select
+                  value={newSpots}
+                  onChange={(e) => setNewSpots(Number(e.target.value))}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
+                    <option key={s} value={s} className="bg-slate-900">{s} Spots</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-slate-400">Strategy</Label>
+                <select
+                  value={newStrategy}
+                  onChange={(e) => setNewStrategy(e.target.value as 'cluster' | 'standard' | 'pattern')}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="cluster" className="bg-slate-900">🧠 ML Cluster</option>
+                  <option value="standard" className="bg-slate-900">📊 Standard</option>
+                  <option value="pattern" className="bg-slate-900">🧬 Pattern Trend</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-slate-400">Stake (ETB)</Label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={newStake}
+                    onChange={(e) => setNewStake(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 pr-6 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="absolute right-2 top-2 text-[9px] text-slate-500 font-mono font-bold">ETB</span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-[10px] text-slate-400">Bet Type</Label>
+                <select
+                  value={String(newFreeBet)}
+                  onChange={(e) => setNewFreeBet(e.target.value === 'true')}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="true" className="bg-slate-900">🎁 Free Bet</option>
+                  <option value="false" className="bg-slate-900">💰 Cash</option>
+                </select>
+              </div>
+              <div>
+                <Button onClick={handleAddTicket} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold p-2 rounded-lg text-xs uppercase tracking-wider flex items-center justify-center gap-1 transition-all cursor-pointer shadow-md h-10">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Ticket</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Generate Preview Button */}
+          <Button
+            onClick={handleGeneratePreview}
+            disabled={generating || tickets.length === 0}
+            variant="outline"
+            className="mb-4 w-full sm:w-auto"
+          >
+            {generating ? (
+              <>
+                <Cpu className="w-4 h-4 mr-2 animate-spin" />
+                Generating Previews…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Preview for All Tickets
+              </>
+            )}
+          </Button>
+
+          {/* Queue List of Tickets */}
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+            {tickets.map((ticket, idx) => {
+              const preview = previewPicks[ticket.id] || [];
+              return (
+                <div
+                  key={ticket.id}
+                  className={`bg-black/35 border p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all ${
+                    ticket.enabled ? 'border-white/10 opacity-100' : 'border-white/5 opacity-50'
+                  }`}
+                >
+                  {/* Status Toggle & Info */}
+                  <div className="flex items-center gap-2.5 min-w-[140px]">
+                    <input
+                      type="checkbox"
+                      checked={ticket.enabled}
+                      onChange={() => handleToggleTicket(ticket.id)}
+                      className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-black/40 border-white/10 cursor-pointer accent-emerald-500"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-white font-mono">Ticket #{idx + 1}</span>
+                        <span
+                          className={`text-[8px] font-black uppercase px-1 rounded font-mono ${
+                            ticket.strategy === 'cluster'
+                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                              : ticket.strategy === 'pattern'
+                              ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                              : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                          }`}
+                        >
+                          {ticket.strategy === 'cluster'
+                            ? 'ML Cluster'
+                            : ticket.strategy === 'pattern'
+                            ? 'Pattern Trend'
+                            : 'Heuristic'}
+                        </span>
+                        {ticket.useFreeBet && (
+                          <span className="text-[8px] font-bold text-amber-400 ml-1 px-1 rounded bg-amber-500/10 border border-amber-500/20">FREE</span>
+                        )}
+                        {!ticket.useFreeBet && (
+                          <span className="text-[8px] font-bold text-blue-400 ml-1 px-1 rounded bg-blue-500/10 border border-blue-500/20">CASH</span>
+                        )}
+                      </div>
+
+                      {/* Ticket editing dropdowns in real time */}
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        <select
+                          value={ticket.spots}
+                          onChange={(e) =>
+                            handleUpdateTicketValue(
+                              ticket.id,
+                              'spots',
+                              Number(e.target.value),
+                            )
+                          }
+                          className="bg-transparent border border-white/5 rounded text-[10px] font-mono text-slate-400 focus:outline-none cursor-pointer"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
+                            <option key={s} value={s} className="bg-slate-900 text-white">
+                              {s} Spots
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={ticket.strategy}
+                          onChange={(e) =>
+                            handleUpdateTicketValue(
+                              ticket.id,
+                              'strategy',
+                              e.target.value,
+                            )
+                          }
+                          className="bg-transparent border border-white/5 rounded text-[10px] text-slate-400 focus:outline-none cursor-pointer"
+                        >
+                          <option value="cluster" className="bg-slate-900 text-white">🧠 ML</option>
+                          <option value="standard" className="bg-slate-900 text-white">📊 Standard</option>
+                          <option value="pattern" className="bg-slate-900 text-white">🧬 Pattern</option>
+                        </select>
+                        <select
+                          value={String(ticket.useFreeBet)}
+                          onChange={(e) =>
+                            handleUpdateTicketValue(
+                              ticket.id,
+                              'useFreeBet',
+                              e.target.value === 'true',
+                            )
+                          }
+                          className="bg-transparent border border-white/5 rounded text-[10px] text-slate-400 focus:outline-none cursor-pointer"
+                        >
+                          <option value="true" className="bg-slate-900 text-white">🎁 Free Bet</option>
+                          <option value="false" className="bg-slate-900 text-white">💰 Cash</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distinct Picks Preview! */}
+                  <div className="flex-grow flex flex-wrap gap-1 items-center max-w-sm min-w-[150px]">
+                    {preview.length > 0 ? (
+                      preview.map((num, pi) => (
+                        <span
+                          key={`${ticket.id}-${pi}`}
+                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-white/5 border border-white/5 text-slate-300"
+                        >
+                          {num}
+                        </span>
+                      ))
+                    ) : ticket.enabled ? (
+                      <span className="text-[10px] text-slate-500 italic">
+                        Click "Generate Preview" to see picks
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 italic">Inactive</span>
+                    )}
+                  </div>
+
+                  {/* Stake and Deletion */}
+                  <div className="flex items-center gap-2 justify-end">
+                    <div className="flex items-center bg-black/40 border border-white/10 rounded-lg px-2 py-1 max-w-[80px]">
+                      <input
+                        type="number"
+                        min="1"
+                        max="10000"
+                        value={ticket.stake}
+                        onChange={(e) =>
+                          handleUpdateTicketValue(
+                            ticket.id,
+                            'stake',
+                            Math.max(1, Number(e.target.value)),
+                          )
+                        }
+                        className="bg-transparent w-full text-right font-mono font-bold text-xs text-white focus:outline-none"
+                      />
+                      <span className="text-[8px] text-slate-500 font-bold ml-1">ETB</span>
+                    </div>
+
+                    <Button
+                      onClick={() => handleDeleteTicket(ticket.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="p-2 bg-black/40 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg border border-white/5 hover:border-rose-500/20 transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {tickets.length === 0 && (
+              <div className="text-center py-6 text-slate-500 text-xs italic">
+                No tickets configured in the queue yet. Use the fields above to
+                add your first predictive set!
+              </div>
+            )}
+          </div>
+
+          {/* Auto-Bet Settings */}
+          <div className="mt-4 p-3 rounded-lg border border-white/10 bg-white/3 space-y-3">
+            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Auto-Bet Engine Settings
+            </span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Tickets Per Round</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={config?.tickets_per_round ?? 4}
+                  onChange={(e) => saveTickets(tickets)} // triggers save with updated config
+                  className="font-mono"
+                />
+                <p className="text-[10px] text-slate-500">How many tickets to play each round from the queue</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Round Interval (seconds)</Label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={3600}
+                  value={config?.round_interval ?? 30}
+                  onChange={(e) => saveTickets(tickets)}
+                  className="font-mono"
+                />
+                <p className="text-[10px] text-slate-500">Seconds between auto-bet rounds</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="rain-auto-enabled"
+                checked={config?.enabled ?? false}
+                onChange={(e) => saveTickets(tickets)}
+                className="h-4 w-4 accent-emerald-500"
+              />
+              <Label htmlFor="rain-auto-enabled" className="cursor-pointer text-sm">
+                Enable Auto-Bet Engine
+              </Label>
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}

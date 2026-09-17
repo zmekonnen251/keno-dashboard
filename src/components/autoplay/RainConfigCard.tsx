@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, Empty } from '@/components/app';
-import { setRainAutoplayConfig } from '@/lib/api';
+import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
+import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { formatTime } from '@/lib/format';
 
@@ -31,9 +32,10 @@ export function RainConfigCard({
   const [manualDraft, setManualDraft] = useState('');
   const seeded = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [ticketConfig, setTicketConfig] = useState<any>(null);
+  const [ticketSeeded, setTicketSeeded] = useState(false);
 
-  // Seed the editor once from the live config (the parent polls every few
-  // seconds, but once the user starts editing we stop clobbering their draft).
+  // Seed the editor once from the live config
   useEffect(() => {
     if (cfg && !seeded.current) {
       setConfig(cfg);
@@ -41,6 +43,17 @@ export function RainConfigCard({
       seeded.current = true;
     }
   }, [cfg]);
+
+  useEffect(() => {
+    if (!ticketSeeded) {
+      getRainTicketConfig().then(res => {
+        if (res.ok) {
+          setTicketConfig(res.config);
+          setTicketSeeded(true);
+        }
+      }).catch(() => { setTicketSeeded(true); });
+    }
+  }, []);
 
   function parseManualSpots(text: string): number[] {
     return text
@@ -183,6 +196,20 @@ export function RainConfigCard({
               {saving ? 'Saving…' : 'Save configuration'}
             </Button>
           </div>
+
+          {/* Ticket Queue Configuration (like Extension) */}
+          <RainTicketConfigCard
+            config={{ 
+              ...config, 
+              provider: config.provider,
+              tickets: ticketConfig?.tickets || [],
+              tickets_per_round: config.tickets_per_round,
+              round_interval: config.round_interval,
+              enabled: config.enabled
+            }}
+            onSaved={onSaved}
+            onRefresh={onRefresh}
+          />
         </>
       )}
     </Card>

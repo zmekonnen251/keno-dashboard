@@ -559,6 +559,16 @@ export interface BotTicket {
 	enabled: boolean;
 	staticTicket?: boolean;
 	numbers?: number[];
+	useFreeBet?: boolean;
+}
+
+export interface RainTicketConfig {
+	tickets: BotTicket[];
+	enabled: boolean;
+	tickets_per_round: number;
+	round_interval: number;
+	provider: string;
+	updated_at: string;
 }
 
 export type DifficultyLevel = 'very_easy' | 'easy' | 'medium' | 'hard' | 'very_hard';

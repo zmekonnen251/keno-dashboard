@@ -42,6 +42,8 @@ import type {
   RainWsTokensResponse,
   TicketPlan,
   RainPredictionResponse,
+  RainTicketConfig,
+  BotTicket,
 } from './types';
 
 // ---- auth ----
@@ -420,6 +422,26 @@ export async function getRainCashBets(limit = 100): Promise<RainCashBetsResponse
 // Raw ws_tokens for the live-drawing observer (admin-only). Never rendered.
 export async function getRainWsTokens(): Promise<RainWsTokensResponse> {
   return apiFetch<RainWsTokensResponse>('api/rain/accounts/ws-tokens');
+}
+
+// Rain ticket config (multi-ticket queue like extension)
+export async function getRainTicketConfig(): Promise<{ ok: boolean; config: RainTicketConfig }> {
+  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/rain/autoplay/ticket-config');
+}
+
+export async function setRainTicketConfig(patch: { tickets: BotTicket[] }): Promise<{ ok: boolean; config: RainTicketConfig }> {
+  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/rain/autoplay/ticket-config', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+// Generate preview picks for all tickets
+export async function getRainTicketPreview(tickets: BotTicket[], provider: string, ticketsPerRound: number): Promise<{ ok: boolean; previews: Record<string, number[]> }> {
+  return apiFetch<{ ok: boolean; previews: Record<string, number[]> }>('api/rain/autoplay/ticket-preview', {
+    method: 'POST',
+    body: JSON.stringify({ tickets, provider, tickets_per_round: ticketsPerRound }),
+  });
 }
 
 // ---- proxies ----
