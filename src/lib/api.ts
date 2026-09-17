@@ -184,11 +184,11 @@ export async function uploadAccounts(file: File): Promise<UploadResponse> {
 }
 
 // ---- autoplay ----
-export async function getAutoplayConfig(): Promise<AutoplayConfig> {
+export async function getAutoplayConfig(siteId?: string): Promise<AutoplayConfig> {
   return apiFetch<AutoplayConfig>('api/accounts/autoplay/config');
 }
 
-export async function setAutoplayConfig(patch: Partial<AutoplayConfig>): Promise<AutoplayConfig> {
+export async function setAutoplayConfig(siteId: string, patch: Partial<AutoplayConfig>): Promise<AutoplayConfig> {
   return apiFetch<AutoplayConfig>('api/accounts/autoplay/config', {
     method: 'POST',
     body: JSON.stringify(patch),

@@ -34,6 +34,7 @@ import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
 import { RainConfigCard } from './RainConfigCard';
+import { RainFreeBetView } from './RainFreeBetView';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -346,6 +347,8 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
 
       <RainManualBetCard accounts={accounts} onMessage={setMsg} onSettled={() => void refreshAccountsAndBets()} />
+
+      <RainFreeBetView autoRefresh={true} />
 
       <RainLiveView bets={cashBets} picks={cfg?.spots_mode === 'manual' ? cfg?.manual_spots : undefined} />
 

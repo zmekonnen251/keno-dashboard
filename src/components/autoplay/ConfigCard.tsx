@@ -14,10 +14,12 @@ export function ConfigCard({
 	cfg,
 	onSaved,
 	onRefresh,
+	siteId,
 }: {
 	cfg?: AutoplayConfig | null;
 	onSaved: (msg: string) => void;
 	onRefresh: () => void;
+	siteId?: string;
 }) {
 	const [loaded, setLoaded] = useState(false);
 	const [stake, setStake] = useState('');
@@ -66,7 +68,7 @@ export function ConfigCard({
 		setSaving(true);
 		onSaved('');
 		try {
-			await setAutoplayConfig({
+			await setAutoplayConfig(siteId || 'fungames_tolobirr', {
 				stake: stake !== '' ? parseFloat(stake) : undefined,
 				batch_size: batch !== '' ? parseInt(batch, 10) : undefined,
 				mode,

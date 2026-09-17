@@ -24,6 +24,7 @@ import { PredictionBetCard } from '@/components/autoplay/PredictionBetCard';
 import { GameView } from '@/components/autoplay/GameView';
 import { LastDrawsBoards } from '@/components/autoplay/LastDrawsBoards';
 import { ShamoAutoplay } from '@/components/autoplay/ShamoAutoplay';
+import { TicketConfig } from '@/components/autoplay/TicketConfig';
 import { useSite } from '@/components/site-provider';
 import { Modal } from '@/components/ui/modal';
 
@@ -48,6 +49,8 @@ function TolobirrAutoplay() {
 	const [signals, setSignals] = useState<'repetitive' | 'recurring' | 'hot' | 'none'>('repetitive');
 	const [manualPicks, setManualPicks] = useState<number[]>([]);
 	const [showConfig, setShowConfig] = useState(false);
+	const [showTicketConfig, setShowTicketConfig] = useState(false);
+	const { siteId } = useSite();
 
 	useGatewayGameState(setGameState);
 
@@ -155,6 +158,9 @@ function TolobirrAutoplay() {
 					<Button variant='outline' onClick={() => setShowConfig(true)}>
 						Configure
 					</Button>
+					<Button variant='outline' onClick={() => setShowTicketConfig(true)}>
+						Ticket Config
+					</Button>
 				</div>
 			</div>
 
@@ -183,7 +189,7 @@ function TolobirrAutoplay() {
 				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
 			</CollapsibleCard>
 
-			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} />
+			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} />
 
 			<ManualBetCard
 				running={conn?.running ?? false}
@@ -198,7 +204,13 @@ function TolobirrAutoplay() {
 
 			{showConfig && (
 				<Modal title='Autoplay configuration' onClose={() => setShowConfig(false)} wide>
-					<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} />
+					<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} />
+				</Modal>
+			)}
+
+			{showTicketConfig && (
+				<Modal title='Ticket Configuration' onClose={() => setShowTicketConfig(false)} wide>
+					<TicketConfig siteId={siteId} />
 				</Modal>
 			)}
 		</div>
