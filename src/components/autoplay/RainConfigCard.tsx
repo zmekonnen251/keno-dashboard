@@ -63,6 +63,8 @@ export function RainConfigCard({
         spots_mode: config.spots_mode,
         manual_spots: parseManualSpots(manualDraft),
         round_interval: config.round_interval,
+        use_cash_after_free_bets: config.use_cash_after_free_bets,
+        cash_stake: config.cash_stake,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -145,6 +147,28 @@ export function RainConfigCard({
                 onChange={(e) => setManualDraft(e.target.value)}
                 placeholder="e.g. 5, 12, 23, 40"
                 disabled={config.spots_mode !== 'manual'}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-use-cash">Use cash after free bets</Label>
+              <Select value={String(config.use_cash_after_free_bets)} onValueChange={(v) => setConfig({ ...config, use_cash_after_free_bets: v === 'true' })}>
+                <SelectTrigger id="rain-auto-use-cash"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Enabled — use account cash when no free bets</SelectItem>
+                  <SelectItem value="false">Disabled — free bets only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-cash-stake">Cash stake (ETB)</Label>
+              <Input
+                id="rain-auto-cash-stake"
+                type="number"
+                min={1}
+                max={10000}
+                value={config.cash_stake}
+                onChange={(e) => setConfig({ ...config, cash_stake: Number(e.target.value) })}
+                disabled={!config.use_cash_after_free_bets}
               />
             </div>
           </div>

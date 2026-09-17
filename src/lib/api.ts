@@ -41,6 +41,7 @@ import type {
   RainTestRoundResponse,
   RainWsTokensResponse,
   TicketPlan,
+  RainPredictionResponse,
 } from './types';
 
 // ---- auth ----
@@ -348,7 +349,7 @@ export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigRespons
 }
 
 export async function setRainAutoplayConfig(
-  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval'>>,
+  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake'>>,
 ): Promise<RainAutoplayConfigResponse> {
   return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
     method: 'PATCH',
@@ -385,6 +386,11 @@ export async function rainBetPrediction(): Promise<{ ok: boolean; result: { ok: 
   return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/rain/bet-prediction', {
     method: 'POST',
   });
+}
+
+// Get AI prediction for rain autoplay (uses DB draws + extension-like logic)
+export async function getRainPrediction(provider = 'fungames_shamo', k = 3) {
+  return apiFetch<RainPredictionResponse>(`api/rain/prediction?provider=${encodeURIComponent(provider)}&k=${k}`);
 }
 
 // Forced test round: the engine immediately plays as many eligible free-bets

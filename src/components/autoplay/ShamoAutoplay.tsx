@@ -346,7 +346,13 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
       <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
 
-      <RainManualBetCard accounts={accounts} onMessage={setMsg} onSettled={() => void refreshAccountsAndBets()} />
+      <RainManualBetCard
+        running={status?.running ?? false}
+        config={cfg}
+        accounts={accounts}
+        onMessage={setMsg}
+        onRefresh={() => void refreshAccountsAndBets()}
+      />
 
       <RainFreeBetView autoRefresh={true} />
 

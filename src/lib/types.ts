@@ -124,6 +124,15 @@ export interface Prediction {
 	// Sequence matching data when using the historical look-ahead engine
 	sequenceMatch?: SequenceMatchData | null;
 	useSequenceMatch?: boolean;
+	// Enhanced ML predictions with trigger reasons
+	numberPredictions?: NumberPrediction[];
+}
+
+// Number prediction with trigger reason from enhanced ML model
+export interface NumberPrediction {
+	number: number;
+	probability: number;
+	trigger_reason: string;
 }
 
 // Sequence matching data from the ML service
@@ -780,6 +789,8 @@ export interface RainAutoplayConfig {
 	spots_mode: 'prediction' | 'prediction_tickets' | 'manual';
 	manual_spots: number[];
 	round_interval: number;
+	use_cash_after_free_bets: boolean;
+	cash_stake: number;
 	updated_at: string;
 }
 
@@ -797,6 +808,8 @@ export interface RainAutoplayStatus {
 	totalPlayed: number;
 	lastError: string | null;
 	pendingAcks: number;
+	freeBetsPlayed: number;
+	cashBetsPlayed: number;
 }
 
 export interface RainAutoplayStatusResponse {
@@ -871,4 +884,18 @@ export interface RainWsTokensResponse {
 	ok: boolean;
 	count: number;
 	tokens: RainWsToken[];
+}
+
+// Rain prediction response from the new predictor
+export interface RainPredictionResponse {
+	ok: boolean;
+	prediction?: {
+		picks: number[];
+		strategy: 'cluster' | 'standard' | 'pattern';
+		difficulty: { level: string; confidence: number; recommendedSpotRange: { min: number; max: number }; recommendedStrategy: string; dominantPattern: string };
+		repetitivePatterns: any[];
+		clusters: any[];
+		metrics: any[];
+		volatility: any;
+	};
 }
