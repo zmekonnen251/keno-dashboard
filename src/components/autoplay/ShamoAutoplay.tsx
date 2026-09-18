@@ -28,13 +28,12 @@ import { Badge, Card, Empty, Loading, StatCard, TableCell, TableRow } from '@/co
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { NumberGrid } from './NumberGrid';
-import { RainLiveView } from './RainLiveView';
+import { RainBetView } from './RainBetView';
 import { RainManualBetCard } from './RainManualBetCard';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
 import { RainConfigCard } from './RainConfigCard';
-import { RainFreeBetView } from './RainFreeBetView';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -354,9 +353,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         onRefresh={() => void refreshAccountsAndBets()}
       />
 
-      <RainFreeBetView autoRefresh={true} />
-
-      <RainLiveView bets={cashBets} picks={cfg?.spots_mode === 'manual' ? cfg?.manual_spots : undefined} />
+      <RainBetView freeBets={freeBets ?? undefined} cashBets={cashBets} config={cfg} autoRefresh={true} />
 
       <Card title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
         {playHistory === null ? (

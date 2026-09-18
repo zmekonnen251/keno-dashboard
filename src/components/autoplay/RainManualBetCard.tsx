@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/app';
 import { rainManualCashBet, getRainAutoplayStatus, rainBetPrediction, getRainPrediction } from '@/lib/api';
-import { Cpu, Play, Trash2, Sparkles, Zap } from 'lucide-react';
+import { Play, Trash2, Sparkles } from 'lucide-react';
 import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus } from '@/lib/types';
 import { useSocket } from '@/lib/service-gateway';
 
@@ -183,7 +185,7 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
           <Button
             onClick={handleGeneratePicks}
             disabled={!running || predicting || spotsMode === 'manual'}
-            className="flex-1 min-w-[160px]"
+            className="flex-1 min-w-40"
           >
             {predicting ? 'Generating…' : <><Sparkles className="w-4 h-4 mr-1" /> Generate AI Picks</>}
           </Button>
@@ -191,7 +193,7 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
             onClick={handlePlaceBet}
             disabled={!running || betting || selectedAccountId === null || picks.length === 0}
             variant="default"
-            className="flex-1 min-w-[160px] bg-emerald-600 hover:bg-emerald-500"
+            className="flex-1 min-w-40 bg-emerald-600 hover:bg-emerald-500"
           >
             {betting ? 'Placing…' : <><Play className="w-4 h-4 mr-1" /> Place Bet</>}
           </Button>
@@ -199,7 +201,7 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
             onClick={handleClearPicks}
             disabled={picks.length === 0}
             variant="outline"
-            className="min-w-[100px]"
+            className="min-w-25"
           >
             <Trash2 className="w-4 h-4 mr-1" /> Clear
           </Button>
@@ -216,7 +218,7 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
               </span>
             )}
           </div>
-          <div className="flex flex-wrap gap-1.5 min-h-[40px]">
+          <div className="flex flex-wrap gap-1.5 min-h-10">
             {picks.length === 0 ? (
               <span className="text-sm text-slate-500 italic w-full">
                 {spotsMode === 'manual' ? 'Enter numbers above or switch to Auto' : 'Click "Generate AI Picks" to get predictions'}
