@@ -34,6 +34,10 @@ function cashStatusLabel(b: RainCashBet): { text: string; tone: string } {
   return { text: 'Lost', tone: '#64748b' };
 }
 
+function cashBetTypeBadge(): { text: string; cls: string } {
+  return { text: '💰 CASH', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+}
+
 export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainCashBet[]; picks?: number[]; autoRefresh?: boolean }) {
   const { status, observer, drawn, updatedAt } = useLiveDraw('shamo');
   const [soundOn, setSoundOn] = useState(() => getSoundPref());
@@ -332,6 +336,7 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
             <div className='flex flex-wrap gap-2 lg:max-h-120 lg:overflow-y-auto lg:pr-1'>
               {listedBets.map((b) => {
                 const st = cashStatusLabel(b);
+                const bt = cashBetTypeBadge();
                 const isWinner = b.status === 'won';
                 return (
                   <div
@@ -352,9 +357,12 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
                       <span className='truncate text-slate-400'>
                         {b.accountName} · Bet {b.stake}
                       </span>
-                      <span className='shrink-0 font-bold' style={{ color: st.tone }}>
-                        {isWinner ? `WINNER +${b.winAmount ?? ''}` : st.text}
-                      </span>
+                      <div className='flex items-center gap-1.5'>
+                        <span className='shrink-0 font-bold' style={{ color: st.tone }}>
+                          {isWinner ? `WINNER +${b.winAmount ?? ''}` : st.text}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
+                      </div>
                     </div>
                     {b.status === 'failed' && b.failReason && (
                       <div className='mt-1 truncate text-[11px] text-red-400/90' title={b.failReason}>

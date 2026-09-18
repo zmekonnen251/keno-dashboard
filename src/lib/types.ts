@@ -779,10 +779,13 @@ export interface RainFreeBet {
 	request_id: string | null;
 	chosen_spots: number[] | null;
 	bet_placed_at: string | null;
+	drawn_spots: number[] | null;
+	matched_spots: number[] | null;
 	error: string | null;
 	last_seen_at: string | null;
 	created_at: string;
 	updated_at: string;
+	bet_type?: 'free_bet' | 'cash';
 }
 
 export interface RainFreeBetsResponse {

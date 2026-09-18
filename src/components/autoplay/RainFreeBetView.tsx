@@ -25,6 +25,13 @@ function freeBetStatusLabel(b: RainFreeBet): { text: string; cls: string } {
   return { text: 'Available', cls: 'bg-emerald-600 text-white' };
 }
 
+function betTypeBadge(b: RainFreeBet): { text: string; cls: string } {
+  const isFreeBet = b.bet_type !== 'cash';
+  return isFreeBet
+    ? { text: '🎁 FREE BET', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/40' }
+    : { text: '💰 CASH', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+}
+
 export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean }) {
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -176,29 +183,58 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
           <div className='flex flex-wrap gap-2'>
             {bettingBets.map((b) => {
               const s = freeBetStatusLabel(b);
+              const bt = betTypeBadge(b);
+              const isDrawing = gameState.phase === 'drawing' || gameState.phase === 'settled';
+              const drawn = b.drawn_spots || [];
+              const matched = b.matched_spots || [];
               return (
                 <div
                   key={b.id}
                   className={`min-w-44 flex-1 rounded-lg border p-2 border-sky-500/40 bg-sky-500/10 shadow-[0_0_8px_rgba(14,165,233,0.2)]`}
                 >
-                  <div className='flex flex-wrap gap-1'>
-                    {(b.chosen_spots || []).map((n) => (
-                      <span
-                        key={n}
-                        className='flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold bg-sky-500 text-white'
-                      >
-                        {n}
-                      </span>
-                    ))}
+                  <div className='flex flex-wrap gap-1 mb-1'>
+                    {(b.chosen_spots || []).map((n) => {
+                      const isMatched = matched.includes(n);
+                      const isDrawn = drawn.includes(n);
+                      return (
+                        <span
+                          key={n}
+                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold ${
+                            isMatched ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' :
+                            isDrawn ? 'bg-amber-500 text-white' :
+                            'bg-sky-500 text-white'
+                          }`}
+                        >
+                          {n}
+                        </span>
+                      );
+                    })}
                   </div>
                   <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
                     <span className='truncate text-slate-400'>
                       {b.account_name ?? `#${b.account_id}`} · +{b.wager_amount} ETB
                     </span>
-                    <span className={`shrink-0 font-bold ${s.cls}`}>
-                      {s.text}
-                    </span>
+                    <div className='flex items-center gap-1.5'>
+                      <span className={`shrink-0 font-bold ${s.cls}`}>{s.text}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
+                    </div>
                   </div>
+                  {isDrawing && drawn.length > 0 && (
+                    <div className='mt-1 flex flex-wrap gap-1'>
+                      <span className='text-[10px] text-slate-500 font-mono'>Drawn:</span>
+                      {drawn.map((n, i) => (
+                        <span
+                          key={i}
+                          className={`flex h-5 w-5 items-center justify-center rounded font-mono text-[10px] font-bold ${
+                            matched.includes(n) ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40' :
+                            'bg-white/5 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {b.bet_placed_at && (
                     <div className='mt-1 text-[11px] text-slate-500'>
                       Placed {formatTime(b.bet_placed_at)}
@@ -227,6 +263,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
               .slice(0, 20)
               .map((b) => {
                 const s = freeBetStatusLabel(b);
+                const bt = betTypeBadge(b);
                 return (
                   <div
                     key={b.id}
@@ -240,6 +277,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
                         <span className={`text-xs px-2 py-0.5 rounded ${s.cls}`}>
                           {s.text}
                         </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
                       </div>
                       <div className='mt-1 flex items-center gap-3 text-xs text-slate-400'>
                         <span>+{b.wager_amount} ETB</span>
