@@ -45,7 +45,19 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
   const [pushOn, setPushOn] = useState(() => isPushActive());
   const [alerts, setAlerts] = useState<WinAlert[]>([]);
   const [localBets, setLocalBets] = useState<RainCashBet[] | null>(null);
-  const celebratedRef = useRef<Set<string>>(new Set());
+  
+  const getStoredCelebrated = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem('rainCashCelebrated');
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  };
+  const celebratedRef = useRef<Set<string>>(getStoredCelebrated());
+  const saveCelebrated = () => {
+    try { localStorage.setItem('rainCashCelebrated', JSON.stringify([...celebratedRef.current])); } catch {}
+  };
+  
   const { notify } = useNotifications();
   const [gameState, setGameState] = useState<GameState>({
     phase: 'unknown',
@@ -173,6 +185,7 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
       const key = `${b.accountId}-${b.requestId}`;
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
+      saveCelebrated();
       const spots = b.spots || [];
       const est = paytableWin(spots.length, spots.length, b.stake) ?? b.winAmount ?? 0;
       const text = `Cash full match! [${spots.join(',')}] on #${b.accountId} — +${est} ETB`;

@@ -58,6 +58,7 @@ interface UnifiedBet {
   requestId: string;
   betPlacedAt: string | number | null;
   failReason?: string;
+  roundNumber: number;
 }
 
 export function RainBetView({ 
@@ -76,7 +77,22 @@ export function RainBetView({
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
   const [alerts, setAlerts] = useState<{ id: string; text: string; at: number }[]>([]);
-  const celebratedRef = useRef<Set<string>>(new Set());
+  // Persist celebrated keys in localStorage to survive page refreshes
+  const getStoredCelebrated = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem('rainBetCelebrated');
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  };
+
+  const celebratedRef = useRef<Set<string>>(getStoredCelebrated());
+
+  const saveCelebrated = () => {
+    try {
+      localStorage.setItem('rainBetCelebrated', JSON.stringify([...celebratedRef.current]));
+    } catch {}
+  };
   const { notify } = useNotifications();
   const [gameState, setGameState] = useState<GameState>({
     phase: 'unknown',
@@ -87,6 +103,13 @@ export function RainBetView({
   // Convert free bets and cash bets to unified format
   const unifiedBets = useMemo((): UnifiedBet[] => {
     const bets: UnifiedBet[] = [];
+    const roundDuration = BETTING_WINDOW_MS + DRAWING_DURATION_MS;
+    
+    const getRoundNumber = (timestamp: string | number | null): number => {
+      if (!timestamp) return 0;
+      const ts = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
+      return Math.floor(ts / roundDuration);
+    };
     
     if (freeBets) {
       for (const b of freeBets) {
@@ -107,6 +130,7 @@ export function RainBetView({
             requestId: b.request_id || `fb-${b.id}`,
             betPlacedAt: b.bet_placed_at ?? null,
             failReason: b.error ?? undefined,
+            roundNumber: getRoundNumber(b.bet_placed_at),
           });
         }
       }
@@ -129,6 +153,7 @@ export function RainBetView({
           requestId: b.requestId,
           betPlacedAt: b.placedAt,
           failReason: b.failReason,
+          roundNumber: getRoundNumber(b.placedAt),
         });
       }
     }
@@ -205,9 +230,10 @@ export function RainBetView({
       const key = `freebet-${b.accountId}-${b.requestId}`;
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
+      saveCelebrated();
       const spots = b.spots || [];
-      const est = paytableWin(spots.length, spots.length, 0) ?? b.winAmount ?? 0;
-      const text = `🎁 Free Bet Full Match! [${spots.join(',')}] on ${b.accountName} — +${est} ETB`;
+      const winAmount = b.winAmount ?? paytableWin(spots.length, spots.length, b.stake) ?? 0;
+      const text = `🎁 Free Bet Full Match! [${spots.join(',')}] on ${b.accountName} — +${winAmount} ETB`;
       if (soundOn) playWinSound();
       if (!pushOn && notifyOn) pushWinNotification('Free Bet Full Match!', text);
       notify({ id: `rainwin-${key}`, kind: 'win', text, phone: b.accountName });
@@ -226,6 +252,7 @@ export function RainBetView({
       const key = `cash-${b.accountId}-${b.requestId}`;
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
+      saveCelebrated();
       const spots = b.spots || [];
       const est = paytableWin(spots.length, spots.length, b.stake) ?? b.winAmount ?? 0;
       const text = `💰 Cash Full Match! [${spots.join(',')}] on ${b.accountName} — +${est} ETB`;
@@ -262,8 +289,11 @@ export function RainBetView({
     setSoundPref(next);
   }
 
-  const activeBets = unifiedBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
-  const settledBets = unifiedBets.filter(b => b.status === 'won' || b.status === 'lost');
+  const currentRound = gameState.roundNumber ?? 0;
+  const currentRoundBets = unifiedBets.filter(b => b.roundNumber === currentRound);
+  
+  const activeBets = currentRoundBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
+  const settledBets = currentRoundBets.filter(b => b.status === 'won' || b.status === 'lost');
 
   return (
     <div className='overflow-hidden rounded-xl border border-white/10 bg-[#0b0f19] text-slate-100'>
@@ -332,13 +362,13 @@ export function RainBetView({
         {/* Left: All Tickets */}
         <div className='min-w-0 lg:max-h-150 overflow-y-auto'>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
-            All Tickets ({unifiedBets.length})
+            Round {currentRound} Tickets ({currentRoundBets.length})
           </div>
-          {unifiedBets.length === 0 ? (
-            <p className='py-4 text-center text-xs italic text-slate-500'>No tickets placed yet.</p>
+          {currentRoundBets.length === 0 ? (
+            <p className='py-4 text-center text-xs italic text-slate-500'>No tickets placed this round.</p>
           ) : (
-            <div className='space-y-2'>
-              {unifiedBets.map((b) => {
+            <div className='flex flex-wrap gap-2 max-h-[150px] overflow-y-auto'>
+              {currentRoundBets.map((b) => {
                 const isFreeBet = b.betType === 'free_bet';
                 const s = freeBetStatusLabel({ status: b.status, winAmount: b.winAmount });
                 const bt = betTypeBadge(b.betType);
@@ -391,8 +421,8 @@ export function RainBetView({
             <div className='keno-board'>
               {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
                 const isDrawn = drawn.includes(n);
-                const isWinnerNum = unifiedBets.some(b => b.status === 'won' && b.spots.includes(n));
-                const isPick = unifiedBets.some(b => b.spots.includes(n));
+                const isWinnerNum = currentRoundBets.some(b => b.status === 'won' && b.spots.includes(n));
+                const isPick = currentRoundBets.some(b => b.spots.includes(n));
                 return (
                   <div key={n} className={isWinnerNum ? 'keno-tile hit' : isDrawn ? 'keno-tile picked' : 'keno-tile'}>
                     {n}

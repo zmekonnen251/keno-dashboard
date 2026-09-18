@@ -45,7 +45,19 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
   const [alerts, setAlerts] = useState<WinAlert[]>([]);
-  const celebratedRef = useRef<Set<string>>(new Set());
+  
+  const getStoredCelebrated = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem('tolobirrCelebrated');
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  };
+  const celebratedRef = useRef<Set<string>>(getStoredCelebrated());
+  const saveCelebrated = () => {
+    try { localStorage.setItem('tolobirrCelebrated', JSON.stringify([...celebratedRef.current])); } catch {}
+  };
+  
   const { notify } = useNotifications();
   const [gameState, setGameState] = useState<GameState>({
     phase: 'unknown',
@@ -169,6 +181,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       const key = `${b.accountId}-${b.requestId}`;
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
+      saveCelebrated();
       const spots = b.spots || [];
       const est = paytableWin(spots.length, spots.length, b.stake) ?? b.winAmount ?? 0;
       const text = `Full match! [${spots.join(',')}] on #${b.accountId} — est. +${est} ETB`;
