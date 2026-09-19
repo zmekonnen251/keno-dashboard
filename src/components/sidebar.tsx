@@ -24,6 +24,7 @@ import {
 import { useTheme } from 'next-themes';
 import { useState } from 'react';
 import { logout } from '@/lib/api';
+import { useSite } from '@/components/site-provider';
 import {
   Sidebar,
   SidebarContent,
@@ -47,11 +48,11 @@ const NAV = [
   { href: '/ml-alerts', label: 'ML Alerts', icon: BellRing },
   { href: '/insights', label: 'Insights', icon: Lightbulb },
   { href: '/sessions', label: 'Sessions', icon: Radio },
-  { href: '/accounts', label: 'Accounts', icon: Users },
+  { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
-  { href: '/proxies', label: 'Proxies', icon: ShieldCheck },
-  { href: '/rain-accounts', label: 'Rain', icon: CloudRain },
-  { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint },
+  { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
+  { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },
 ];

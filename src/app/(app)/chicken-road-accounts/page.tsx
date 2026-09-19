@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -190,15 +191,7 @@ function AutoplayCard() {
   const [status, setStatus] = useState<ChickenRoadAutoplayStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [manualDraft, setManualDraft] = useState('');
-  const [draftSynced, setDraftSynced] = useState(false);
-
-  useEffect(() => {
-    if (config && !draftSynced) {
-      setManualDraft(config.manual_spots.join(', '));
-      setDraftSynced(true);
-    }
-  }, [config, draftSynced]);
+  const [manualDraft, setManualDraft] = useState<string | null>(null);
 
   function parseManualSpots(text: string): number[] {
     return text
@@ -240,10 +233,11 @@ function AutoplayCard() {
         provider: config.provider,
         tickets_per_round: config.tickets_per_round,
         spots_mode: config.spots_mode,
-        manual_spots: parseManualSpots(manualDraft),
+        manual_spots: parseManualSpots(manualDraft ?? ''),
         round_interval: config.round_interval,
       });
       setConfig(res.config);
+      setManualDraft(null);
       setMsg('Autoplay config saved.');
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -355,7 +349,7 @@ function AutoplayCard() {
             <Input
               type="text"
               id="cr-auto-manual-spots"
-              value={manualDraft}
+              value={manualDraft ?? config.manual_spots.join(', ')}
               onChange={(e) => setManualDraft(e.target.value)}
               placeholder="e.g. 5, 12, 23, 40"
               disabled={config.spots_mode !== 'manual'}
@@ -404,9 +398,14 @@ export default function ChickenRoadAccountsPage() {
   }
 
   useEffect(() => {
-    void loadPlayHistory();
+    const initialLoad = window.setTimeout(() => {
+      void loadPlayHistory();
+    }, 0);
     const timer = setInterval(() => { refresh(); void loadPlayHistory(); }, 10000);
-    return () => clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialLoad);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   async function onAdd(input: { name: string; ws_token: string; provider: ChickenRoadProvider; is_enabled: boolean; access_token?: string }) {
@@ -629,7 +628,7 @@ export default function ChickenRoadAccountsPage() {
       </Card>
 
       {(adding || editing) && (
-        <Modal open onClose={() => { setAdding(false); setEditing(null); }}>
+        <Modal title={editing ? 'Edit account' : 'Add account'} onClose={() => { setAdding(false); setEditing(null); }}>
           <AccountForm
             initial={editing}
             onSave={editing ? (i) => onEdit(editing, i) : onAdd}
@@ -639,7 +638,7 @@ export default function ChickenRoadAccountsPage() {
       )}
 
       {claims && (
-        <Modal open onClose={() => setClaims(null)}>
+        <Modal title={`Claims — ${claims.account.name}`} onClose={() => setClaims(null)}>
           <div className="space-y-4">
             <h3 className="text-lg font-bold">Claims — {claims.account.name}</h3>
             {claimsLoading ? (
