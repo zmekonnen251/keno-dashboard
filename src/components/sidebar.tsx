@@ -61,8 +61,13 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
+  const { siteId } = useSite();
   const [busy, setBusy] = useState(false);
   const {state} = useSidebar();
+  
+  // Filter navigation items based on current site
+  const filteredNav = NAV.filter(item => !item.sites || item.sites.includes(siteId));
+  
   async function onLogout() {
     setBusy(true);
     try {
@@ -100,7 +105,7 @@ export default function AppSidebar() {
 					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{NAV.map((item) => {
+							{filteredNav.map((item) => {
 								const active = item.end
 									? pathname === item.href
 									: pathname === item.href ||

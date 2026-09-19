@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import Link from 'next/link';
@@ -18,6 +19,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: any;
+  sites?: string[];
 }
 
 const MOBILE_NAV: NavItem[] = [
@@ -26,8 +28,8 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/patterns', label: 'Patterns', icon: Waypoints },
   { href: '/predictions', label: 'Predictions', icon: Sparkles },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
-  { href: '/rain-accounts', label: 'Rain', icon: CloudRain },
-  { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
+  { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint, sites: ['fungames_shamo'] },
 ];
 
 export function MobileBottomNav() {
@@ -35,12 +37,15 @@ export function MobileBottomNav() {
   const { siteId, setSiteId, sites } = useSite();
   const [showSiteSelector, setShowSiteSelector] = useState(false);
 
+  // Filter navigation items based on current site
+  const filteredNav = MOBILE_NAV.filter(item => !item.sites || item.sites.includes(siteId));
+
   return (
     <>
       {/* Mobile bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background sm:hidden">
         <div className="flex items-center justify-around px-2 py-2">
-          {MOBILE_NAV.map((item) => {
+          {filteredNav.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
             return (
