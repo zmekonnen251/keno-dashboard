@@ -912,3 +912,216 @@ export interface RainPredictionResponse {
 		volatility: any;
 	};
 }
+
+// Chicken Road (free-bet) claiming accounts - similar to rain but for chicken road game
+export type ChickenRoadProvider = 'chicken_road';
+
+export interface ChickenRoadAccount {
+	id: number;
+	name: string;
+	provider: ChickenRoadProvider;
+	gateway_host: string;
+	ws_token_masked: string | null;
+	access_token_masked: string | null;
+	has_access_token: boolean;
+	is_enabled: boolean;
+	status: string;
+	connected: boolean;
+	lastError: string | null;
+	connectedAt: number | null;
+	claimedThisSession: number;
+	lastRainId: string | null;
+	lastSlot: number | null;
+	lastWager: number | null;
+	lastRainAt: number | null;
+	balance: number;
+	balanceLive: boolean;
+	rain_count: number;
+	last_claimed_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface ChickenRoadAccountsResponse {
+	ok: boolean;
+	count: number;
+	accounts: ChickenRoadAccount[];
+}
+
+export interface ChickenRoadClaimRecord {
+	id: number;
+	account_id: number;
+	rain_id: string;
+	message_id: string;
+	slot_index: number;
+	wager_amount: number;
+	created_at: string;
+}
+
+export interface ChickenRoadClaimsResponse {
+	ok: boolean;
+	accountId: number;
+	count: number;
+	claims: ChickenRoadClaimRecord[];
+}
+
+export type ChickenRoadFreeBetStatus =
+	| 'available'
+	| 'claiming'
+	| 'bet_placed'
+	| 'won'
+	| 'lost'
+	| 'failed'
+	| 'expired';
+
+export interface ChickenRoadFreeBet {
+	id: number;
+	account_id: number;
+	account_name?: string;
+	account_enabled?: boolean;
+	free_bet_id: string;
+	player_id: string | null;
+	wager_amount: number;
+	won_amount: number;
+	given_count: number;
+	pending_bet_count: number;
+	closed_bet_count: number;
+	min_cashout_odd: number | null;
+	granted_at: string | null;
+	expires_at: string | null;
+	source_kind: 'campaign' | 'p2p_rain' | null;
+	campaign_id: string | null;
+	giver_player_id: string | null;
+	rain_id: string | null;
+	slot_index: number | null;
+	status: ChickenRoadFreeBetStatus;
+	request_id: string | null;
+	chosen_spots: number[] | null;
+	bet_placed_at: string | null;
+	drawn_spots: number[] | null;
+	matched_spots: number[] | null;
+	error: string | null;
+	last_seen_at: string | null;
+	created_at: string;
+	updated_at: string;
+	bet_type?: 'free_bet' | 'cash';
+}
+
+export interface ChickenRoadFreeBetsResponse {
+	ok: boolean;
+	count: number;
+	bets: ChickenRoadFreeBet[];
+}
+
+export interface ChickenRoadAutoplayConfig {
+	id: 1;
+	enabled: boolean;
+	provider: ChickenRoadProvider;
+	tickets_per_round: number;
+	spots_mode: 'prediction' | 'prediction_tickets' | 'manual';
+	manual_spots: number[];
+	round_interval: number;
+	use_cash_after_free_bets: boolean;
+	cash_stake: number;
+	updated_at: string;
+}
+
+export interface ChickenRoadAutoplayConfigResponse {
+	ok: boolean;
+	config: ChickenRoadAutoplayConfig;
+}
+
+export interface ChickenRoadAutoplayStatus {
+	running: boolean;
+	intervalMs: number;
+	lastRoundAt: number | null;
+	lastRoundDurationMs: number | null;
+	lastRoundPlayed: number;
+	totalPlayed: number;
+	lastError: string | null;
+	pendingAcks: number;
+	freeBetsPlayed: number;
+	cashBetsPlayed: number;
+}
+
+export interface ChickenRoadAutoplayStatusResponse {
+	ok: boolean;
+	status: ChickenRoadAutoplayStatus;
+	config: ChickenRoadAutoplayConfig;
+}
+
+export interface PlayChickenRoadFreeBetResponse {
+	ok: boolean;
+	result: { ok: boolean; found: boolean; request_id?: string; error?: string };
+}
+
+export type ChickenRoadCashBetStatus = 'won' | 'lost' | 'failed';
+
+export interface ChickenRoadCashBet {
+	accountId: number;
+	phone: string;
+	accountName: string;
+	spots: number[];
+	stake: number;
+	requestId: string;
+	status: ChickenRoadCashBetStatus;
+	winAmount: number | null;
+	matched: number | null;
+	drawnSpots: number[];
+	failReason?: string;
+	placedAt: number;
+	settledAt: number;
+}
+
+export interface ChickenRoadCashBetsResponse {
+	ok: boolean;
+	count: number;
+	bets: ChickenRoadCashBet[];
+}
+
+export interface ChickenRoadManualBetResponse {
+	ok: boolean;
+	result: {
+		ok: boolean;
+		requestId: string;
+		balance: number | null;
+		error?: string;
+	};
+}
+
+export interface ChickenRoadTestRoundResponse {
+	ok: boolean;
+	result: {
+		ok: boolean;
+		played: number;
+		bets: { accountId: number; freeBetId: string; requestId: string }[];
+	};
+}
+
+export interface ChickenRoadWsToken {
+	id: number;
+	name: string;
+	phone: string;
+	provider: ChickenRoadProvider;
+	gateway_host: string;
+	ws_token: string | null;
+}
+
+export interface ChickenRoadWsTokensResponse {
+	ok: boolean;
+	count: number;
+	tokens: ChickenRoadWsToken[];
+}
+
+export interface ChickenRoadPredictionResponse {
+	ok: boolean;
+	prediction?: {
+		picks: number[];
+		strategy: 'cluster' | 'standard' | 'pattern';
+		difficulty: { level: string; confidence: number; recommendedSpotRange: { min: number; max: number }; recommendedStrategy: string; dominantPattern: string };
+		repetitivePatterns: any[];
+		clusters: any[];
+		metrics: any[];
+		volatility: any;
+	};
+}

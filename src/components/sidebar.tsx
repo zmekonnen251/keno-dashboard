@@ -16,6 +16,7 @@ import {
   ScrollText,
   BellRing,
   CloudRain,
+  PawPrint,
   LogOut,
   Moon,
   Sun,
@@ -50,6 +51,7 @@ const NAV = [
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain },
+  { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },
 ];

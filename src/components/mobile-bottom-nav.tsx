@@ -10,6 +10,7 @@ import {
   Sparkles,
   Repeat,
   CloudRain,
+  PawPrint,
 } from 'lucide-react';
 import { useSite } from './site-provider';
 
@@ -26,6 +27,7 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/predictions', label: 'Predictions', icon: Sparkles },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain },
+  { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint },
 ];
 
 export function MobileBottomNav() {
