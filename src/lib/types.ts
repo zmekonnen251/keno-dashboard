@@ -554,7 +554,7 @@ export interface MlAlertsResponse {
 export interface BotTicket {
 	id: string;
 	spots: number;
-	strategy: 'cluster' | 'standard' | 'pattern';
+	strategy: 'cluster' | 'standard' | 'pattern' | 'manual';
 	stake: number;
 	enabled: boolean;
 	staticTicket?: boolean;

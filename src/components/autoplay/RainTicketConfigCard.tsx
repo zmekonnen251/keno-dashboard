@@ -20,9 +20,10 @@ interface RainTicketConfigCardProps {
 export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketConfigCardProps) {
   const [tickets, setTickets] = useState<BotTicket[]>([]);
   const [newSpots, setNewSpots] = useState<number>(2);
-  const [newStrategy, setNewStrategy] = useState<'cluster' | 'standard' | 'pattern'>('cluster');
+  const [newStrategy, setNewStrategy] = useState<'cluster' | 'standard' | 'pattern' | 'manual'>('cluster');
   const [newStake, setNewStake] = useState<number>(2);
   const [newFreeBet, setNewFreeBet] = useState<boolean>(true);
+  const [newNumbers, setNewNumbers] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -37,12 +38,12 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
         } else if (config?.tickets?.length) {
           setTickets(config.tickets);
         } else {
-          // Default tickets
+          // Default tickets: user's usual pre-configured picks + space for ML picks
           const defaults: BotTicket[] = [
-            { id: '1', spots: 2, strategy: 'cluster', stake: 2, enabled: true, useFreeBet: true },
-            { id: '2', spots: 2, strategy: 'standard', stake: 2, enabled: true, useFreeBet: true },
-            { id: '3', spots: 3, strategy: 'cluster', stake: 2, enabled: true, useFreeBet: true },
-            { id: '4', spots: 3, strategy: 'standard', stake: 2, enabled: true, useFreeBet: true },
+            { id: '1', spots: 3, strategy: 'manual', stake: 2, enabled: true, useFreeBet: true, numbers: [1, 2, 3] },
+            { id: '2', spots: 3, strategy: 'manual', stake: 2, enabled: true, useFreeBet: true, numbers: [72, 73, 74] },
+            { id: '3', spots: 3, strategy: 'manual', stake: 2, enabled: true, useFreeBet: true, numbers: [77, 78, 79] },
+            { id: '4', spots: 3, strategy: 'cluster', stake: 2, enabled: true, useFreeBet: true },
           ];
           setTickets(defaults);
         }
@@ -71,17 +72,53 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
     }
   };
 
+  const parseNumbers = (input: string): number[] => {
+    const nums = input
+      .split(/[\s,;\-–—]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80);
+    return Array.from(new Set(nums));
+  };
+
   const handleAddTicket = () => {
+    const newId = String(Date.now());
+    const numbers = parseNumbers(newNumbers);
+    const updated = [
+      ...tickets,
+      {
+        id: newId,
+        spots: numbers.length > 0 ? numbers.length : newSpots,
+        strategy: numbers.length > 0 ? ('manual' as const) : newStrategy,
+        stake: newStake,
+        enabled: true,
+        useFreeBet: newFreeBet,
+        ...(numbers.length > 0 ? { numbers } : {}),
+      },
+    ];
+    setNewNumbers('');
+    saveTickets(updated);
+  };
+
+  const QUICK_PRESETS: { label: string; numbers: number[] }[] = [
+    { label: '1,2,3', numbers: [1, 2, 3] },
+    { label: '72,73,74', numbers: [72, 73, 74] },
+    { label: '77,78,79', numbers: [77, 78, 79] },
+  ];
+
+  const handleAddPreset = (numbers: number[]) => {
     const newId = String(Date.now());
     const updated = [
       ...tickets,
       {
         id: newId,
-        spots: newSpots,
-        strategy: newStrategy,
+        spots: numbers.length,
+        strategy: 'manual' as const,
         stake: newStake,
         enabled: true,
         useFreeBet: newFreeBet,
+        numbers,
       },
     ];
     saveTickets(updated);
@@ -101,12 +138,28 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
 
   const handleUpdateTicketValue = (
     id: string,
-    field: 'spots' | 'stake' | 'strategy' | 'useFreeBet',
+    field: 'spots' | 'stake' | 'strategy' | 'useFreeBet' | 'numbers',
     value: any,
   ) => {
+    let next = value;
+    if (field === 'numbers' && typeof value === 'string') {
+      next = parseNumbers(value);
+      /* allow clearing: empty string removes fixed numbers */
+    }
     const updated = tickets.map((t) => {
       if (t.id === id) {
-        return { ...t, [field]: value };
+        const ticket = { ...t, [field]: next };
+        // When numbers are set, keep spots in sync and mark strategy as manual
+        if (field === 'numbers') {
+          if (Array.isArray(next) && next.length > 0) {
+            ticket.spots = next.length;
+            ticket.strategy = 'manual';
+          } else {
+            ticket.numbers = undefined;
+            if (ticket.strategy === 'manual') ticket.strategy = 'cluster';
+          }
+        }
+        return ticket;
       }
       return t;
     });
@@ -166,6 +219,38 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
             <span className="block text-[10px] text-slate-300 font-black uppercase tracking-wider mb-3">
               Create & Append Ticket
             </span>
+
+            {/* Quick presets: one-click add of usual picks */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider self-center">
+                ⚡ Your tickets:
+              </span>
+              {QUICK_PRESETS.map((p) => (
+                <Button
+                  key={p.label}
+                  onClick={() => handleAddPreset(p.numbers)}
+                  size="sm"
+                  className="bg-indigo-600/30 hover:bg-indigo-500/40 text-indigo-200 border border-indigo-500/30 text-[10px] font-mono font-bold rounded-lg cursor-pointer"
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Manual numbers entry */}
+            <div className="mb-3">
+              <Label className="text-[10px] text-slate-400">
+                Fixed numbers (comma / space / dash separated) — overrides strategy
+              </Label>
+              <input
+                type="text"
+                value={newNumbers}
+                onChange={(e) => setNewNumbers(e.target.value)}
+                placeholder="e.g. 1,2,3 or 72,73,74 or 77,78,79"
+                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
             <div className="grid grid-cols-5 gap-2 items-end">
               <div>
                 <Label className="text-[10px] text-slate-400">Spots</Label>
@@ -183,9 +268,10 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                 <Label className="text-[10px] text-slate-400">Strategy</Label>
                 <select
                   value={newStrategy}
-                  onChange={(e) => setNewStrategy(e.target.value as 'cluster' | 'standard' | 'pattern')}
+                  onChange={(e) => setNewStrategy(e.target.value as 'cluster' | 'standard' | 'pattern' | 'manual')}
                   className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
+                  <option value="manual" className="bg-slate-900">✋ Manual / Fixed</option>
                   <option value="cluster" className="bg-slate-900">🧠 ML Cluster</option>
                   <option value="standard" className="bg-slate-900">📊 Standard</option>
                   <option value="pattern" className="bg-slate-900">🧬 Pattern Trend</option>
@@ -269,14 +355,18 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                         <span className="text-xs font-black text-white font-mono">Ticket #{idx + 1}</span>
                         <span
                           className={`text-[8px] font-black uppercase px-1 rounded font-mono ${
-                            ticket.strategy === 'cluster'
+                            ticket.strategy === 'manual'
+                              ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
+                              : ticket.strategy === 'cluster'
                               ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                               : ticket.strategy === 'pattern'
                               ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
                               : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
                           }`}
                         >
-                          {ticket.strategy === 'cluster'
+                          {ticket.strategy === 'manual'
+                            ? '✋ Fixed'
+                            : ticket.strategy === 'cluster'
                             ? 'ML Cluster'
                             : ticket.strategy === 'pattern'
                             ? 'Pattern Trend'
@@ -320,6 +410,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                           }
                           className="bg-transparent border border-white/5 rounded text-[10px] text-slate-400 focus:outline-none cursor-pointer"
                         >
+                          <option value="manual" className="bg-slate-900 text-white">✋ Manual</option>
                           <option value="cluster" className="bg-slate-900 text-white">🧠 ML</option>
                           <option value="standard" className="bg-slate-900 text-white">📊 Standard</option>
                           <option value="pattern" className="bg-slate-900 text-white">🧬 Pattern</option>
@@ -344,7 +435,17 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
 
                   {/* Distinct Picks Preview! */}
                   <div className="grow flex flex-wrap gap-1 items-center max-w-sm min-w-37.5">
-                    {preview.length > 0 ? (
+                    {ticket.numbers && ticket.numbers.length > 0 ? (
+                      ticket.numbers.map((num, pi) => (
+                        <span
+                          key={`${ticket.id}-${pi}`}
+                          title="Fixed number (edit in numbers field below)"
+                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-indigo-500/15 border border-indigo-500/30 text-indigo-200"
+                        >
+                          {num}
+                        </span>
+                      ))
+                    ) : preview.length > 0 ? (
                       preview.map((num, pi) => (
                         <span
                           key={`${ticket.id}-${pi}`}
@@ -360,6 +461,31 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                     ) : (
                       <span className="text-[10px] text-slate-500 italic">Inactive</span>
                     )}
+                  </div>
+
+                  {/* Fixed numbers quick-edit box */}
+                  <div className="flex items-center gap-1.5 grow min-w-40">
+                    <input
+                      type="text"
+                      defaultValue={ticket.numbers?.join(', ') ?? ''}
+                      key={`numinput-${ticket.id}-${ticket.numbers?.join(',') ?? 'none'}`}
+                      onBlur={(e) => {
+                        const parsed = parseNumbers(e.target.value);
+                        if (parsed.length > 0) {
+                          handleUpdateTicketValue(ticket.id, 'numbers', parsed);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
+                          const parsed = parseNumbers(e.currentTarget.value);
+                          if (parsed.length > 0) {
+                            handleUpdateTicketValue(ticket.id, 'numbers', parsed);
+                          }
+                        }
+                      }}
+                      placeholder={`Fixed numbers (e.g. 1,2,3)${ticket.numbers ? '' : ' or empty for ML'}`}
+                      className="w-full bg-black/40 border border-indigo-500/20 rounded-lg p-1.5 text-[10px] text-white font-mono focus:outline-none focus:border-indigo-500"
+                    />
                   </div>
 
                   {/* Stake and Deletion */}

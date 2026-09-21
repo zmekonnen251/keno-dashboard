@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/app';
-import { rainManualCashBet, getRainAutoplayStatus, rainBetPrediction, getRainPrediction } from '@/lib/api';
-import { Play, Trash2, Sparkles } from 'lucide-react';
-import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus } from '@/lib/types';
+import { rainManualCashBet, getRainAutoplayStatus, rainBetPrediction, getRainPrediction, getRainTicketConfig } from '@/lib/api';
+import { Play, Trash2, Sparkles, Zap } from 'lucide-react';
+import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus, BotTicket } from '@/lib/types';
 import { useSocket } from '@/lib/service-gateway';
 
 interface RainManualBetCardProps {
@@ -36,6 +36,7 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
     clusters: any[];
   } | null>(null);
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
+  const [savedTickets, setSavedTickets] = useState<BotTicket[]>([]);
 
   useSocket('/rain/autoplay/status', (data: any) => {
     if (data?.status) setStatus(data.status);
@@ -44,14 +45,47 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await getRainAutoplayStatus();
-        setStatus(res.status);
+        const [st, tc] = await Promise.all([
+          getRainAutoplayStatus(),
+          getRainTicketConfig(),
+        ]);
+        setStatus(st.status);
+        if (tc.ok && tc.config?.tickets) setSavedTickets(tc.config.tickets.filter((t: BotTicket) => t.enabled));
       } catch {}
     };
     fetchStatus();
     const t = setInterval(fetchStatus, 5000);
     return () => clearInterval(t);
   }, []);
+
+  /** One-click bet: play a saved ticket's fixed numbers, or its queue spots, on the selected account. */
+  const handlePlaySavedTicket = async (ticket: BotTicket) => {
+    if (!running || selectedAccountId === null) {
+      onMessage('Select an account first (engine must be running).');
+      return;
+    }
+    const numbers = ticket.numbers && ticket.numbers.length > 0
+      ? ticket.numbers
+      : picks.length > 0 ? picks : null;
+    if (!numbers) {
+      onMessage(`Ticket #${ticket.id} has no fixed numbers — generate AI picks first or click it with picks loaded.`);
+      return;
+    }
+    setBetting(true);
+    try {
+      const res = await rainManualCashBet(selectedAccountId, numbers, ticket.stake || stake);
+      if (res.ok && res.result?.ok) {
+        onMessage(`One-click bet placed: [${numbers.join(', ')}] stake ${ticket.stake || stake} ETB`);
+        onRefresh();
+      } else {
+        onMessage(res.result?.error || 'Failed to place one-click bet');
+      }
+    } catch (e) {
+      onMessage('Error: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setBetting(false);
+    }
+  };
 
   const handleInjectPicks = async () => {
     if (!config) return;
@@ -180,6 +214,43 @@ export function RainManualBetCard({ running, config, accounts, onMessage, onRefr
             />
           )}
         </div>
+
+        {savedTickets.length > 0 && (
+          <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                One-Click Saved Tickets
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {savedTickets.map((t, idx) => (
+                <Button
+                  key={t.id}
+                  onClick={() => void handlePlaySavedTicket(t)}
+                  disabled={!running || betting || selectedAccountId === null}
+                  size="sm"
+                  className="bg-indigo-600/30 hover:bg-indigo-500/50 text-indigo-100 border border-indigo-500/30 text-[11px] font-mono cursor-pointer"
+                  title={t.numbers ? `Play ${t.numbers.join(', ')}` : 'Uses currently generated picks'}
+                >
+                  #{idx + 1}
+                  {t.numbers ? ` [${t.numbers.join(',')}]` : ' AI'}
+                  <span className="ml-1 text-[9px] opacity-70">{t.stake} ETB</span>
+                </Button>
+              ))}
+              {selectedAccountId === null && (
+                <span className="text-[10px] text-indigo-200/60 self-center italic">
+                  Select an account above to enable
+                </span>
+              )}
+            </div>
+            {savedTickets.some((t) => !t.numbers) && (
+              <p className="mt-2 text-[10px] text-indigo-200/60">
+                AI tickets use the picks currently shown on the board — generate first, then click.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button
