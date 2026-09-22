@@ -1,15 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_COOKIE } from '@/lib/config';
 
-// Client-side guard (Next 16 renamed middleware -> proxy). If no admin session
-// cookie is present, bounce to /login. The cookie is HttpOnly and only set after
-// a successful proxied /api/admin/login.
-const PUBLIC = new Set(['/login']);
+// Client-side guard (Next 16 renamed middleware -> proxy). Public routes (the
+// home / draw-history page and /login) never require auth; everything else
+// bounces to /login unless the admin session cookie is present.
+const PUBLIC = new Set(['/', '/login']);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (PUBLIC.has(pathname)) {
-    if (req.cookies.has(AUTH_COOKIE)) {
+    // A logged-in visitor has no reason to be on /login — send them home.
+    if (pathname === '/login' && req.cookies.has(AUTH_COOKIE)) {
       return NextResponse.redirect(new URL('/', req.url));
     }
     return NextResponse.next();
