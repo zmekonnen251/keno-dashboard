@@ -24,7 +24,7 @@ import type {
   RainCashBet,
 } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Badge, Card, Empty, Loading, StatCard, TableCell, TableRow } from '@/components/app';
+import { Badge, Empty, Loading, StatCard, TableCell, TableRow } from '@/components/app';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { NumberGrid } from './NumberGrid';
@@ -345,7 +345,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         {status?.lastError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{status.lastError}</p>}
       </CollapsibleCard>
 
-      <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
+      <CollapsibleCard title="Last draws" defaultOpen={false}>
+        <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
+      </CollapsibleCard>
 
       <RainManualBetCard
         running={status?.running ?? false}
@@ -355,9 +357,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         onRefresh={() => void refreshAccountsAndBets()}
       />
 
-      <RainBetView freeBets={freeBets ?? undefined} cashBets={cashBets} config={cfg} autoRefresh={true} />
+      <CollapsibleCard title="Live view — current draw & recent bets" defaultOpen={true}>
+        <RainBetView freeBets={freeBets ?? undefined} cashBets={cashBets} config={cfg} autoRefresh={true} />
+      </CollapsibleCard>
 
-      <Card title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
+      <CollapsibleCard title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen={false}>
         {playHistory === null ? (
           <Loading rows={2} />
         ) : playHistory.length === 0 ? (
@@ -405,9 +409,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             </Table>
           </div>
         )}
-      </Card>
+      </CollapsibleCard>
 
-      <Card title={`Rain-claiming accounts & balance (${accounts.length})`}>
+      <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={false}>
         {accounts.length === 0 ? (
           <Empty label="No rain accounts yet — add them on the Rain Accounts page." />
         ) : (
@@ -460,9 +464,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             </Table>
           </div>
         )}
-      </Card>
+      </CollapsibleCard>
 
-      <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} />
+      <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} defaultOpen={false} />
 
       {showConfig && (
         <Modal title="Rain autoplay configuration" onClose={() => setShowConfig(false)} wide>

@@ -181,15 +181,19 @@ function TolobirrAutoplay() {
 				<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
 			</CollapsibleCard>
 
-			<GameView bets={bets} picks={manualPicks} />
+			<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
+				<GameView bets={bets} picks={manualPicks} />
+			</CollapsibleCard>
 
-			<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />
+			<CollapsibleCard title='Last draws' defaultOpen={false}>
+				<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />
+			</CollapsibleCard>
 
 			<CollapsibleCard title='Signals' defaultOpen={false}>
 				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
 			</CollapsibleCard>
 
-			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} />
+			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} defaultOpen={false} />
 
 			<ManualBetCard
 				running={conn?.running ?? false}

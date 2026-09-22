@@ -11,11 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, Empty } from '@/components/app';
+import { Empty } from '@/components/app';
 import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { formatTime } from '@/lib/format';
+import { CollapsibleCard } from './CollapsibleCard';
 
 const PROVIDERS: RainProvider[] = ['fungames_shamo', 'phoenixbet'];
 
@@ -23,10 +24,12 @@ export function RainConfigCard({
   cfg,
   onSaved,
   onRefresh,
+  defaultOpen = true,
 }: {
   cfg?: RainAutoplayConfig | null;
   onSaved?: (msg: string) => void;
   onRefresh?: () => void;
+  defaultOpen?: boolean;
 }) {
   const [config, setConfig] = useState<RainAutoplayConfig | null>(null);
   const [manualDraft, setManualDraft] = useState('');
@@ -91,7 +94,7 @@ export function RainConfigCard({
   }
 
   return (
-    <Card title="Rain autoplay configuration">
+    <CollapsibleCard title="Rain autoplay configuration" defaultOpen={defaultOpen}>
       {!config ? (
         <Empty label={'Wait — the current configuration is loading…'} />
       ) : (
@@ -212,6 +215,6 @@ export function RainConfigCard({
           />
         </>
       )}
-    </Card>
+    </CollapsibleCard>
   );
 }

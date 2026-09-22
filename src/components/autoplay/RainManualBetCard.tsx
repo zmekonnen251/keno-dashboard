@@ -6,9 +6,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card } from '@/components/app';
-import { rainManualCashBet, getRainAutoplayStatus, rainBetPrediction, getRainPrediction, getRainTicketConfig } from '@/lib/api';
-import { Play, Trash2, Sparkles, Zap } from 'lucide-react';
+import { CollapsibleCard } from './CollapsibleCard';
+import { rainManualCashBet, getRainAutoplayStatus, rainBetPrediction, getRainPrediction, getRainTicketConfig, setRainTicketConfig } from '@/lib/api';
+import { Play, Trash2, Sparkles, Zap, Plus } from 'lucide-react';
 import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus, BotTicket } from '@/lib/types';
 import { useSocket } from '@/lib/service-gateway';
 import { NumberGrid } from './NumberGrid';
@@ -42,7 +42,13 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     clusters: any[];
   } | null>(null);
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
-  const [savedTickets, setSavedTickets] = useState<BotTicket[]>([]);
+  // Full ticket queue from the rain autoplay config (enabled + disabled) so
+  // "Add ticket" never drops disabled entries. Only enabled ones are playable.
+  const [queue, setQueue] = useState<BotTicket[]>([]);
+  const [newNumbers, setNewNumbers] = useState('');
+  const [newStake, setNewStake] = useState('2');
+
+  const savedTickets = queue.filter((t: BotTicket) => t.enabled);
 
   useSocket('/rain/autoplay/status', (data: any) => {
     if (data?.status) setStatus(data.status);
@@ -56,7 +62,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
           getRainTicketConfig(),
         ]);
         setStatus(st.status);
-        if (tc.ok && tc.config?.tickets) setSavedTickets(tc.config.tickets.filter((t: BotTicket) => t.enabled));
+        if (tc.ok && Array.isArray(tc.config?.tickets)) setQueue(tc.config.tickets);
       } catch {}
     };
     fetchStatus();
@@ -83,47 +89,66 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
       ? `account #${id}`
       : `auto-selected account (${stakeMax.toFixed(2)} ETB max balance)`;
 
-  /** One-click bet: play a saved ticket's fixed numbers, or its queue spots, on the selected account. */
-  const handlePlaySavedTicket = async (ticket: BotTicket) => {
-    const numbers = ticket.numbers && ticket.numbers.length > 0
-      ? ticket.numbers
-      : picks.length > 0 ? picks : null;
-    if (!numbers) {
-      onMessage(`Ticket #${ticket.id} has no fixed numbers — generate AI picks first or click it with picks loaded.`);
-      return;
+  const parseNumbers = (input: string): number[] => {
+    const nums = input
+      .split(/[\s,;\-–—]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && Number.isInteger(n) && n >= 1 && n <= 80);
+    return Array.from(new Set(nums));
+  };
+
+  /** Shared one-click bet: validates + clamps, places the cash wager, reports the outcome. */
+  const placeOneClick = async (numbersIn: number[], stakeIn: number, label: string) => {
+    const numbers = Array.from(new Set(numbersIn))
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= 80)
+      .slice(0, 10);
+    if (numbers.length === 0) {
+      onMessage(`Can't place ${label}: need 1–10 valid keno numbers (1–80).`);
+      return null;
     }
+    const st = clampStake(stakeIn);
     setBetting(true);
     try {
-      const res = await rainManualCashBet(selectedAccountId, numbers, ticket.stake || stake);
+      const res = await rainManualCashBet(selectedAccountId, numbers, st);
       if (res.ok && res.result?.ok) {
-        onMessage(`One-click bet placed: [${numbers.join(', ')}] stake ${ticket.stake || stake} ETB · ${accountLabel(res.accountId ?? selectedAccountId)}`);
+        onMessage(`✓ One-click bet placed [${numbers.join(', ')}] · ${st} ETB · ${accountLabel(res.accountId ?? selectedAccountId)}`);
         onRefresh();
-      } else {
-        onMessage(res.result?.error || 'Failed to place one-click bet');
+        return res;
       }
+      onMessage(res.result?.error || 'Failed to place one-click bet');
+      return null;
     } catch (e) {
-      onMessage('Error: ' + (e instanceof Error ? e.message : String(e)));
+      onMessage('One-click bet failed: ' + (e instanceof Error ? e.message : String(e)));
+      return null;
     } finally {
       setBetting(false);
     }
   };
 
-  /** One-click preset ticket: place the fixed numbers immediately on the selected account. */
-  const handlePlayPreset = async (numbers: number[]) => {
-    setBetting(true);
-    try {
-      const res = await rainManualCashBet(selectedAccountId, numbers, stake);
-      if (res.ok && res.result?.ok) {
-        onMessage(`One-click preset bet placed: [${numbers.join(', ')}] · ${stake} ETB · ${accountLabel(res.accountId ?? selectedAccountId)}`);
-        onRefresh();
-      } else {
-        onMessage(res.result?.error || 'Failed to place preset bet');
+  /** One-click saved ticket: fixed numbers, otherwise generate picks on the fly
+   *  so a click ALWAYS results in a bet (never a silent no-op). */
+  const handlePlaySavedTicket = async (ticket: BotTicket) => {
+    let numbers = ticket.numbers && ticket.numbers.length > 0 ? ticket.numbers : null;
+    if (!numbers) {
+      onMessage(`Ticket #${ticket.id} has no fixed numbers — generating picks, then betting…`);
+      try {
+        const res = await getRainPrediction(config?.provider ?? 'fungames_shamo', ticket.spots || 3);
+        if (res.ok && res.prediction?.picks?.length) numbers = res.prediction.picks;
+      } catch {}
+      if (!numbers || numbers.length === 0) numbers = picks.length > 0 ? picks : null;
+      if (!numbers || numbers.length === 0) {
+        onMessage(`Ticket #${ticket.id} has no numbers — pick numbers on the board and click again.`);
+        return;
       }
-    } catch (e) {
-      onMessage('Error: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setBetting(false);
     }
+    await placeOneClick(numbers, ticket.stake ?? stake, `saved ticket #${ticket.id}`);
+  };
+
+  /** One-click preset ticket: place the fixed numbers immediately on the selected account. */
+  const handlePlayPreset = (numbers: number[]) => {
+    void placeOneClick(numbers, stake, `pre-configured [${numbers.join(',')}]`);
   };
 
   const handleInjectPicks = async () => {
@@ -197,172 +222,280 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     });
   }
 
+  /** Build a ticket from the "Add custom ticket" inputs. Empty numbers ⇒ AI ticket. */
+  const buildTicket = (): BotTicket => {
+    const numbers = parseNumbers(newNumbers);
+    return {
+      id: `t${Date.now()}`,
+      spots: numbers.length || 3,
+      strategy: numbers.length ? 'manual' : 'cluster',
+      stake: clampStake(Number(newStake) || 2),
+      enabled: true,
+      useFreeBet: false,
+      ...(numbers.length ? { numbers } : {}),
+    };
+  };
+
+  const persistQueue = async (next: BotTicket[]): Promise<boolean> => {
+    setQueue(next);
+    try {
+      const res = await setRainTicketConfig({ tickets: next });
+      if (res.ok) return true;
+      onMessage('Failed to save ticket queue (server error).');
+    } catch (e) {
+      onMessage('Failed to save ticket queue: ' + (e instanceof Error ? e.message : String(e)));
+    }
+    return false;
+  };
+
+  /** Persist a new custom ticket to the queue so it appears in the one-click list. */
+  const handleAddTicket = async () => {
+    const t = buildTicket();
+    await persistQueue([...queue, t]);
+    onMessage(
+      `Ticket added (#${t.id})${t.numbers ? ` [${t.numbers.join(',')}]` : ' (AI — generates picks on click)'} · ${t.stake} ETB. Click it under One-Click Saved Tickets to play.`,
+    );
+    setNewNumbers('');
+    setNewStake('2');
+  };
+
+  /** Persist a new custom ticket AND play it immediately. */
+  const handleAddAndPlay = async () => {
+    const t = buildTicket();
+    const ok = await persistQueue([...queue, t]);
+    setNewNumbers('');
+    setNewStake('2');
+    if (!ok) return;
+    if (t.numbers && t.numbers.length > 0) {
+      await placeOneClick(t.numbers, t.stake, `new ticket [${t.numbers.join(',')}]`);
+    } else {
+      await handlePlaySavedTicket(t);
+    }
+  };
+
   return (
-    <Card title="Manual Cash Bet (Rain Accounts)">
+    <CollapsibleCard title="Manual Cash Bet (Rain Accounts)" defaultOpen={true}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Manual bets work without starting autoplay — pick or generate numbers on the board, set a stake
-          (min 2, max your richest account balance), and place the bet.
+          (min 2, max your richest account balance), and place the bet. Saved one-click tickets place
+          immediately; AI tickets generate picks first.
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Account</Label>
-            <select
-              value={selectedAccountId ?? 'auto'}
-              onChange={(e) => setSelectedAccountId(e.target.value === 'auto' ? null : Number(e.target.value))}
-              className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-            >
-              <option value="auto">🤖 Auto — server picks by balance</option>
-              {enabledAccounts.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.provider}) — Bal: {a.balance} ETB
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Stake (ETB) — min 2, max {stakeMax.toFixed(2)}</Label>
-            <Input
-              type="number"
-              min={2}
-              max={stakeMax}
-              value={stake}
-              onChange={(e) => setStake(clampStake(Number(e.target.value)))}
-              className="font-mono"
-            />
-            {selectedAccountId === null && (
-              <p className="text-[10px] text-muted-foreground">
-                Max = highest enabled account balance ({stakeMax.toFixed(2)} ETB).
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Keno Board — tap up to 10 numbers</span>
-            <Button variant="outline" size="sm" onClick={handleClearPicks} disabled={picks.length === 0} className="h-7 px-2 text-xs">
-              <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear ({picks.length})
-            </Button>
-          </div>
-          <NumberGrid
-            selected={picks}
-            max={10}
-            onToggle={toggleNumber}
-            onClear={() => setPicks([])}
-          />
-        </div>
-
-        {savedTickets.length > 0 && (
-          <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                One-Click Saved Tickets
-              </span>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* LEFT — keno board */}
+          <div className="rounded-lg border border-border p-3 lg:self-start">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Keno Board — tap up to 10 numbers</span>
+              <Button variant="outline" size="sm" onClick={handleClearPicks} disabled={picks.length === 0} className="h-7 px-2 text-xs">
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear ({picks.length})
+              </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {savedTickets.map((t, idx) => (
+            <NumberGrid
+              selected={picks}
+              max={10}
+              onToggle={toggleNumber}
+              onClear={() => setPicks([])}
+            />
+          </div>
+
+          {/* RIGHT — controls, quick tickets & add-ticket */}
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Account</Label>
+                <select
+                  value={selectedAccountId ?? 'auto'}
+                  onChange={(e) => setSelectedAccountId(e.target.value === 'auto' ? null : Number(e.target.value))}
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                >
+                  <option value="auto">🤖 Auto — server picks by balance</option>
+                  {enabledAccounts.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.provider}) — Bal: {a.balance} ETB
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Stake (ETB) — min 2, max {stakeMax.toFixed(2)}</Label>
+                <Input
+                  type="number"
+                  min={2}
+                  max={stakeMax}
+                  value={stake}
+                  onChange={(e) => setStake(clampStake(Number(e.target.value)))}
+                  className="font-mono"
+                />
+                {selectedAccountId === null && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Max = highest enabled account balance ({stakeMax.toFixed(2)} ETB).
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {savedTickets.length > 0 && (
+              <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                    One-Click Saved Tickets
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {savedTickets.map((t, idx) => (
+                    <Button
+                      key={t.id}
+                      onClick={() => void handlePlaySavedTicket(t)}
+                      disabled={betting}
+                      size="sm"
+                      className="bg-indigo-600/30 hover:bg-indigo-500/50 text-indigo-100 border border-indigo-500/30 text-[11px] font-mono cursor-pointer"
+                      title={t.numbers ? `Play ${t.numbers.join(', ')} · ${t.stake} ETB` : 'AI — generates picks on click, then bets'}
+                    >
+                      #{idx + 1}
+                      {t.numbers ? ` [${t.numbers.join(',')}]` : ' AI'}
+                      <span className="ml-1 text-[9px] opacity-70">{t.stake} ETB</span>
+                    </Button>
+                  ))}
+                </div>
+                {savedTickets.some((t) => !t.numbers) && (
+                  <p className="mt-2 text-[10px] text-indigo-200/60">
+                    AI tickets generate picks automatically when clicked — no setup needed.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Plus className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                  Add custom one-click ticket
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Numbers (e.g. 1,2,3) — blank = AI</Label>
+                  <Input
+                    value={newNumbers}
+                    onChange={(e) => setNewNumbers(e.target.value)}
+                    placeholder="1,2,3"
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Stake (ETB)</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={stakeMax}
+                    value={newStake}
+                    onChange={(e) => setNewStake(e.target.value)}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
                 <Button
-                  key={t.id}
-                  onClick={() => void handlePlaySavedTicket(t)}
+                  onClick={() => void handleAddTicket()}
+                  disabled={betting}
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-500/40 text-amber-200"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add ticket
+                </Button>
+                <Button
+                  onClick={() => void handleAddAndPlay()}
                   disabled={betting}
                   size="sm"
-                  className="bg-indigo-600/30 hover:bg-indigo-500/50 text-indigo-100 border border-indigo-500/30 text-[11px] font-mono cursor-pointer"
-                  title={t.numbers ? `Play ${t.numbers.join(', ')}` : 'Uses currently generated picks'}
+                  className="bg-amber-600 hover:bg-amber-500 text-white"
                 >
-                  #{idx + 1}
-                  {t.numbers ? ` [${t.numbers.join(',')}]` : ' AI'}
-                  <span className="ml-1 text-[9px] opacity-70">{t.stake} ETB</span>
+                  <Play className="w-3.5 h-3.5 mr-1" /> Add &amp; play now
                 </Button>
-              ))}
+              </div>
             </div>
-            {savedTickets.some((t) => !t.numbers) && (
-              <p className="mt-2 text-[10px] text-indigo-200/60">
-                AI tickets use the picks currently shown on the board — generate first, then click.
-              </p>
-            )}
-          </div>
-        )}
 
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Play className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-              One-Click Pre-Configured Tickets
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PRESET_TICKETS.map((p) => (
-              <Button
-                key={p.label}
-                onClick={() => void handlePlayPreset(p.numbers)}
-                disabled={betting}
-                size="sm"
-                className="bg-emerald-600/30 hover:bg-emerald-500/50 text-emerald-100 border border-emerald-500/30 text-[11px] font-mono cursor-pointer"
-                title={`Play ${p.numbers.join(', ')} · ${stake} ETB`}
-              >
-                {p.label}
-                <span className="ml-1 text-[9px] opacity-70">{stake} ETB</span>
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={handleGeneratePicks}
-            disabled={predicting || !config}
-            className="flex-1 min-w-40"
-          >
-            {predicting ? 'Generating…' : <><Sparkles className="w-4 h-4 mr-1" /> Generate AI Picks</>}
-          </Button>
-          <Button
-            onClick={handlePlaceBet}
-            disabled={betting || picks.length === 0}
-            variant="default"
-            className="flex-1 min-w-40 bg-emerald-600 hover:bg-emerald-500"
-            title={selectedAccountId === null ? 'Server auto-selects the account by balance' : undefined}
-          >
-            {betting ? 'Placing…' : <><Play className="w-4 h-4 mr-1" /> Place Bet</>}
-          </Button>
-          <Button
-            onClick={handleClearPicks}
-            disabled={picks.length === 0}
-            variant="outline"
-            className="min-w-25"
-          >
-            <Trash2 className="w-4 h-4 mr-1" /> Clear
-          </Button>
-        </div>
-
-        <div className="rounded-lg border border-white/10 bg-white/3 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Selected Numbers ({picks.length})
-            </span>
-            {lastPrediction && (
-              <span className="text-[10px] text-slate-500">
-                Strategy: {lastPrediction.strategy} · Difficulty: {lastPrediction.difficulty}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5 min-h-10">
-            {picks.length === 0 ? (
-              <span className="text-sm text-slate-500 italic w-full">
-                Tap the board above or click &quot;Generate AI Picks&quot;
-              </span>
-            ) : (
-              picks.map((num, idx) => (
-                <span
-                  key={`${num}-${idx}`}
-                  className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-mono font-bold text-sm"
-                >
-                  {num}
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Play className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                  One-Click Pre-Configured Tickets
                 </span>
-              ))
-            )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_TICKETS.map((p) => (
+                  <Button
+                    key={p.label}
+                    onClick={() => void handlePlayPreset(p.numbers)}
+                    disabled={betting}
+                    size="sm"
+                    className="bg-emerald-600/30 hover:bg-emerald-500/50 text-emerald-100 border border-emerald-500/30 text-[11px] font-mono cursor-pointer"
+                    title={`Play ${p.numbers.join(', ')} · ${stake} ETB`}
+                  >
+                    {p.label}
+                    <span className="ml-1 text-[9px] opacity-70">{stake} ETB</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleGeneratePicks}
+                disabled={predicting || !config}
+                className="flex-1 min-w-40"
+              >
+                {predicting ? 'Generating…' : <><Sparkles className="w-4 h-4 mr-1" /> Generate AI Picks</>}
+              </Button>
+              <Button
+                onClick={handlePlaceBet}
+                disabled={betting || picks.length === 0}
+                variant="default"
+                className="flex-1 min-w-40 bg-emerald-600 hover:bg-emerald-500"
+                title={selectedAccountId === null ? 'Server auto-selects the account by balance' : undefined}
+              >
+                {betting ? 'Placing…' : <><Play className="w-4 h-4 mr-1" /> Place Bet</>}
+              </Button>
+              <Button
+                onClick={handleClearPicks}
+                disabled={picks.length === 0}
+                variant="outline"
+                className="min-w-25"
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Clear
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-white/3 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Selected Numbers ({picks.length})
+                </span>
+                {lastPrediction && (
+                  <span className="text-[10px] text-slate-500">
+                    Strategy: {lastPrediction.strategy} · Difficulty: {lastPrediction.difficulty}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 min-h-10">
+                {picks.length === 0 ? (
+                  <span className="text-sm text-slate-500 italic w-full">
+                    Tap the board above or click &quot;Generate AI Picks&quot;
+                  </span>
+                ) : (
+                  picks.map((num, idx) => (
+                    <span
+                      key={`${num}-${idx}`}
+                      className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-mono font-bold text-sm"
+                    >
+                      {num}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -391,6 +524,6 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
           </div>
         )}
       </div>
-    </Card>
+    </CollapsibleCard>
   );
 }

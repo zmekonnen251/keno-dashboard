@@ -4,22 +4,25 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, Empty } from '@/components/app';
+import { Empty } from '@/components/app';
 import { setAutoplayConfig } from '@/lib/api';
 import { formatTime } from '@/lib/format';
 import type { AutoplayConfig } from '@/lib/types';
 import { ticketsToText, textToTickets } from './utils';
+import { CollapsibleCard } from './CollapsibleCard';
 
 export function ConfigCard({
 	cfg,
 	onSaved,
 	onRefresh,
 	siteId,
+	defaultOpen = true,
 }: {
 	cfg?: AutoplayConfig | null;
 	onSaved: (msg: string) => void;
 	onRefresh: () => void;
 	siteId?: string;
+	defaultOpen?: boolean;
 }) {
 	const [loaded, setLoaded] = useState(false);
 	const [stake, setStake] = useState('');
@@ -88,8 +91,9 @@ export function ConfigCard({
 	}
 
 	return (
-		<Card
+		<CollapsibleCard
 			title='Configuration'
+			defaultOpen={defaultOpen}
 			actions={
 				<div className='flex gap-2'>
 					<Button variant='outline' size='sm' onClick={onNew} disabled={loaded}>
@@ -248,6 +252,6 @@ export function ConfigCard({
 					</div>
 				</>
 			)}
-		</Card>
+		</CollapsibleCard>
 	);
 }
