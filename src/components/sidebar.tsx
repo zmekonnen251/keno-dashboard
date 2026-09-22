@@ -17,6 +17,7 @@ import {
   BellRing,
   CloudRain,
   PawPrint,
+  TrendingDown,
   LogOut,
   Moon,
   Sun,
@@ -53,6 +54,7 @@ const NAV = [
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
   { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
+  { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },
 ];

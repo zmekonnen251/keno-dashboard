@@ -58,6 +58,10 @@ import type {
   ChickenRoadTestRoundResponse,
   ChickenRoadWsTokensResponse,
   ChickenRoadPredictionResponse,
+  OddsDrop,
+  OddsSuggestion,
+  OddsWatcherConfig,
+  OddsWatcherStatus,
 } from './types';
 
 // ---- auth ----
@@ -655,4 +659,48 @@ export async function testProxy(id: number): Promise<ProxyTestResponse> {
 
 export async function testAllProxies(): Promise<ProxyTestAllResponse> {
   return apiFetch<ProxyTestAllResponse>('api/accounts/proxies/test-all', { method: 'POST' });
+}
+
+// ---- odds drop monitor + soccer suggester ----
+// All /api/odds/* endpoints are admin-gated on the keno-server; the dashboard
+// proxy relays the session cookie so these just work from the client.
+
+export interface OddsLiveResponse {
+  status: OddsWatcherStatus;
+  drops: OddsDrop[];
+  suggestions: OddsSuggestion[];
+  now: string;
+}
+
+export async function getOddsLive(): Promise<OddsLiveResponse> {
+  return apiFetch<OddsLiveResponse>('api/odds/live');
+}
+
+export async function getOddsDrops(limit = 100, minutes = 60): Promise<OddsDrop[]> {
+  return apiFetch<OddsDrop[]>(`api/odds/drops?limit=${limit}&minutes=${minutes}`);
+}
+
+export async function getOddsSuggestions(limit = 50): Promise<OddsSuggestion[]> {
+  return apiFetch<OddsSuggestion[]>(`api/odds/suggestions?limit=${limit}`);
+}
+
+export async function oddsPollNow(): Promise<{ ok: boolean; status: OddsWatcherStatus }> {
+  return apiFetch<{ ok: boolean; status: OddsWatcherStatus }>('api/odds/poll', { method: 'POST' });
+}
+
+export async function getOddsConfig(): Promise<OddsWatcherConfig> {
+  return apiFetch<OddsWatcherConfig>('api/odds/config');
+}
+
+export async function setOddsConfig(patch: Partial<OddsWatcherConfig>): Promise<OddsWatcherConfig> {
+  return apiFetch<OddsWatcherConfig>('api/odds/config', {
+    method: 'POST',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function oddsCalibrate(): Promise<{ ok: boolean; sides: Record<string, string>; samples: number }> {
+  return apiFetch<{ ok: boolean; sides: Record<string, string>; samples: number }>('api/odds/calibrate', {
+    method: 'POST',
+  });
 }

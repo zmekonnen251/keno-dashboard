@@ -1193,3 +1193,90 @@ export interface ChickenRoadPredictionResponse {
 		volatility: any;
 	};
 }
+
+// ---- Odds drop monitor + soccer suggester (mirrors server/src/odds/types.ts) ----
+// The watcher polls melbet (drops signal) + shamo (counterpart price the user
+// bets on), persists snapshots/drops/suggestions, and pushes drop alerts to
+// every browser push subscriber.
+
+export interface OddsDrop {
+	id?: number;
+	source: 'melbet' | 'shamo';
+	externalId: string;
+	eventId?: number | null;
+	home: string;
+	away: string;
+	league: string;
+	sport: string;
+	marketKey: string;
+	marketLabel?: string | null;
+	outcome: string;
+	outcomeLabel?: string | null;
+	prevOdd: number;
+	newOdd: number;
+	pctChange: number;
+	absChange: number;
+	steam: boolean;
+	createdAt: string;
+}
+
+export interface OddsWatcherConfig {
+	enabled: boolean;
+	pollIntervalMs: number;
+	dropPct: number;
+	steamWindowMin: number;
+	dropWindowMin: number;
+	matchToleranceMin: number;
+	maxSuggestions: number;
+	pushEnabled: boolean;
+	updatedAt?: string;
+}
+
+export interface OddsWatcherStatus {
+	configured: boolean;
+	melbetUrl: string | null;
+	shamoUrl: string | null;
+	enabled: boolean;
+	running: boolean;
+	lastPollAt: string | null;
+	lastPollOk: boolean;
+	lastError: string | null;
+	lastMelbetAt: string | null;
+	lastShamoAt: string | null;
+	melbetEvents: number;
+	shamoEvents: number;
+	melbetFootball: number;
+	shamoFootball: number;
+	matchedFootball: number;
+	config: OddsWatcherConfig;
+}
+
+export interface OddsSuggestion {
+	id: number;
+	melbetEventId: number | null;
+	shamoEventId: number | null;
+	home: string;
+	away: string;
+	league: string;
+	sport: string;
+	marketKey: string;
+	outcome: string;
+	outcomeLabel: string | null;
+	melbetOdd: number;
+	melbetCurrent: number;
+	shamoOdd: number | null;
+	dropPct: number;
+	steam: boolean;
+	score: number;
+	reason: string;
+	startTs: string | null;
+	expiresAt: string | null;
+	createdAt: string;
+}
+
+export interface OddsLiveResponse {
+	status: OddsWatcherStatus;
+	drops: OddsDrop[];
+	suggestions: OddsSuggestion[];
+	now: string;
+}
