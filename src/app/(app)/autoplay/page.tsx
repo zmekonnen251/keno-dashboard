@@ -23,6 +23,7 @@ import { ManualBetCard } from '@/components/autoplay/ManualBetCard';
 import { PredictionBetCard } from '@/components/autoplay/PredictionBetCard';
 import { GameView } from '@/components/autoplay/GameView';
 import { LastDrawsBoards } from '@/components/autoplay/LastDrawsBoards';
+import { MlPredictorCard } from '@/components/autoplay/MlPredictorCard';
 import { ShamoAutoplay } from '@/components/autoplay/ShamoAutoplay';
 import { TicketConfig } from '@/components/autoplay/TicketConfig';
 import { useSite } from '@/components/site-provider';
@@ -184,6 +185,8 @@ function TolobirrAutoplay() {
 			<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
 				<GameView bets={bets} picks={manualPicks} />
 			</CollapsibleCard>
+
+			<MlPredictorCard siteId={siteId} />
 
 			<CollapsibleCard title='Last draws' defaultOpen={false}>
 				<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />

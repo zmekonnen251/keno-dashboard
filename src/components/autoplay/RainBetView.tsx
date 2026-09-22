@@ -220,7 +220,6 @@ export function RainBetView({
 
   const phaseInfo = getPhaseInfo(gameState.phase);
   const done = drawn.length >= 20;
-  const isDrawing = gameState.phase === 'drawing' || gameState.phase === 'settled';
 
   // Win celebration for free bets
   useEffect(() => {
@@ -359,55 +358,50 @@ export function RainBetView({
       </div>
 
       <div className='grid grid-cols-1 gap-3 p-3 lg:grid-cols-2'>
-        {/* Left: All Tickets */}
-        <div className='min-w-0 lg:max-h-150 overflow-y-auto'>
+        {/* Left: ALL active tickets for the current round — simple like the real
+            fungames tolobirr ticket: number balls in a row, digits light up as
+            the draw lands (live stream), plus a compact account/wager/status line. */}
+        <div className='min-w-0'>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
             Round {currentRound} Tickets ({currentRoundBets.length})
+            {activeBets.length > 0 && <span className='ml-1.5 font-bold text-emerald-400'>· {activeBets.length} betting</span>}
           </div>
           {currentRoundBets.length === 0 ? (
             <p className='py-4 text-center text-xs italic text-slate-500'>No tickets placed this round.</p>
           ) : (
-            <div className='flex flex-wrap gap-2 max-h-[150px] overflow-y-auto'>
+            <div className='flex flex-col gap-2'>
               {currentRoundBets.map((b) => {
                 const isFreeBet = b.betType === 'free_bet';
                 const s = freeBetStatusLabel({ status: b.status, winAmount: b.winAmount });
                 const bt = betTypeBadge(b.betType);
                 const isWinner = b.status === 'won';
-                const matched = b.matched ?? 0;
-                const drawnSpots = b.drawnSpots || [];
+                // Highlight digits from the LIVE draw stream so they light up in
+                // real time during the draw (all 20 land by settlement).
+                const hits = b.spots.filter((n) => drawn.includes(n)).length;
 
                 return (
-                  <div key={b.id} className={`min-w-44 flex-1 rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : isFreeBet ? 'border-sky-500/40 bg-sky-500/10' : 'border-white/5 bg-white/3'}`}>
-                    <div className='flex flex-wrap gap-1 mb-1'>
+                  <div key={b.id} className={`rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : isFreeBet ? 'border-sky-500/40 bg-sky-500/10' : 'border-white/5 bg-white/3'}`}>
+                    <div className='flex flex-wrap items-center gap-1'>
                       {b.spots.map((n, idx) => {
-                        const isMatched = drawnSpots.includes(n);
-                        const isDrawn = drawnSpots.includes(n);
+                        const isHit = drawn.includes(n);
                         return (
-                          <span key={idx} className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold ${
-                            isMatched ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' :
-                            isDrawn ? 'bg-amber-500 text-white' :
-                            isFreeBet ? 'bg-sky-500 text-white' : 'bg-black/40 text-slate-300'
+                          <span key={idx} className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-extrabold transition-all duration-300 ${
+                            isHit ? 'scale-110 bg-amber-400 text-black ring-2 ring-amber-300' : isFreeBet ? 'bg-sky-600/40 text-sky-100' : 'bg-black/40 text-slate-200'
                           }`}>{n}</span>
                         );
                       })}
+                      {hits > 0 && (
+                        <span className='ml-auto pr-0.5 text-[10px] font-bold text-amber-300'>✓ {hits}/{b.spots.length}</span>
+                      )}
                     </div>
                     <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
-                      <span className='truncate text-slate-400'>{b.accountName} · {isFreeBet ? `+${b.wagerAmount} ETB` : `Bet ${b.stake}`}</span>
+                      <span className='truncate text-slate-400'>{b.accountName} · {isFreeBet ? `+${b.wagerAmount} ETB` : `${b.stake} ETB`}</span>
                       <div className='flex items-center gap-1.5'>
                         <span className={`shrink-0 font-bold ${s.cls}`}>{isWinner ? `WINNER +${b.winAmount ?? ''}` : s.text}</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
                       </div>
                     </div>
-                    {isDrawing && drawnSpots.length > 0 && (
-                      <div className='mt-1 flex flex-wrap gap-1'>
-                        <span className='text-[10px] text-slate-500 font-mono'>Drawn:</span>
-                        {drawnSpots.map((n, i) => (
-                          <span key={i} className={`flex h-5 w-5 items-center justify-center rounded font-mono text-[10px] font-bold ${drawnSpots.includes(n) ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40' : 'bg-white/5 text-slate-400 border border-white/10'}`}>{n}</span>
-                        ))}
-                      </div>
-                    )}
                     {b.failReason && <div className='mt-1 truncate text-[11px] text-red-400/90' title={b.failReason}>{b.failReason}</div>}
-                    {b.betPlacedAt && <div className='mt-1 text-[11px] text-slate-500'>Placed {typeof b.betPlacedAt === 'number' ? new Date(b.betPlacedAt).toLocaleTimeString() : new Date(b.betPlacedAt).toLocaleTimeString()}</div>}
                   </div>
                 );
               })}

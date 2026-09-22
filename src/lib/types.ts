@@ -207,6 +207,67 @@ export interface MlStatus {
 	lastTrainAt: { [siteId: string]: string };
 }
 
+// Live ML predictor output (GET /api/ml/live/:siteId) — recurrence_v1.
+// Honest insight telemetry (see RECURRENCE_MODEL.md): recurrence averages and
+// the model's own output, not a claim of an edge.
+export interface MlNumberRecurrence {
+	count: number;
+	freq: number;
+	avg_gap_draws: number | null;
+	top_hour: number | null;
+	top_hour_lift: number | null;
+}
+
+export interface MlRunRecurrence {
+	run: number[];
+	type: string;
+	obs: number;
+	lift: number;
+	avg_gap_min: number | null;
+	median_gap_min: number | null;
+	last_epoch: number;
+	top_hour: number | null;
+	top_hour_share: number;
+}
+
+export interface MlIndicator {
+	pair: number[];
+	triplet: number[];
+	count: number;
+	cond_rate: number;
+	base_rate: number;
+	lift: number;
+}
+
+export interface MlInsights {
+	available: boolean;
+	model?: string;
+	n_draws?: number;
+	metrics?: MlTrainMetrics | null;
+	numbers?: Record<string, MlNumberRecurrence>;
+	runs?: MlRunRecurrence[];
+	indicators?: MlIndicator[];
+}
+
+export interface MlLivePrediction {
+	numbers: number[];
+	ticket: number[];
+	fullDraw: number[];
+	confidence: number;
+	numberPredictions: NumberPrediction[];
+	reasoning: string[];
+	disclaimer: string | null;
+}
+
+export interface MlLiveResponse {
+	siteId: string;
+	generatedAt?: number;
+	status: 'ok' | 'unavailable' | 'no_draws' | 'error';
+	message?: string;
+	prediction?: MlLivePrediction | null;
+	insights?: MlInsights | null;
+}
+
 export interface PredictionsResponse {
 	siteId: string;
 	prediction: Prediction | null;

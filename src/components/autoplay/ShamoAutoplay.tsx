@@ -33,6 +33,7 @@ import { RainManualBetCard } from './RainManualBetCard';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
+import { MlPredictorCard } from './MlPredictorCard';
 import { RainConfigCard } from './RainConfigCard';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
@@ -348,6 +349,8 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       <CollapsibleCard title="Last draws" defaultOpen={false}>
         <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
       </CollapsibleCard>
+
+      <MlPredictorCard siteId="fungames_shamo" />
 
       <RainManualBetCard
         running={status?.running ?? false}

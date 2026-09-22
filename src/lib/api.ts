@@ -8,6 +8,7 @@ import type {
   PatternsResponse,
   PredictionsResponse,
   InsightsResponse,
+  MlLiveResponse,
   DashboardResponse,
   SessionsResponse,
   AccountsResponse,
@@ -106,6 +107,12 @@ export async function getPredictions(siteId: string): Promise<PredictionsRespons
 
 export async function getInsights(siteId: string): Promise<InsightsResponse> {
   return apiFetch<InsightsResponse>(`api/insights/${siteId}`);
+}
+
+// Live ML predictor output (recurrence_v1): prediction + ticket-recurrence
+// averages + per-number reasons. Consumed by the autoplay-page ML card.
+export async function getMlLive(siteId: string): Promise<MlLiveResponse> {
+  return apiFetch<MlLiveResponse>(`api/ml/live/${siteId}`);
 }
 
 export async function getDashboard(siteId: string): Promise<DashboardResponse> {
