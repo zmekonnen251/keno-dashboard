@@ -23,7 +23,7 @@ interface NavItem {
 }
 
 const MOBILE_NAV: NavItem[] = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/overview', label: 'Overview', icon: LayoutDashboard },
   { href: '/stats', label: 'Stats', icon: BarChart3 },
   { href: '/patterns', label: 'Patterns', icon: Waypoints },
   { href: '/predictions', label: 'Predictions', icon: Sparkles },

@@ -41,7 +41,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 const NAV = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { href: '/overview', label: 'Overview', icon: LayoutDashboard, end: true },
   { href: '/stats', label: 'Stats', icon: BarChart3 },
   { href: '/patterns', label: 'Patterns', icon: Waypoints },
   { href: '/predictions', label: 'Predictions', icon: Sparkles },

@@ -81,8 +81,8 @@ export async function getSites(): Promise<ProviderSummary[]> {
   return apiFetch<ProviderSummary[]>('api/sites');
 }
 
-export async function getDraws(siteId: string, limit = 100): Promise<DrawsResponse> {
-  return apiFetch<DrawsResponse>(`api/draws/${siteId}?limit=${limit}`);
+export async function getDraws(siteId: string, limit = 100, offset = 0): Promise<DrawsResponse> {
+  return apiFetch<DrawsResponse>(`api/draws/${siteId}?limit=${limit}&offset=${offset}`);
 }
 
 export async function getStats(siteId: string): Promise<StatsResponse> {

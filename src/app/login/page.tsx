@@ -22,7 +22,7 @@ function LoginForm() {
     setError('');
     try {
       await login(password);
-      const next = params.get('next') || '/';
+      const next = params.get('next') || '/overview';
       router.push(next);
       router.refresh();
     } catch (err) {

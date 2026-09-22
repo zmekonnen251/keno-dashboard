@@ -22,6 +22,7 @@ export interface DrawsResponse {
 	siteId: string;
 	count: number;
 	total: number;
+	offset: number;
 	draws: Draw[];
 }
 
