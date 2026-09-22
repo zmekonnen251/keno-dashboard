@@ -865,6 +865,12 @@ export interface RainCashBetsResponse {
 
 export interface RainManualBetResponse {
 	ok: boolean;
+	accountId?: number;
+	picked?: {
+		accountId: number;
+		phone: string;
+		balance: number | null;
+	} | null;
 	result: {
 		ok: boolean;
 		requestId: string;

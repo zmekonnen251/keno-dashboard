@@ -415,15 +415,20 @@ export async function rainTestRound(): Promise<RainTestRoundResponse> {
 }
 
 // Manual CASH wager through a rain account. Spots are the keno numbers
-// (1–10 of 1–80), stake is the amount to bet.
+// (1–10 of 1–80), stake is the amount to bet. accountId may be null/omitted —
+// the server then auto-selects an account whose balance covers the stake.
 export async function rainManualCashBet(
-  accountId: number,
+  accountId: number | null,
   spots: number[],
   stake: number,
 ): Promise<RainManualBetResponse> {
   return apiFetch<RainManualBetResponse>('api/rain/autoplay/manual-bet', {
     method: 'POST',
-    body: JSON.stringify({ account_id: accountId, spots, stake }),
+    body: JSON.stringify({
+      account_id: accountId ?? 'auto',
+      spots,
+      stake,
+    }),
   });
 }
 

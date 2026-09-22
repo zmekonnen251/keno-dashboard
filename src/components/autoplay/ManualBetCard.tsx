@@ -32,7 +32,6 @@ function suggestionChips(
 }
 
 export function ManualBetCard({
-	running,
 	recurrence,
 	accounts,
 	onMessage,
@@ -46,7 +45,7 @@ export function ManualBetCard({
 	onRefresh: () => void;
 	onPicksChange?: (spots: number[]) => void;
 }) {
-	const [spotsCount, setSpotsCount] = useState<2 | 3>(3);
+	const [spotsCount, setSpotsCount] = useState<number>(3);
 	const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
 	const [manualStake, setManualStake] = useState('2');
 	const [accountMode, setAccountMode] = useState<'auto' | 'manual'>('auto');
@@ -162,6 +161,22 @@ export function ManualBetCard({
 	}
 	const manualAccounts = accountMode === 'manual' ? (eligible.length > 0 ? eligible : accounts.map((a) => ({ accountId: a.accountId, phone: a.phone, balance: a.balance, connected: a.connected }))) : [];
 
+	// Stake cap: min 2, max = the selected account's balance (manual mode) or
+	// the richest enabled wallet (auto mode, server picks which one).
+	const maxBalance = accounts.length > 0 ? Math.max(...accounts.map((a) => a.balance ?? 0)) : 2;
+	const stakeMax = Math.max(
+		2,
+		accountMode === 'manual'
+			? manualAccounts.find((a) => String(a.accountId) === selectedAccountId)?.balance ?? maxBalance
+			: maxBalance,
+	);
+
+	function clampStakeInput(v: string): string {
+		const n = parseFloat(v);
+		if (!Number.isFinite(n)) return '';
+		return String(Math.min(Math.max(n, 2), stakeMax));
+	}
+
 	return (
 		<CollapsibleCard title='Manual play — pick a ticket, set stake, place bet' defaultOpen={false}>
 			<div className='space-y-4'>
@@ -196,19 +211,21 @@ export function ManualBetCard({
 								<select
 									value={String(spotsCount)}
 									onChange={(e) => {
-										const v = e.target.value === '2' ? 2 : 3;
+										const v = Number(e.target.value);
 										setSpotsCount(v);
 										setSelectedSpots((prev) => prev.slice(0, v));
 									}}
 									className='w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground'
 								>
-									<option value='2'>2 numbers</option>
-									<option value='3'>3 numbers</option>
+									{Array.from({ length: 9 }, (_, i) => i + 2).map((n) => (
+										<option key={n} value={n}>{n} numbers</option>
+									))}
 								</select>
 							</div>
 							<div className='space-y-1.5'>
 								<Label>Stake (ETB)</Label>
-								<Input type='number' min='2' value={manualStake} onChange={(e) => setManualStake(e.target.value)} placeholder='2' />
+								<Input type='number' min='2' max={stakeMax} value={manualStake} onChange={(e) => setManualStake(clampStakeInput(e.target.value))} placeholder='2' />
+								<p className='text-[10px] text-muted-foreground'>Min 2 · Max {stakeMax} ETB (richest wallet)</p>
 							</div>
 						</div>
 
@@ -292,7 +309,7 @@ export function ManualBetCard({
 								</div>
 							</div>
 							<div className='mt-2 flex flex-wrap gap-2'>
-								<Button variant='outline' size='sm' onClick={generateFromStrategy} disabled={!running}>
+								<Button variant='outline' size='sm' onClick={generateFromStrategy}>
 									Generate from strategy
 								</Button>
 								<Button variant='outline' size='sm' onClick={saveCurrentTicket}>
@@ -333,7 +350,7 @@ export function ManualBetCard({
 							Selected: {selectedSpots.length > 0 ? `[${selectedSpots.join(',')}]` : '—'} · {stakeNum} ETB
 						</div>
 
-					<Button onClick={onPlaceBet} disabled={placing || !running}>
+					<Button onClick={onPlaceBet} disabled={placing}>
 						{placing ? 'Placing…' : 'Place bet'}
 					</Button>
 				</div>

@@ -62,7 +62,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const [showConfig, setShowConfig] = useState(false);
   const [pickBet, setPickBet] = useState<RainFreeBet | null>(null);
   const [pickSpots, setPickSpots] = useState<number[]>([]);
-  const [pickSpotsCount, setPickSpotsCount] = useState<2 | 3>(3);
+  const [pickSpotsCount, setPickSpotsCount] = useState<number>(3);
   const [msg, setMsg] = useState('');
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
@@ -224,10 +224,12 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
   function onPlayFreeBet(bet: RainFreeBet) {
     const existing = (bet.chosen_spots ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= 80);
-    const count: 2 | 3 = existing.length === 2 ? 2 : 3;
+    const count = existing.length >= 2 ? Math.min(existing.length, 10) : 3;
     setPickSpotsCount(count);
     setPickSpots(existing.length ? existing.slice(0, count) : []);
     setPickBet(bet);
+    // Close the ledger list so the pick board is the only modal on screen.
+    setShowFreeBets(false);
     setMsg('');
   }
 
@@ -489,14 +491,15 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
               <select
                 value={String(pickSpotsCount)}
                 onChange={(e) => {
-                  const v = e.target.value === '2' ? 2 : 3;
+                  const v = Number(e.target.value);
                   setPickSpotsCount(v);
                   setPickSpots((prev) => prev.slice(0, v));
                 }}
                 className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground"
               >
-                <option value="2">2 numbers</option>
-                <option value="3">3 numbers</option>
+                {Array.from({ length: 9 }, (_, i) => i + 2).map((n) => (
+                  <option key={n} value={n}>{n} numbers</option>
+                ))}
               </select>
             </div>
             <NumberGrid
