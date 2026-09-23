@@ -300,7 +300,7 @@ function DropsTab({
                     {d.url && (
                       <Button asChild variant="outline" size="xs">
                         <a href={d.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink /> Melbet
+                          <ExternalLink /> Shamo
                         </a>
                       </Button>
                     )}
