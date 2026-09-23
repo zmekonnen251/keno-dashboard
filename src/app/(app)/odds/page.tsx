@@ -15,6 +15,7 @@ import {
   cancelShamoBetOrder,
   requeueShamoBetOrder,
   createShamoBetOrder,
+  pushTest,
   type OddsLiveResponse,
 } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
@@ -633,6 +634,18 @@ function BetsTab() {
     }
   }
 
+  async function onTestPush() {
+    setMsg('Sending test push…');
+    const r = await pushTest();
+    if (r.ok && r.subscriptions > 0) {
+      setMsg(`Test push sent to ${r.subscriptions} browser(s) — check for a Chrome notification.`);
+    } else if (r.error) {
+      setMsg(r.error);
+    } else {
+      setMsg('No push subscriptions yet — click “Push on” at the top of this page, allow notifications, then retry.');
+    }
+  }
+
   const orders = ordersApi.data ?? [];
   const bets = betsApi.data ?? [];
   const dryRun = status?.engine.dryRun ?? [];
@@ -737,6 +750,17 @@ function BetsTab() {
               never auto-spent unless mode is auto AND the extension is running with a logged-in
               shamo.bet tab. dry-run previews what would queue without risking anything.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <Button variant="outline" size="sm" onClick={onTestPush}>
+                <Bell className="mr-1.5 h-3.5 w-3.5" />
+                Send test push
+              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                Browser push alerts you on odd drops and when bet slips are generated. Enable it with
+                the “Push on” button at the top of this page and allow notifications, then verify with
+                the test button. The Chrome extension notifies separately on the same events.
+              </span>
+            </div>
           </>
         )}
 

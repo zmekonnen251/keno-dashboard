@@ -70,7 +70,12 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     return () => clearInterval(t);
   }, []);
 
-  const enabledAccounts = accounts.filter(a => a.is_enabled);
+  // Only enabled accounts with a playable balance (min stake is 2 ETB,
+  // below that the bet can't be placed) — sorted richest first so the least
+  // likely-to-cover accounts are at the bottom.
+  const enabledAccounts = accounts
+    .filter((a) => a.is_enabled && a.balance >= 2)
+    .sort((a, b) => b.balance - a.balance);
 
   // Max stake = the balance of the selected account, or (auto) the highest
   // balance among enabled accounts — e.g. if the richest account has 20 ETB
@@ -312,10 +317,15 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                   <option value="auto">🤖 Auto — server picks by balance</option>
                   {enabledAccounts.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.name} ({a.provider}) — Bal: {a.balance} ETB
+                      {a.name} ({a.provider}) — Bal: {a.balance.toFixed(2)} ETB
                     </option>
                   ))}
                 </select>
+                {enabledAccounts.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    No enabled rain account with balance ≥ 2 ETB — the bet cannot be placed.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Stake (ETB) — min 2, max {stakeMax.toFixed(2)}</Label>

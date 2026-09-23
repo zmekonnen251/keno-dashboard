@@ -754,3 +754,14 @@ export async function requeueShamoBetOrder(id: number): Promise<ShamoBetOrder> {
 export async function getShamoBets(limit = 50): Promise<ShamoBetRecord[]> {
   return apiFetch<ShamoBetRecord[]>(`api/odds/bet/bets?limit=${limit}`);
 }
+
+/** Send a browser-push test notification to every subscribed dashboard. */
+export async function pushTest(): Promise<{ ok: boolean; sent: number; subscriptions: number; error?: string }> {
+  try {
+    return await apiFetch<{ ok: boolean; sent: number; subscriptions: number }>('api/push/test', {
+      method: 'POST',
+    });
+  } catch (e) {
+    return { ok: false, sent: 0, subscriptions: 0, error: e instanceof Error ? e.message : String(e) };
+  }
+}

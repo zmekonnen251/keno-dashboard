@@ -45,6 +45,8 @@ import {
 } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { formatTime } from '@/lib/format';
+import { DataTable } from '@/components/ui/data-table';
+import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-accounts-columns';
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
   fungames_shamo: 'gateway.fungames.live',
@@ -62,27 +64,6 @@ const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: str
   failed: { label: 'Failed', cls: 'bg-rose-600 text-white' },
   expired: { label: 'Expired', cls: 'bg-muted text-muted-foreground' },
 };
-
-function ProviderBadge({ provider }: { provider: RainProvider }) {
-  return (
-    <Badge className={provider === 'phoenixbet' ? 'bg-fuchsia-600 text-white' : ''} variant={provider === 'fungames_shamo' ? 'default' : 'secondary'}>
-      {provider}
-    </Badge>
-  );
-}
-
-function StatusBadge({ acc }: { acc: RainAccount }) {
-  if (acc.connected) {
-    return <Badge className="bg-emerald-600 text-white">Connected</Badge>;
-  }
-  const detail =
-    acc.lastError && acc.lastError !== '' ? acc.lastError : acc.status;
-  return (
-    <Badge variant="outline" className="text-muted-foreground" title={acc.lastError ?? ''}>
-      {acc.is_enabled ? `Disconnected · ${detail}` : 'Disabled'}
-    </Badge>
-  );
-}
 
 function AccountForm({
   initial,
@@ -616,80 +597,29 @@ export default function RainAccountsPage() {
 
       <Card title={`Rain-claiming accounts (${data.count})`}>
         {data.accounts.length ? (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Token</TableHead>
-                  <TableHead>Balance</TableHead>
-                  <TableHead>Access token</TableHead>
-                  <TableHead>Claims</TableHead>
-                  <TableHead>Last claimed</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.accounts.map((acc) => (
-                  <TableRow key={acc.id}>
-                    <TableCell className="font-medium">{acc.name}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-start gap-0.5">
-                        <ProviderBadge provider={acc.provider} />
-                        <span className="font-mono text-[10px] text-muted-foreground">{acc.gateway_host}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <StatusBadge acc={acc} />
-                        {acc.connected && acc.connectedAt != null && (
-                          <span className="text-[10px] text-muted-foreground">since {formatTime(new Date(acc.connectedAt).toISOString())}</span>
-                        )}
-                        {acc.claimedThisSession > 0 && (
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                            {acc.claimedThisSession} this session
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{acc.ws_token_masked ?? '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className={acc.balanceLive ? 'text-emerald-600 dark:text-emerald-400' : ''}>
-                          {acc.balance.toFixed(2)} ETB
-                        </span>
-                        {acc.balanceLive && (
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400">live</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {acc.has_access_token ? acc.access_token_masked : '—'}
-                    </TableCell>
-                    <TableCell>{acc.rain_count}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {acc.last_claimed_at ? formatTime(acc.last_claimed_at) : '—'}
-                      {acc.lastWager != null && (
-                        <span className="mt-0.5 block">slot {acc.lastSlot} · +{acc.lastWager} ETB</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => onShowClaims(acc)}>Claims</Button>
-                        <Button variant="outline" size="sm" disabled={busyId === acc.id} onClick={() => onReconnect(acc)}>
-                          {busyId === acc.id ? '…' : 'Check status'}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setEditing(acc)}>Edit</Button>
-                        <Button variant="destructive" size="sm" onClick={() => onDelete(acc)}>Delete</Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={rainAccountColumns}
+            data={data.accounts}
+            meta={{
+              onShowClaims,
+              onReconnect,
+              onEdit: setEditing,
+              onDelete,
+              busyId,
+            }}
+            renderMobileRowCard={(acc) => (
+              <RainAccountMobileCard
+                account={acc}
+                meta={{
+                  onShowClaims,
+                  onReconnect,
+                  onEdit: setEditing,
+                  onDelete,
+                  busyId,
+                }}
+              />
+            )}
+          />
         ) : (
           <Empty label="No rain-claiming accounts. Add one to start auto-claiming free bets." />
         )}
