@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Play, RotateCw, TrendingDown } from 'lucide-react';
+import { Bell, ExternalLink, Play, RotateCw, TrendingDown } from 'lucide-react';
 import { getOddsLive, getOddsConfig, setOddsConfig, oddsPollNow, oddsCalibrate, type OddsLiveResponse } from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import {
@@ -189,7 +189,11 @@ export default function OddsPage() {
           label="Football coverage"
           value={status ? `${status.matchedFootball}/${status.melbetFootball}` : '—'}
           tone={status && status.matchedFootball > 0 ? 'positive' : 'default'}
-          sub={status ? `${status.shamoFootball} football events on shamo` : '—'}
+          sub={
+            status
+              ? `${status.shamoFootball} football on shamo · ${status.shamoLeagueCount ?? 0} leagues named`
+              : '—'
+          }
         />
         <StatCard
           label="Drops / Suggestions"
@@ -280,7 +284,8 @@ function DropsTab({
                       {d.home} <span className="text-muted-foreground">vs</span> {d.away}
                     </div>
                     <div className="truncate text-[11px] text-muted-foreground">
-                      {d.sport} · {d.league} · {formatTime(d.createdAt)}
+                      {d.sport} · {d.country ? `${d.country} · ` : ''}
+                      {d.league} · {formatTime(d.createdAt)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -292,6 +297,13 @@ function DropsTab({
                     <Badge variant="outline" className="font-mono">
                       {d.marketLabel ?? d.marketKey}
                     </Badge>
+                    {d.url && (
+                      <Button asChild variant="outline" size="xs">
+                        <a href={d.url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Melbet
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -351,7 +363,9 @@ function SuggestionsTab({
                       {s.home} <span className="text-muted-foreground">vs</span> {s.away}
                     </div>
                     <div className="truncate text-[11px] text-muted-foreground">
-                      {s.league} · kickoff {formatTime(s.startTs)} · expires {formatTime(s.expiresAt)}
+                      {s.country ? `${s.country} · ` : ''}
+                      {s.league} · kickoff {formatTime(s.startTs)} · expires{' '}
+                      {formatTime(s.expiresAt)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -363,6 +377,20 @@ function SuggestionsTab({
                     <Badge className="bg-violet-500/15 text-violet-600 dark:text-violet-400">
                       score {s.score.toFixed(1)}
                     </Badge>
+                    {s.shamoUrl && (
+                      <Button asChild variant="outline" size="xs">
+                        <a href={s.shamoUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Shamo
+                        </a>
+                      </Button>
+                    )}
+                    {s.melbetUrl && (
+                      <Button asChild variant="outline" size="xs">
+                        <a href={s.melbetUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Melbet
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

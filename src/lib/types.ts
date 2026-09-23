@@ -1207,7 +1207,10 @@ export interface OddsDrop {
 	home: string;
 	away: string;
 	league: string;
+	country?: string;
 	sport: string;
+	/** Deep link to the event on the source site (melbet for drop signals). */
+	url?: string | null;
 	marketKey: string;
 	marketLabel?: string | null;
 	outcome: string;
@@ -1248,6 +1251,8 @@ export interface OddsWatcherStatus {
 	melbetFootball: number;
 	shamoFootball: number;
 	matchedFootball: number;
+	/** Number of shamo leagues resolved to names via the coredata dictionary. */
+	shamoLeagueCount: number;
 	config: OddsWatcherConfig;
 }
 
@@ -1258,7 +1263,12 @@ export interface OddsSuggestion {
 	home: string;
 	away: string;
 	league: string;
+	country?: string;
 	sport: string;
+	/** Melbet event deep link (where the drop was seen). */
+	melbetUrl?: string | null;
+	/** Shamo match deep link (where the bet lands). */
+	shamoUrl?: string | null;
 	marketKey: string;
 	outcome: string;
 	outcomeLabel: string | null;
