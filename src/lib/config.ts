@@ -4,7 +4,7 @@
 
 export function apiBase(): string {
   const base = process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE;
-  return (base || 'http://127.0.0.1:3001').replace(/\/+$/, '');
+  return (base || 'http://127.0.0.1:5000').replace(/\/+$/, '');
 }
 
 // Name of the cookie the dashboard stores (HttpOnly, on the dashboard origin) that
