@@ -62,6 +62,10 @@ import type {
   OddsSuggestion,
   OddsWatcherConfig,
   OddsWatcherStatus,
+  ShamoBetConfig,
+  ShamoBetOrder,
+  ShamoBetRecord,
+  ShamoBetStatus,
 } from './types';
 
 // ---- auth ----
@@ -703,4 +707,50 @@ export async function oddsCalibrate(): Promise<{ ok: boolean; sides: Record<stri
   return apiFetch<{ ok: boolean; sides: Record<string, string>; samples: number }>('api/odds/calibrate', {
     method: 'POST',
   });
+}
+
+// ---- shamo sports bet slips ----
+// Admin panel endpoints (dashboard proxy relays the session cookie). The
+// extension itself talks directly to the server's /api/odds/bot/* routes with
+// the X-Bot-Token shared secret.
+
+export async function getShamoBetStatus(): Promise<ShamoBetStatus> {
+  return apiFetch<ShamoBetStatus>('api/odds/bet/status');
+}
+
+export async function getShamoBetConfig(): Promise<ShamoBetConfig> {
+  return apiFetch<ShamoBetConfig>('api/odds/bet/config');
+}
+
+export async function setShamoBetConfig(patch: Partial<ShamoBetConfig>): Promise<ShamoBetConfig> {
+  return apiFetch<ShamoBetConfig>('api/odds/bet/config', {
+    method: 'POST',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function getShamoBetOrders(limit = 50): Promise<ShamoBetOrder[]> {
+  return apiFetch<ShamoBetOrder[]>(`api/odds/bet/orders?limit=${limit}`);
+}
+
+export async function createShamoBetOrder(
+  suggestionId: number,
+  stake?: number,
+): Promise<ShamoBetOrder> {
+  return apiFetch<ShamoBetOrder>('api/odds/bet/orders', {
+    method: 'POST',
+    body: JSON.stringify({ suggestionId, ...(stake ? { stake } : {}) }),
+  });
+}
+
+export async function cancelShamoBetOrder(id: number): Promise<ShamoBetOrder> {
+  return apiFetch<ShamoBetOrder>(`api/odds/bet/orders/${id}/cancel`, { method: 'POST' });
+}
+
+export async function requeueShamoBetOrder(id: number): Promise<ShamoBetOrder> {
+  return apiFetch<ShamoBetOrder>(`api/odds/bet/orders/${id}/requeue`, { method: 'POST' });
+}
+
+export async function getShamoBets(limit = 50): Promise<ShamoBetRecord[]> {
+  return apiFetch<ShamoBetRecord[]>(`api/odds/bet/bets?limit=${limit}`);
 }

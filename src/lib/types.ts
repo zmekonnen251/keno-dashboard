@@ -1290,3 +1290,110 @@ export interface OddsLiveResponse {
 	suggestions: OddsSuggestion[];
 	now: string;
 }
+
+// ---- Shamo sports bet slips (extension-assisted; mirrors server/src/odds/betTypes.ts) ----
+// Suggestions become shamo_bet_orders (edge/cap/cooldown rules run server-side).
+// The Chrome extension claims an order, the user confirms on shamo.bet, the
+// extension places it (POST platform.shamo.bet/sport-data/bet.place/) and the
+// audit log lands in shamo_bets.
+
+export type ShamoBetMode = 'confirm' | 'auto' | 'dry-run';
+export type BetOrderAction = 'confirm' | 'auto';
+export type BetOrderStatus =
+	| 'pending'
+	| 'claimed'
+	| 'placed'
+	| 'rejected'
+	| 'failed'
+	| 'expired'
+	| 'cancelled';
+
+export interface ShamoBetConfig {
+	enabled: boolean;
+	mode: ShamoBetMode;
+	stakePerBet: number;
+	minEdgePct: number;
+	maxDayStake: number;
+	maxBetsPerDay: number;
+	cooldownMin: number;
+	orderTtlMin: number;
+	maxOddDriftPct: number;
+	botToken: string;
+	updatedAt?: string;
+}
+
+export interface ShamoBetOrderDraft {
+	suggestionId: number;
+	shamoExternalId: string;
+	shamoUrl: string | null;
+	home: string;
+	away: string;
+	league: string;
+	country: string;
+	sport: string;
+	marketKey: string;
+	outcome: string;
+	outcomeLabel: string | null;
+	betGroup: number | null;
+	betType: number | null;
+	quotedOdd: number;
+	melbetCurrent: number;
+	edgePct: number;
+	stake: number;
+}
+
+export interface ShamoBetOrder {
+	id: number;
+	suggestionId: number | null;
+	shamoExternalId: string;
+	shamoUrl: string | null;
+	home: string;
+	away: string;
+	league: string;
+	country: string;
+	sport: string;
+	marketKey: string;
+	outcome: string;
+	outcomeLabel: string | null;
+	betGroup: number | null;
+	betType: number | null;
+	quotedOdd: number;
+	melbetCurrent: number;
+	edgePct: number;
+	stake: number;
+	action: BetOrderAction;
+	status: BetOrderStatus;
+	ticketId: string | null;
+	actualOdd: number | null;
+	error: string | null;
+	claimedAt: string | null;
+	placedAt: string | null;
+	expiresAt: string | null;
+	createdAt: string;
+}
+
+export interface ShamoBetRecord {
+	id: number;
+	orderId: number;
+	ticketId: string | null;
+	stake: number;
+	quotedOdd: number | null;
+	actualOdd: number | null;
+	state: string;
+	message: string | null;
+	createdAt: string;
+}
+
+export interface ShamoBetStatus {
+	config: ShamoBetConfig;
+	engine: {
+		running: boolean;
+		lastTickAt: string | null;
+		dryRun: ShamoBetOrderDraft[];
+	};
+	pending: number;
+	claimed: number;
+	placedToday: number;
+	stakeUsedToday: number;
+	botTokenSet: boolean;
+}

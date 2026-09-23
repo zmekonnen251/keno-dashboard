@@ -1,8 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ExternalLink, Play, RotateCw, TrendingDown } from 'lucide-react';
-import { getOddsLive, getOddsConfig, setOddsConfig, oddsPollNow, oddsCalibrate, type OddsLiveResponse } from '@/lib/api';
+import { Bell, ExternalLink, Play, RotateCw, TrendingDown, Ticket, ShieldCheck, Ban } from 'lucide-react';
+import {
+  getOddsLive,
+  getOddsConfig,
+  setOddsConfig,
+  oddsPollNow,
+  oddsCalibrate,
+  getShamoBetStatus,
+  getShamoBetOrders,
+  getShamoBets,
+  setShamoBetConfig,
+  cancelShamoBetOrder,
+  requeueShamoBetOrder,
+  createShamoBetOrder,
+  type OddsLiveResponse,
+} from '@/lib/api';
 import { useApi } from '@/lib/hooks';
 import {
   isPushActive,
@@ -17,7 +31,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatTime } from '@/lib/format';
-import type { OddsDrop, OddsSuggestion, OddsWatcherConfig } from '@/lib/types';
+import type {
+  OddsDrop,
+  OddsSuggestion,
+  OddsWatcherConfig,
+  ShamoBetConfig,
+  ShamoBetOrder,
+  ShamoBetRecord,
+  ShamoBetStatus,
+} from '@/lib/types';
 
 // Live odd-drop monitor + soccer suggester. Watches the melbet feed for priced
 // drops (>= configured %), flags "steam" when the same market drops again, and
@@ -35,6 +57,21 @@ export default function OddsPage() {
   const [calibrating, setCalibrating] = useState(false);
   const [flashIds, setFlashIds] = useState<Set<number>>(new Set());
   const [calMsg, setCalMsg] = useState('');
+  const [queueMsg, setQueueMsg] = useState('');
+
+  // Manual "Queue bet" from a suggestion card (bypasses edge/cooldown rules —
+  // the admin clicked it on purpose; the extension still confirm-firsts it).
+  async function onQueueSuggestion(id: number) {
+    try {
+      const order = await createShamoBetOrder(id);
+      setQueueMsg(
+        `Queued order #${order.id} — ${order.home} vs ${order.away} · ${order.outcomeLabel ?? order.outcome} @ ${order.quotedOdd}`,
+      );
+    } catch (e) {
+      setQueueMsg(e instanceof Error ? e.message : 'Could not queue order');
+    }
+    setTimeout(() => setQueueMsg(''), 6000);
+  }
 
   // Push (Chrome) drop alerts — reuses the win-flag subscription.
   const [pushOn, setPushOn] = useState(() => isPushActive());
@@ -214,10 +251,17 @@ export default function OddsPage() {
         <ErrorBox message={`Latest tick error: ${status.lastError}`} />
       )}
 
+      {queueMsg && (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+          {queueMsg}
+        </div>
+      )}
+
       <Tabs defaultValue="drops">
         <TabsList>
           <TabsTrigger value="drops">Drops ({drops.length})</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions ({suggestions.length})</TabsTrigger>
+          <TabsTrigger value="bets">Bet slips</TabsTrigger>
           <TabsTrigger value="config">Watcher config</TabsTrigger>
         </TabsList>
 
@@ -226,7 +270,16 @@ export default function OddsPage() {
         </TabsContent>
 
         <TabsContent value="suggestions">
-          <SuggestionsTab suggestions={suggestions} loading={live.loading} error={live.error} />
+          <SuggestionsTab
+            suggestions={suggestions}
+            loading={live.loading}
+            error={live.error}
+            onQueue={onQueueSuggestion}
+          />
+        </TabsContent>
+
+        <TabsContent value="bets">
+          <BetsTab />
         </TabsContent>
 
         <TabsContent value="config">
@@ -337,10 +390,12 @@ function SuggestionsTab({
   suggestions,
   loading,
   error,
+  onQueue,
 }: {
   suggestions: OddsSuggestion[];
   loading: boolean;
   error: string;
+  onQueue?: (suggestionId: number) => void;
 }) {
   return (
     <Card title={`Soccer suggestions (${suggestions.length})`}>
@@ -389,6 +444,11 @@ function SuggestionsTab({
                         <a href={s.melbetUrl} target="_blank" rel="noopener noreferrer">
                           <ExternalLink /> Melbet
                         </a>
+                      </Button>
+                    )}
+                    {onQueue && s.shamoUrl && (
+                      <Button size="xs" onClick={() => onQueue(s.id)}>
+                        <Ticket /> Queue bet
                       </Button>
                     )}
                   </div>
@@ -492,5 +552,327 @@ function ConfigTab({
         auto-learned by comparing shamo prices to melbet 1X2 on matched matches.
       </p>
     </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Shamo sports bet slips: config + engine status, the order queue (what the
+// extension is working through) and the placed/attempted audit log. The
+// extension polls /api/odds/bot/* directly with the X-Bot-Token.
+const ORDER_TONE: Record<string, string> = {
+  pending: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  claimed: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+  placed: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  rejected: 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400',
+  failed: 'bg-red-500/15 text-red-600 dark:text-red-400',
+  expired: 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400',
+  cancelled: 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400',
+};
+
+function BetsTab() {
+  const statusApi = useApi<ShamoBetStatus>(() => getShamoBetStatus(), []);
+  const ordersApi = useApi<ShamoBetOrder[]>(() => getShamoBetOrders(50), []);
+  const betsApi = useApi<ShamoBetRecord[]>(() => getShamoBets(50), []);
+  const [overrides, setOverrides] = useState<Partial<ShamoBetConfig> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      statusApi.refresh();
+      ordersApi.refresh();
+    }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const status = statusApi.data;
+  const cfg = status?.config ?? null;
+  const draft: ShamoBetConfig | null = cfg ? { ...cfg, ...(overrides ?? {}) } : null;
+  const patchDraft = (p: Partial<ShamoBetConfig>) =>
+    setOverrides((prev) => ({ ...(prev ?? {}), ...p }));
+
+  async function onSave() {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      await setShamoBetConfig(draft);
+      setOverrides(null);
+      await statusApi.refresh();
+      setMsg('Config saved');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onCancel(id: number) {
+    setBusyId(id);
+    try {
+      await cancelShamoBetOrder(id);
+      await Promise.all([ordersApi.refresh(), statusApi.refresh()]);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Cancel failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onRequeue(id: number) {
+    setBusyId(id);
+    try {
+      await requeueShamoBetOrder(id);
+      await Promise.all([ordersApi.refresh(), statusApi.refresh()]);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Requeue failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const orders = ordersApi.data ?? [];
+  const bets = betsApi.data ?? [];
+  const dryRun = status?.engine.dryRun ?? [];
+
+  const num = (key: keyof ShamoBetConfig, label: string, step = 1, min = 0) => (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        type="number"
+        step={step}
+        min={min}
+        value={String(draft?.[key] ?? '')}
+        onChange={(e) =>
+          patchDraft({ [key]: parseFloat(e.target.value) || 0 } as Partial<ShamoBetConfig>)
+        }
+      />
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {msg && (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+          {msg}
+        </div>
+      )}
+
+      <Card title="Bet engine" actions={<ShieldCheck className="h-4 w-4 text-emerald-500" />}>
+        {statusApi.loading && !status ? (
+          <Loading rows={3} />
+        ) : statusApi.error && !status ? (
+          <ErrorBox message={statusApi.error} />
+        ) : !draft ? null : (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatCard
+                label="Engine"
+                value={draft.enabled ? 'Enabled' : 'Disabled'}
+                tone={draft.enabled ? 'positive' : 'default'}
+                sub={status?.engine.running ? 'loop running' : 'loop idle'}
+              />
+              <StatCard label="Mode" value={draft.mode} sub="confirm asks · auto places · dry-run previews" />
+              <StatCard
+                label="Today"
+                value={`${status?.placedToday ?? 0} bets`}
+                sub={`${(status?.stakeUsedToday ?? 0).toFixed(0)} stake used`}
+              />
+              <StatCard
+                label="Queue"
+                value={`${status?.pending ?? 0} pending`}
+                sub={`${status?.claimed ?? 0} claimed by extension`}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {num('stakePerBet', 'Stake per bet', 1, 1)}
+              {num('minEdgePct', 'Min edge (%)', 0.1, 0)}
+              {num('maxDayStake', 'Max daily stake', 10, 1)}
+              {num('maxBetsPerDay', 'Max bets / day', 1, 1)}
+              {num('cooldownMin', 'Cooldown (min)', 1, 0)}
+              {num('orderTtlMin', 'Order TTL (min)', 1, 1)}
+              {num('maxOddDriftPct', 'Max odd drift (%)', 0.1, 0)}
+              <div className="space-y-1">
+                <Label className="text-xs">Bot token (extension)</Label>
+                <Input
+                  type="password"
+                  placeholder="shared secret"
+                  value={draft.botToken}
+                  onChange={(e) => patchDraft({ botToken: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                variant={draft.enabled ? 'default' : 'outline'}
+                onClick={() => patchDraft({ enabled: !draft.enabled })}
+              >
+                {draft.enabled ? 'Engine enabled' : 'Engine disabled'}
+              </Button>
+              {(['confirm', 'auto', 'dry-run'] as const).map((m) => (
+                <Button
+                  key={m}
+                  variant={draft.mode === m ? 'default' : 'outline'}
+                  onClick={() => patchDraft({ mode: m })}
+                >
+                  {m}
+                </Button>
+              ))}
+              <Button onClick={onSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save config'}
+              </Button>
+            </div>
+            {!status?.botTokenSet && (
+              <p className="mt-3 text-xs text-red-500">
+                No bot token set — the extension cannot reach /api/odds/bot/* until you set one
+                here or via SHAMO_BET_BOT_TOKEN in the server .env.
+              </p>
+            )}
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              The engine only queues orders that pass the edge/cooldown/daily-cap rules. Money is
+              never auto-spent unless mode is auto AND the extension is running with a logged-in
+              shamo.bet tab. dry-run previews what would queue without risking anything.
+            </p>
+          </>
+        )}
+
+        {dryRun.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">
+              Dry-run: would queue ({dryRun.length})
+            </p>
+            <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+              {dryRun.map((d, i) => (
+                <div
+                  key={i}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-xs"
+                >
+                  <span className="font-medium text-foreground">
+                    {d.home} vs {d.away}
+                  </span>
+                  <span className="text-muted-foreground">{d.outcomeLabel ?? d.outcome}</span>
+                  <span className="font-mono">@{d.quotedOdd.toFixed(2)}</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    +{d.edgePct.toFixed(1)}%
+                  </span>
+                  <span className="ml-auto font-mono text-muted-foreground">
+                    stake {d.stake.toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card title={`Bet orders (${orders.length})`} actions={<Ticket className="h-4 w-4 text-violet-500" />}>
+        {ordersApi.loading && !orders.length ? (
+          <Loading rows={4} />
+        ) : ordersApi.error && !orders.length ? (
+          <ErrorBox message={ordersApi.error} />
+        ) : orders.length === 0 ? (
+          <Empty label="No bet orders yet. Fresh suggestions that pass the edge/cooldown/cap rules queue automatically; you can also hit 'Queue bet' on any suggestion card." />
+        ) : (
+          <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+            {orders.map((o) => (
+              <div key={o.id} className="rounded-lg border border-border bg-card p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-foreground">
+                      #{o.id} · {o.home} <span className="text-muted-foreground">vs</span> {o.away}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {o.country ? `${o.country} · ` : ''}
+                      {o.league} · created {formatTime(o.createdAt)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={ORDER_TONE[o.status] ?? ''}>{o.status}</Badge>
+                    {o.shamoUrl && (
+                      <Button asChild variant="outline" size="xs">
+                        <a href={o.shamoUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Shamo
+                        </a>
+                      </Button>
+                    )}
+                    {o.ticketId && (
+                      <Badge variant="outline" className="font-mono">
+                        ticket {o.ticketId}
+                      </Badge>
+                    )}
+                    {(o.status === 'pending' || o.status === 'claimed') && (
+                      <Button size="xs" variant="outline" disabled={busyId === o.id} onClick={() => onCancel(o.id)}>
+                        <Ban /> Cancel
+                      </Button>
+                    )}
+                    {['expired', 'cancelled', 'rejected', 'failed'].includes(o.status) && (
+                      <Button size="xs" variant="outline" disabled={busyId === o.id} onClick={() => onRequeue(o.id)}>
+                        <RotateCw /> Requeue
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className="font-medium">{o.outcomeLabel ?? o.outcome}</span>
+                  <span className="font-mono text-muted-foreground">said {o.quotedOdd.toFixed(2)}</span>
+                  {o.actualOdd != null && (
+                    <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                      placed @ {o.actualOdd.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    +{o.edgePct.toFixed(1)}%
+                  </span>
+                  <span className="font-mono text-muted-foreground">stake {o.stake.toFixed(1)}</span>
+                  {o.action === 'auto' && <Badge variant="outline">auto</Badge>}
+                  <span className="ml-auto text-[10px] text-muted-foreground">
+                    {o.expiresAt ? `expires ${formatTime(o.expiresAt)}` : ''}
+                  </span>
+                </div>
+                {o.error && <p className="mt-1.5 text-xs text-red-500">{o.error}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title={`Placed / attempted (${bets.length})`}>
+        {betsApi.loading && !bets.length ? (
+          <Loading rows={3} />
+        ) : betsApi.error && !bets.length ? (
+          <ErrorBox message={betsApi.error} />
+        ) : bets.length === 0 ? (
+          <Empty label="Nothing reported yet. Once the extension places (or skips/fails) an order, the result lands here." />
+        ) : (
+          <div className="max-h-[40vh] space-y-1.5 overflow-y-auto pr-1">
+            {bets.map((b) => (
+              <div
+                key={b.id}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              >
+                <Badge className={ORDER_TONE[b.state] ?? ''}>{b.state}</Badge>
+                <span className="font-mono text-xs">#{b.orderId}</span>
+                {b.ticketId && <span className="font-mono text-xs">ticket {b.ticketId}</span>}
+                <span className="font-mono text-muted-foreground">stake {b.stake.toFixed(1)}</span>
+                {b.quotedOdd != null && (
+                  <span className="font-mono text-muted-foreground">said {b.quotedOdd.toFixed(2)}</span>
+                )}
+                {b.actualOdd != null && (
+                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                    @ {b.actualOdd.toFixed(2)}
+                  </span>
+                )}
+                {b.message && <span className="text-xs text-muted-foreground">{b.message}</span>}
+                <span className="ml-auto text-[10px] text-muted-foreground">{formatTime(b.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
