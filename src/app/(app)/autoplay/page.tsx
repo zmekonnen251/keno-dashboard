@@ -29,6 +29,7 @@ import { ShamoAutoplay } from '@/components/autoplay/ShamoAutoplay';
 import { TicketConfig } from '@/components/autoplay/TicketConfig';
 import { useSite } from '@/components/site-provider';
 import { Modal } from '@/components/ui/modal';
+import { SnapScroll, SnapSection } from '@/components/snap-scroll';
 
 // Site-gated autoplay: the tolobirr (real-money gateway) autoplay is shown for
 // the default site, while fungames_shamo is driven by rain free-bets.
@@ -134,83 +135,101 @@ function TolobirrAutoplay() {
 	}
 
 	return (
-		<div className='space-y-5'>
-			<div className='flex flex-wrap items-center justify-between gap-3'>
-				<h2 className='text-lg font-bold text-foreground'>Autoplay</h2>
-				<div className='flex flex-wrap gap-2'>
-					{conn?.running ? (
-						<Button variant='destructive' onClick={() => stopAutoplay().then(() => refresh())}>
-							Stop
+		<SnapScroll>
+			<SnapSection fill>
+				<div className='flex flex-wrap items-center justify-between gap-3'>
+					<h2 className='text-lg font-bold text-foreground'>Autoplay</h2>
+					<div className='flex flex-wrap gap-2'>
+						{conn?.running ? (
+							<Button variant='destructive' onClick={() => stopAutoplay().then(() => refresh())}>
+								Stop
+							</Button>
+						) : (
+							<Button onClick={() => startAutoplay().then(() => refresh())}>Start</Button>
+						)}
+						<Button variant='outline' onClick={onTestRound} disabled={testing || !conn?.running}>
+							{testing ? 'Testing…' : 'Test Round'}
 						</Button>
-					) : (
-						<Button onClick={() => startAutoplay().then(() => refresh())}>Start</Button>
-					)}
-					<Button variant='outline' onClick={onTestRound} disabled={testing || !conn?.running}>
-						{testing ? 'Testing…' : 'Test Round'}
-					</Button>
-					<Button variant='outline' onClick={onRefreshTokens} disabled={refreshing}>
-						{refreshing ? 'Refreshing…' : 'Refresh tokens'}
-					</Button>
-					<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
-						{syncing ? 'Syncing…' : 'Sync wallets'}
-					</Button>
-					<Button variant='outline' onClick={onCheckLiveBalances} disabled={checking}>
-						{checking ? 'Checking…' : 'WS balances'}
-					</Button>
-					<Button variant='outline' onClick={() => setShowConfig(true)}>
-						Configure
-					</Button>
-					<Button variant='outline' onClick={() => setShowTicketConfig(true)}>
-						Ticket Config
-					</Button>
+						<Button variant='outline' onClick={onRefreshTokens} disabled={refreshing}>
+							{refreshing ? 'Refreshing…' : 'Refresh tokens'}
+						</Button>
+						<Button variant='outline' onClick={onSyncWallets} disabled={syncing}>
+							{syncing ? 'Syncing…' : 'Sync wallets'}
+						</Button>
+						<Button variant='outline' onClick={onCheckLiveBalances} disabled={checking}>
+							{checking ? 'Checking…' : 'WS balances'}
+						</Button>
+						<Button variant='outline' onClick={() => setShowConfig(true)}>
+							Configure
+						</Button>
+						<Button variant='outline' onClick={() => setShowTicketConfig(true)}>
+							Ticket Config
+						</Button>
+					</div>
 				</div>
-			</div>
 
-			<div className='alert alert-info mt-3'>
-				<strong>Game State:</strong>{' '}
-				{gameState === 'betting_open'
-					? 'Betting OPEN — inject tickets now'
-					: gameState === 'drawing'
-						? 'Drawing in progress — bets scheduled for next round'
-						: gameState === 'settled'
-							? 'Settled — results announced'
-							: 'Unknown'}
-			</div>
+				<div className='alert alert-info mt-3'>
+					<strong>Game State:</strong>{' '}
+					{gameState === 'betting_open'
+						? 'Betting OPEN — inject tickets now'
+						: gameState === 'drawing'
+							? 'Drawing in progress — bets scheduled for next round'
+							: gameState === 'settled'
+								? 'Settled — results announced'
+								: 'Unknown'}
+				</div>
 
-			{testMsg && <p className='text-sm text-muted-foreground'>{testMsg}</p>}
+				{testMsg && <p className='text-sm text-muted-foreground'>{testMsg}</p>}
 
-			<CollapsibleCard title='Stats' defaultOpen={true}>
-				<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
-			</CollapsibleCard>
+				<CollapsibleCard title='Stats' defaultOpen={true}>
+					<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />
+				</CollapsibleCard>
+			</SnapSection>
 
-			<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
-				<GameView bets={bets} picks={manualPicks} />
-			</CollapsibleCard>
+			<SnapSection fill>
+				<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
+					<GameView bets={bets} picks={manualPicks} />
+				</CollapsibleCard>
+			</SnapSection>
 
-			<MlPredictorCard siteId={siteId} />
+			<SnapSection fill>
+				<MlPredictorCard siteId={siteId} />
+			</SnapSection>
 
-			<TwoDigitTicketsCard siteId={siteId} onMessage={setTestMsg} onRefresh={refresh} />
+			<SnapSection fill>
+				<TwoDigitTicketsCard siteId={siteId} onMessage={setTestMsg} onRefresh={refresh} />
+			</SnapSection>
 
-			<CollapsibleCard title='Last draws' defaultOpen={false}>
-				<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />
-			</CollapsibleCard>
+			<SnapSection>
+				<CollapsibleCard title='Last draws' defaultOpen={false}>
+					<LastDrawsBoards siteId="fungames_tolobirr" siteName="fungames_tolobirr" />
+				</CollapsibleCard>
+			</SnapSection>
 
-			<CollapsibleCard title='Signals' defaultOpen={false}>
-				<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
-			</CollapsibleCard>
+			<SnapSection>
+				<CollapsibleCard title='Signals' defaultOpen={false}>
+					<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
+				</CollapsibleCard>
+			</SnapSection>
 
-			<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} defaultOpen={false} />
+			<SnapSection>
+				<ConfigCard cfg={cfg ?? null} onSaved={setTestMsg} onRefresh={refresh} siteId={siteId} defaultOpen={false} />
+			</SnapSection>
 
-			<ManualBetCard
-				running={conn?.running ?? false}
-				recurrence={rec ?? null}
-				accounts={accounts}
-				onMessage={setTestMsg}
-				onRefresh={refresh}
-				onPicksChange={setManualPicks}
-			/>
+			<SnapSection fill>
+				<ManualBetCard
+					running={conn?.running ?? false}
+					recurrence={rec ?? null}
+					accounts={accounts}
+					onMessage={setTestMsg}
+					onRefresh={refresh}
+					onPicksChange={setManualPicks}
+				/>
+			</SnapSection>
 
-			<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} />
+			<SnapSection fill>
+				<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} />
+			</SnapSection>
 
 			{showConfig && (
 				<Modal title='Autoplay configuration' onClose={() => setShowConfig(false)} wide>
@@ -223,6 +242,6 @@ function TolobirrAutoplay() {
 					<TicketConfig siteId={siteId} />
 				</Modal>
 			)}
-		</div>
+		</SnapScroll>
 	);
 }

@@ -36,6 +36,7 @@ import { LastDrawsBoards } from './LastDrawsBoards';
 import { MlPredictorCard } from './MlPredictorCard';
 import { RainConfigCard } from './RainConfigCard';
 import { TwoDigitTicketsCard } from './TwoDigitTicketsCard';
+import { SnapScroll, SnapSection } from '@/components/snap-scroll';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -275,7 +276,8 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const ledgerBets = freeBets ?? [];
 
   return (
-    <div className="space-y-5">
+    <SnapScroll>
+      <SnapSection fill>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)</h2>
         <div className="flex flex-wrap gap-2">
@@ -346,19 +348,27 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         </div>
         {status?.lastError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{status.lastError}</p>}
       </CollapsibleCard>
+      </SnapSection>
 
+      <SnapSection>
       <CollapsibleCard title="Last draws" defaultOpen={false}>
         <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
       </CollapsibleCard>
+      </SnapSection>
 
+      <SnapSection fill>
       <MlPredictorCard siteId="fungames_shamo" />
+      </SnapSection>
 
+      <SnapSection fill>
       <TwoDigitTicketsCard
         siteId="fungames_shamo"
         onMessage={setMsg}
         onRefresh={() => void refreshAccountsAndBets()}
       />
+      </SnapSection>
 
+      <SnapSection fill>
       <RainManualBetCard
         running={status?.running ?? false}
         config={cfg}
@@ -367,10 +377,15 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         onRefresh={() => void refreshAccountsAndBets()}
       />
 
+      </SnapSection>
+
+      <SnapSection fill>
       <CollapsibleCard title="Live view — current draw & recent bets" defaultOpen={true}>
         <RainBetView freeBets={freeBets ?? undefined} cashBets={cashBets} config={cfg} autoRefresh={true} />
       </CollapsibleCard>
+      </SnapSection>
 
+      <SnapSection>
       <CollapsibleCard title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen={false}>
         {playHistory === null ? (
           <Loading rows={2} />
@@ -420,7 +435,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
           </div>
         )}
       </CollapsibleCard>
+      </SnapSection>
 
+      <SnapSection>
       <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={false}>
         {accounts.length === 0 ? (
           <Empty label="No rain accounts yet — add them on the Rain Accounts page." />
@@ -475,8 +492,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
           </div>
         )}
       </CollapsibleCard>
+      </SnapSection>
 
+      <SnapSection>
       <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} defaultOpen={false} />
+      </SnapSection>
 
       {showConfig && (
         <Modal title="Rain autoplay configuration" onClose={() => setShowConfig(false)} wide>
@@ -601,6 +621,6 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
           )}
         </Modal>
       )}
-    </div>
+    </SnapScroll>
   );
 }
