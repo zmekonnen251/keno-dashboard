@@ -37,12 +37,31 @@ import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus, BotTicket, Ra
 import { useSocket } from '@/lib/service-gateway';
 import { NumberGrid } from './NumberGrid';
 
-// Pre-configured one-click tickets (mirrors the mobile RainAutoplayConfig defaults).
-const PRESET_TICKETS: { label: string; numbers: number[] }[] = [
+// Pre-configured one-click tickets. Seeded with the classic defaults and then
+// fully configurable per-browser: add board picks or custom numbers, remove any
+// chip. Persisted to localStorage under RainManualBetCard's key.
+const DEFAULT_PRESETS: { label: string; numbers: number[] }[] = [
   { label: '1,2,3', numbers: [1, 2, 3] },
   { label: '72,73,74', numbers: [72, 73, 74] },
   { label: '77,78,79', numbers: [77, 78, 79] },
 ];
+const PRESETS_KEY = 'rainManualOneClickPresets';
+const presetKey = (p: { numbers: number[] }) => p.numbers.join(',');
+function loadPresets(): { label: string; numbers: number[] }[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        const clean = arr.filter((p) => Array.isArray(p?.numbers) && p.numbers.length > 0);
+        if (clean.length > 0) return clean;
+      }
+    }
+  } catch {
+    /* corrupted/blocked storage → fall back to defaults */
+  }
+  return DEFAULT_PRESETS.map((p) => ({ ...p, numbers: [...p.numbers] }));
+}
 
 // Cash quick-stake buttons (ETB). All manual-bet stake defaults are 5 ETB;
 // the minimum stays 2 ETB.
@@ -146,6 +165,12 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   const [editStake, setEditStake] = useState('');
   // HTML5 drag-and-drop reorder — stored as ticket id so state stays in sync.
   const [dragId, setDragId] = useState<string | null>(null);
+  // One-Click Pre-Configured Tickets: browser-local, configurable preset list.
+  const [presets, setPresets] = useState<{ label: string; numbers: number[] }[]>(() =>
+    DEFAULT_PRESETS.map((p) => ({ ...p, numbers: [...p.numbers] })),
+  );
+  const [presetsLoaded, setPresetsLoaded] = useState(false);
+  const [presetNumbers, setPresetNumbers] = useState('');
 
   const savedTickets = queue.filter((t: BotTicket) => t.enabled);
   const cashTickets = savedTickets.filter((t) => !t.useFreeBet);
@@ -165,6 +190,22 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   useSocket('/rain/autoplay/status', (data: any) => {
     if (data?.status) setStatus(data.status);
   });
+
+  // Load the browser's custom pre-configured list once on mount (defaults on
+  // first run), then persist every change back to localStorage.
+  useEffect(() => {
+    setPresets(loadPresets());
+    setPresetsLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!presetsLoaded) return;
+    try {
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+    } catch {
+      /* ignore storage errors (private mode / quota) */
+    }
+  }, [presets, presetsLoaded]);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -274,6 +315,37 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   /** One-click preset ticket: place the fixed numbers immediately on the selected account. */
   const handlePlayPreset = (numbers: number[]) => {
     void placeOneClick(numbers, stake, `pre-configured [${numbers.join(',')}]`);
+  };
+
+  /** Add a preset chip (deduped by its number list). */
+  const addPreset = (numbersIn: number[]) => {
+    const numbers = Array.from(new Set(numbersIn.map(Number)))
+      .filter((n) => Number.isFinite(n) && Number.isInteger(n) && n >= 1 && n <= 80)
+      .slice(0, 10);
+    if (numbers.length === 0) return;
+    const key = numbers.join(',');
+    if (presets.some((p) => presetKey(p) === key)) {
+      onMessage(`Preset [${key}] is already in One-Click Pre-Configured Tickets.`);
+      return;
+    }
+    setPresets((prev) => [...prev, { label: key, numbers }]);
+    onMessage(`Preset [${key}] added to One-Click Pre-Configured Tickets.`);
+  };
+
+  const addPresetFromInput = () => {
+    addPreset(parseNumbers(presetNumbers));
+    setPresetNumbers('');
+  };
+
+  const removePreset = (p: { label: string; numbers: number[] }) => {
+    const key = presetKey(p);
+    setPresets((prev) => prev.filter((x) => presetKey(x) !== key));
+    onMessage(`Preset [${key}] removed from One-Click Pre-Configured Tickets.`);
+  };
+
+  const resetPresets = () => {
+    setPresets(DEFAULT_PRESETS.map((x) => ({ ...x, numbers: [...x.numbers] })));
+    onMessage('One-Click Pre-Configured Tickets reset to defaults.');
   };
 
   /** Free-bet manual play: Auto-Mode picks the best eligible free bet (highest
@@ -484,7 +556,8 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     void persistQueue(next);
   };
 
-  /** Render one ticket row with drag handle, context menu + inline stake editor. */
+  /** Render one ticket row: click to PLAY the ticket, right-click for the menu,
+   *  drag (grip) to reorder. Compact card that wraps in a flex row. */
   const ticketRow = (t: BotTicket, idx: number, group: BotTicket[], kind: 'cash' | 'free') => {
     const isFree = kind === 'free';
     const editing = editingId === t.id;
@@ -507,12 +580,23 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
           e.preventDefault();
           setCtxMenu({ id: t.id, x: e.clientX, y: e.clientY });
         }}
-        className={`group/ticket flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${
-          dragId === t.id ? 'border-indigo-400 bg-indigo-500/10' : 'border-border bg-muted/40 hover:bg-muted'
+        onClick={() => {
+          if (!editing) void handlePlaySavedTicket(t);
+        }}
+        className={`group/ticket flex min-w-56 max-w-full flex-1 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+          dragId === t.id
+            ? 'border-indigo-400 bg-indigo-500/10'
+            : 'border-border bg-muted/40 hover:border-emerald-400/60 hover:bg-emerald-500/10'
         }`}
-        title={isFree ? 'Free-bet ticket — right-click for actions; drag to reorder' : 'Cash ticket — right-click for actions; drag to reorder'}
+        title={
+          isFree
+            ? 'Click to play this free-bet ticket · right-click for menu · drag to reorder'
+            : 'Click to play this cash ticket · right-click for menu · drag to reorder'
+        }
       >
-        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" />
+        <span onClick={(e) => e.stopPropagation()} className="flex shrink-0 items-center">
+          <GripVertical className="h-3.5 w-3.5 cursor-grab text-muted-foreground" />
+        </span>
         <span className="min-w-0 flex-1 truncate font-mono">
           {t.numbers?.length
             ? `#${idx + 1} [${t.numbers.join(',')}]`
@@ -521,8 +605,15 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             {t.stake ?? DEFAULT_STAKE} {isFree ? 'Birr 🎁' : 'ETB 💰'}
           </span>
         </span>
+        {/* Click-to-play affordance */}
+        <span
+          className="flex shrink-0 cursor-pointer items-center rounded border border-emerald-500/40 bg-emerald-500/15 p-0.5 text-emerald-300 transition-colors group-hover/ticket:bg-emerald-500/30"
+          title="Click to place this bet now"
+        >
+          <Play className="h-3 w-3" />
+        </span>
         {editing ? (
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <Input
               type="number"
               min={2}
@@ -548,7 +639,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             </Button>
           </span>
         ) : (
-          <span className="flex items-center gap-0.5">
+          <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
             <Button size="xs" variant="ghost" className="h-6 w-6 px-0" onClick={() => moveTicket(group, idx, idx - 1)} disabled={idx === 0} title="Move up">
               <ArrowUp className="h-3 w-3" />
             </Button>
@@ -603,7 +694,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             </Button>
           </span>
         </summary>
-        <div className="space-y-1.5 px-3 pb-3 pt-1">
+        <div className="flex flex-wrap gap-1.5 px-3 pb-3 pt-1">
           {group.length === 0 ? (
             <p className="text-[11px] italic text-muted-foreground">
               No {kind === 'cash' ? 'cash' : 'free-bet'} tickets yet — add one below.
@@ -861,7 +952,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-indigo-400" />
                   <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">One-Click Saved Tickets</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground">right-click = menu · drag = reorder</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">click = play · right-click = menu · drag = reorder</span>
                 </div>
                 {ticketGroup('cash')}
                 {ticketGroup('free')}
@@ -958,22 +1049,80 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
                   One-Click Pre-Configured Tickets
                 </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_TICKETS.map((p) => (
+                <span className="ml-auto flex items-center gap-1">
                   <Button
-                    key={p.label}
-                    onClick={() => void handlePlayPreset(p.numbers)}
-                    disabled={betting}
-                    size="sm"
-                    className="bg-emerald-600/30 hover:bg-emerald-500/50 text-emerald-100 border border-emerald-500/30 text-[11px] font-mono cursor-pointer"
-                    title={`Play ${p.numbers.join(', ')} · ${stake} ETB`}
+                    size="xs"
+                    variant="ghost"
+                    className="h-6 px-1.5 text-[10px] text-emerald-300/70 hover:text-emerald-200"
+                    onClick={resetPresets}
+                    title="Restore the default chips"
                   >
-                    {p.label}
-                    <span className="ml-1 text-[9px] opacity-70">{stake} ETB</span>
+                    Reset
                   </Button>
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {presets.map((p) => (
+                  <span
+                    key={presetKey(p)}
+                    className="flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-600/30 pr-1"
+                  >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="px-2 py-1 text-[11px] font-mono text-emerald-100 cursor-pointer hover:bg-emerald-500/30"
+                      onClick={() => void handlePlayPreset(p.numbers)}
+                      disabled={betting}
+                      title={`Play [${p.numbers.join(', ')}] · ${stake} ETB — click to place now`}
+                    >
+                      {p.label}
+                      <span className="ml-1 text-[9px] opacity-70">{stake} ETB</span>
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => removePreset(p)}
+                      className="rounded-sm px-1 text-[11px] font-bold text-emerald-200/60 hover:bg-red-500/30 hover:text-white"
+                      title={`Remove ${p.label} from presets`}
+                    >
+                      ✕
+                    </button>
+                  </span>
                 ))}
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Input
+                  value={presetNumbers}
+                  onChange={(e) => setPresetNumbers(e.target.value)}
+                  placeholder="1,2,3"
+                  className="h-7 w-28 font-mono text-xs"
+                  aria-label="Preset numbers"
+                />
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="h-7"
+                  onClick={addPresetFromInput}
+                  disabled={parseNumbers(presetNumbers).length === 0}
+                  title="Add these numbers as a pre-configured ticket"
+                >
+                  <Plus className="h-3 w-3 mr-0.5" /> Add
+                </Button>
+                {picks.length > 0 && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="h-7"
+                    onClick={() => addPreset(picks)}
+                    title="Save the numbers currently on the board as a pre-configured ticket"
+                  >
+                    + Board picks ({picks.length})
+                  </Button>
+                )}
+              </div>
+              <p className="mt-1.5 text-[10px] text-emerald-200/50">
+                Click a chip to place it instantly at the current stake · ✕ removes a chip · your list is
+                saved in this browser (defaults on first run).
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">

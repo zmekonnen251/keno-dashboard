@@ -153,13 +153,18 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
 
   const newest = useMemo(() => bets.reduce((m, b) => Math.max(m, b.placedAt ?? 0), 0), [bets]);
 
-  // Round bucket keyed to the websocket draw state: bets stay "current" while
-  // the live draw is running (any phase — drawing / settled / between games)
-  // and are only dropped once the stream shows a brand-new draw beginning
-  // (drawn reset from a completed 20 back to 0). This stops live tickets from
-  // disappearing mid-draw just because a wall-clock window elapsed.
-  const roundResetRef = useRef<number>(Date.now());
+  // Round bucket keyed to the websocket draw state. IMPORTANT: on this gateway
+  // the board keeps showing the PREVIOUS round's 20 balls throughout the
+  // betting (WAITING) window, so the (20 -> 0) transition marks the START of a
+  // fresh draw — not the start of betting. Resetting the bucket at 20 -> 0
+  // therefore wiped the current round's tickets exactly when the draw began.
+  // Instead we record each draw-start boundary time and keep tickets visible
+  // (through their draw, settlement, and the next betting window) until the
+  // draw AFTER theirs begins: tickets are cut off at the SECOND-TO-LAST
+  // boundary, falling back to the seed cutoff until two boundaries are seen.
+  const cutoffRef = useRef<number>(Date.now());
   const seededRef = useRef(false);
+  const boundaryTimesRef = useRef<number[]>([]);
   const prevDrawnLenRef = useRef<number>(0);
   const [drawEpoch, setDrawEpoch] = useState(0);
 
@@ -168,25 +173,28 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   useEffect(() => {
     if (!seededRef.current && newest > 0) {
       seededRef.current = true;
-      roundResetRef.current = newest - ROUND_WINDOW_MS;
+      cutoffRef.current = newest - ROUND_WINDOW_MS;
     }
   }, [newest]);
 
-  // A fresh draw frame arriving after a completed draw (20 -> 0) means the next
-  // game has started: close the previous round's bucket.
+  // Each 20 -> 0 on the stream = a new draw is starting.
   useEffect(() => {
     const prev = prevDrawnLenRef.current;
     prevDrawnLenRef.current = drawn.length;
     if (prev >= 20 && drawn.length === 0) {
-      roundResetRef.current = Date.now();
+      const t = Date.now();
+      boundaryTimesRef.current = [...boundaryTimesRef.current.slice(-1), t];
       setDrawEpoch((e) => e + 1);
     }
   }, [drawn]);
 
-  const current = useMemo(
-    () => bets.filter((b) => (b.placedAt ?? 0) >= roundResetRef.current),
-    [bets, drawn, drawEpoch],
-  );
+  const current = useMemo(() => {
+    const cutoff =
+      boundaryTimesRef.current.length < 2
+        ? cutoffRef.current
+        : boundaryTimesRef.current[0];
+    return bets.filter((b) => (b.placedAt ?? 0) >= cutoff);
+  }, [bets, drawn, drawEpoch]);
 
   // Celebrate ONLY gateway-settled wins. Pending ("Sent") tickets are frames
   // written to a socket — the game server may never have accepted them — so

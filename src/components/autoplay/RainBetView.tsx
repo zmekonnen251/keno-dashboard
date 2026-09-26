@@ -295,11 +295,18 @@ export function RainBetView({
     setSoundPref(next);
   }
 
-  // Round bucket keyed to the live-draw stream: tickets stay visible while the
-  // same draw is running (betting / drawing / settled / between games) and are
-  // only dropped once the stream shows a brand-new draw start (resets 20 -> 0).
-  const roundResetRef = useRef<number>(Date.now());
+  // Round bucket keyed to the live-draw stream. IMPORTANT: on this gateway the
+  // board keeps showing the PREVIOUS round's 20 balls throughout the betting
+  // (WAITING) window, so the (20 -> 0) transition marks the START of a fresh
+  // draw — not the start of betting. Resetting the bucket at 20 -> 0 therefore
+  // wiped the current round's tickets exactly when the draw began. Instead we
+  // record each draw-start boundary time and keep tickets visible (through
+  // their draw, settlement, and the next betting window) until the draw AFTER
+  // theirs begins: tickets are cut off at the SECOND-TO-LAST boundary, falling
+  // back to the seed cutoff until two boundaries have been observed.
+  const cutoffRef = useRef<number>(Date.now());
   const seededRef = useRef(false);
+  const boundaryTimesRef = useRef<number[]>([]);
   const prevDrawnLenRef = useRef<number>(0);
   const [drawEpoch, setDrawEpoch] = useState(0);
 
@@ -315,27 +322,31 @@ export function RainBetView({
   useEffect(() => {
     if (!seededRef.current && newestBet > 0) {
       seededRef.current = true;
-      roundResetRef.current = newestBet - (BETTING_WINDOW_MS + DRAWING_DURATION_MS);
+      cutoffRef.current = newestBet - (BETTING_WINDOW_MS + DRAWING_DURATION_MS);
     }
   }, [newestBet]);
 
+  // Each 20 -> 0 on the stream = a new draw is starting.
   useEffect(() => {
     const prev = prevDrawnLenRef.current;
     prevDrawnLenRef.current = drawn.length;
     if (prev >= 20 && drawn.length === 0) {
-      roundResetRef.current = Date.now();
+      const t = Date.now();
+      boundaryTimesRef.current = [...boundaryTimesRef.current.slice(-1), t];
       setDrawEpoch((e) => e + 1);
     }
   }, [drawn]);
 
-  const currentRoundBets = useMemo(
-    () =>
-      unifiedBets.filter((b) => {
-        const ts = typeof b.betPlacedAt === 'number' ? b.betPlacedAt : b.betPlacedAt ? new Date(b.betPlacedAt).getTime() : 0;
-        return ts >= roundResetRef.current;
-      }),
-    [unifiedBets, drawEpoch],
-  );
+  const currentRoundBets = useMemo(() => {
+    const cutoff =
+      boundaryTimesRef.current.length < 2
+        ? cutoffRef.current
+        : boundaryTimesRef.current[0];
+    return unifiedBets.filter((b) => {
+      const ts = typeof b.betPlacedAt === 'number' ? b.betPlacedAt : b.betPlacedAt ? new Date(b.betPlacedAt).getTime() : 0;
+      return ts >= cutoff;
+    });
+  }, [unifiedBets, drawn, drawEpoch]);
 
   const activeBets = currentRoundBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
   const settledBets = currentRoundBets.filter(b => b.status === 'won' || b.status === 'lost');
