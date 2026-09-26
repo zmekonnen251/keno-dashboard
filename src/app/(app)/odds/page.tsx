@@ -14,6 +14,9 @@ import {
   setShamoBetConfig,
   cancelShamoBetOrder,
   requeueShamoBetOrder,
+  placeShamoBetOrder,
+  getShamoBetSession,
+  clearShamoBetSession,
   createShamoBetOrder,
   pushTest,
   type OddsLiveResponse,
@@ -39,6 +42,7 @@ import type {
   ShamoBetConfig,
   ShamoBetOrder,
   ShamoBetRecord,
+  ShamoBetSessionInfo,
   ShamoBetStatus,
 } from '@/lib/types';
 
@@ -301,6 +305,37 @@ export default function OddsPage() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Human labels for persistent sides (melbet TYPE_INFO + calibrated shamo sides).
+const SIDE_HUMAN: Record<string, string> = {
+  '1': '1 (Home)',
+  X: 'X (Draw)',
+  '2': '2 (Away)',
+  '1X': '1X (Home/Draw)',
+  12: '12 (Home/Away)',
+  X2: 'X2 (Draw/Away)',
+  O: 'Over',
+  U: 'Under',
+  H: 'Home (handicap)',
+  A: 'Away (handicap)',
+};
+
+/** Readable outcome for a drop: prefer the semantic side, else stored label/outcome. */
+export function dropOutcomeDisplay(d: OddsDrop): { text: string; sideKnown: boolean } {
+  if (d.side) return { text: SIDE_HUMAN[d.side] ?? d.side, sideKnown: true };
+  if (d.outcomeLabel) return { text: d.outcomeLabel, sideKnown: false };
+  return { text: d.outcome, sideKnown: false };
+}
+
+/** Readable market name for a drop's market key (melbet keys are already semantic). */
+export function dropMarketDisplay(d: OddsDrop): string {
+  const k = d.marketKey;
+  if (k.startsWith('1X2')) return '1X2';
+  if (k.startsWith('DC')) return 'Double chance';
+  if (k.startsWith('OU')) return `Total${k.includes('@') ? ` ${k.split('@')[1]}` : ''}`;
+  if (k.startsWith('HCP')) return 'Handicap';
+  return k;
+}
+
 function DropsTab({
   drops,
   loading,
@@ -325,6 +360,8 @@ function DropsTab({
           {drops.map((d, i) => {
             const flash = d.id != null && flashIds.has(d.id);
             const dropPct = Math.abs(d.pctChange);
+            const outcome = dropOutcomeDisplay(d);
+            const market = dropMarketDisplay(d);
             return (
               <div
                 key={d.id ?? `${d.externalId}-${i}`}
@@ -348,20 +385,27 @@ function DropsTab({
                         STEAM
                       </Badge>
                     )}
-                    <Badge variant="outline" className="font-mono">
-                      {d.marketLabel ?? d.marketKey}
+                    <Badge variant="outline" className="font-mono" title={`market ${d.marketKey}`}>
+                      {market}
                     </Badge>
                     {d.url && (
                       <Button asChild variant="outline" size="xs">
                         <a href={d.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink /> Shamo
+                          <ExternalLink /> {d.source === 'melbet' ? 'Melbet' : 'Shamo'}
                         </a>
                       </Button>
                     )}
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                  <span className="font-medium text-foreground">{d.outcomeLabel ?? d.outcome}</span>
+                  <span className="font-medium text-foreground">
+                    {outcome.text}
+                    {!outcome.sideKnown && (
+                      <span className="ml-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        side unknown
+                      </span>
+                    )}
+                  </span>
                   <span className="font-mono text-muted-foreground">
                     {d.prevOdd.toFixed(2)}
                   </span>
@@ -579,6 +623,7 @@ function BetsTab() {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
+  const [session, setSession] = useState<ShamoBetSessionInfo | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -588,6 +633,27 @@ function BetsTab() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Server-side placement session: token is write-only via the mobile app's
+  // shamo.bet WebView; the dashboard only reports whether it's set + who.
+  useEffect(() => {
+    void (async () => {
+      try {
+        setSession(await getShamoBetSession());
+      } catch {
+        setSession(null);
+      }
+    })();
+  }, []);
+
+  async function onClearSession() {
+    try {
+      setSession(await clearShamoBetSession());
+      setMsg('Stored shamo session cleared');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Clear session failed');
+    }
+  }
 
   const status = statusApi.data;
   const cfg = status?.config ?? null;
@@ -629,6 +695,24 @@ function BetsTab() {
       await Promise.all([ordersApi.refresh(), statusApi.refresh()]);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Requeue failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Place server-side (no extension): live feed refresh → drift check → bet.place → report. */
+  async function onPlace(id: number) {
+    setBusyId(id);
+    try {
+      const r = await placeShamoBetOrder(id);
+      setMsg(
+        r.ok
+          ? `Placed → ticket ${r.ticketId ?? '?'}${r.order?.actualOdd != null ? ` @ ${r.order.actualOdd.toFixed(2)}` : ''}`
+          : (r.message ?? 'Place failed'),
+      );
+      await Promise.all([ordersApi.refresh(), statusApi.refresh(), betsApi.refresh()]);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Place failed');
     } finally {
       setBusyId(null);
     }
@@ -745,6 +829,24 @@ function BetsTab() {
                 here or via SHAMO_BET_BOT_TOKEN in the server .env.
               </p>
             )}
+            <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+              <Badge variant={session?.set ? 'default' : 'outline'}>
+                Server placement session: {session?.set ? 'registered' : 'not set'}
+              </Badge>
+              <span className="text-[11px] text-muted-foreground">
+                {session?.set
+                  ? `tg user: ${session.tgUserId || '—'}${session.updatedAt ? ` · updated ${formatTime(session.updatedAt)}` : ''}`
+                  : 'Log in on shamo.bet in the mobile app to register a session for server-side placement.'}
+              </span>
+              {session?.set && (
+                <Button variant="outline" size="sm" onClick={onClearSession}>
+                  Clear stored session
+                </Button>
+              )}
+              <Badge variant={status?.botTokenSet ? 'default' : 'outline'}>
+                Extension session: {status?.botTokenSet ? 'token set' : 'no bot token'}
+              </Badge>
+            </div>
             <p className="mt-3 text-[11px] text-muted-foreground">
               The engine only queues orders that pass the edge/cooldown/daily-cap rules. Money is
               never auto-spent unless mode is auto AND the extension is running with a logged-in
@@ -829,9 +931,20 @@ function BetsTab() {
                       </Badge>
                     )}
                     {(o.status === 'pending' || o.status === 'claimed') && (
-                      <Button size="xs" variant="outline" disabled={busyId === o.id} onClick={() => onCancel(o.id)}>
-                        <Ban /> Cancel
-                      </Button>
+                      <>
+                        <Button
+                          size="xs"
+                          variant="default"
+                          disabled={busyId === o.id}
+                          onClick={() => onPlace(o.id)}
+                          title="Place server-side with the stored shamo session (no extension)"
+                        >
+                          <Play /> Place now
+                        </Button>
+                        <Button size="xs" variant="outline" disabled={busyId === o.id} onClick={() => onCancel(o.id)}>
+                          <Ban /> Cancel
+                        </Button>
+                      </>
                     )}
                     {['expired', 'cancelled', 'rejected', 'failed'].includes(o.status) && (
                       <Button size="xs" variant="outline" disabled={busyId === o.id} onClick={() => onRequeue(o.id)}>

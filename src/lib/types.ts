@@ -1247,6 +1247,8 @@ export interface OddsDrop {
 	marketLabel?: string | null;
 	outcome: string;
 	outcomeLabel?: string | null;
+	/** Semantic side when known (1/X/2/1X/12/X2, or O/U/H/A). Mirrors server OddsDrop. */
+	side?: string | null;
 	prevOdd: number;
 	newOdd: number;
 	pctChange: number;
@@ -1428,4 +1430,20 @@ export interface ShamoBetStatus {
 	placedToday: number;
 	stakeUsedToday: number;
 	botTokenSet: boolean;
+}
+
+/** Server-side shamo session (mobile/dashboard placement, token never returned). */
+export interface ShamoBetSessionInfo {
+	set: boolean;
+	tgUserId: string;
+	updatedAt: string | null;
+}
+
+/** Result shape of the server-side placement endpoint. */
+export interface ShamoPlaceResponse {
+	ok: boolean;
+	order: ShamoBetOrder | null;
+	state: BetOrderStatus | 'placed' | 'rejected' | 'failed' | null;
+	ticketId: string | null;
+	message: string | null;
 }

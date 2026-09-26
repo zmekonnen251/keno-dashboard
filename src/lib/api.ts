@@ -66,7 +66,9 @@ import type {
   ShamoBetConfig,
   ShamoBetOrder,
   ShamoBetRecord,
+  ShamoBetSessionInfo,
   ShamoBetStatus,
+  ShamoPlaceResponse,
 } from './types';
 
 // ---- auth ----
@@ -769,6 +771,29 @@ export async function cancelShamoBetOrder(id: number): Promise<ShamoBetOrder> {
 
 export async function requeueShamoBetOrder(id: number): Promise<ShamoBetOrder> {
   return apiFetch<ShamoBetOrder>(`api/odds/bet/orders/${id}/requeue`, { method: 'POST' });
+}
+
+/** Place an order server-side with the registered shamo session (no extension). */
+export async function placeShamoBetOrder(id: number): Promise<ShamoPlaceResponse> {
+  return apiFetch<ShamoPlaceResponse>(`api/odds/bet/orders/${id}/place`, { method: 'POST' });
+}
+
+/** Whether a shamo session is registered for server-side placement (token never returned). */
+export async function getShamoBetSession(): Promise<ShamoBetSessionInfo> {
+  return apiFetch<ShamoBetSessionInfo>('api/odds/bet/session');
+}
+
+/** Register the shamo `mulasport_session` token from a logged-in WebView/extension. */
+export async function setShamoBetSession(token: string, tgUserId?: string): Promise<ShamoBetSessionInfo> {
+  return apiFetch<ShamoBetSessionInfo>('api/odds/bet/session', {
+    method: 'POST',
+    body: JSON.stringify({ token, ...(tgUserId ? { tgUserId } : {}) }),
+  });
+}
+
+/** Forget the stored shamo session. */
+export async function clearShamoBetSession(): Promise<ShamoBetSessionInfo> {
+  return apiFetch<ShamoBetSessionInfo>('api/odds/bet/session', { method: 'DELETE' });
 }
 
 export async function getShamoBets(limit = 50): Promise<ShamoBetRecord[]> {
