@@ -31,6 +31,33 @@ function suggestionChips(
 	return out;
 }
 
+// The two ML ticket groups: "Most Repetitive 2–5 Digit" (most repeated
+// numbers) and "Recurrence" (numbers that keep showing in recent draws).
+// Each chip is a ready one-click ticket with a stake default of 5 ETB.
+function mlTicketGroups(rec: RecurrenceSignal | null | undefined, spots: number): { key: string; label: string; chips: { id: string; numbers: number[]; stake: number; hint: string }[] }[] {
+	if (!rec) return [];
+	const groups: { key: string; label: string; chips: { id: string; numbers: number[]; stake: number; hint: string }[] }[] = [];
+	const repetitive = rec.suggestions.length >= 2 ? slicePool(rec.suggestions, Math.min(spots, 5)) : [];
+	const top3 = rec.suggestions.length >= 3 ? slicePool(rec.suggestions, 3) : [];
+	const recurrence = rec.recurrenceNumbers.length >= 2 ? slicePool(rec.recurrenceNumbers, Math.min(spots, 5)) : [];
+	if (repetitive.length >= 2)
+		groups.push({
+			key: 'ml-repetitive',
+			label: 'Most Repetitive 2–5 Digit',
+			chips: [
+				{ id: `mlrep-${Date.now()}`, numbers: repetitive, stake: 5, hint: 'top repeated numbers' },
+				...(top3.length >= 2 ? [{ id: `mlrep2-${Date.now()}`, numbers: top3, stake: 5, hint: 'top 3' }] : []),
+			],
+		});
+	if (recurrence.length >= 2)
+		groups.push({
+			key: 'ml-recurrence',
+			label: 'Recurrence',
+			chips: [{ id: `mlrec-${Date.now()}`, numbers: recurrence, stake: 5, hint: 'recurring numbers' }],
+		});
+	return groups;
+}
+
 export function ManualBetCard({
 	recurrence,
 	accounts,
@@ -47,7 +74,8 @@ export function ManualBetCard({
 }) {
 	const [spotsCount, setSpotsCount] = useState<number>(3);
 	const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
-	const [manualStake, setManualStake] = useState('2');
+	const [manualStake, setManualStake] = useState('5');
+	const [stakeMode, setStakeMode] = useState<'custom' | 'quick'>('custom');
 	const [accountMode, setAccountMode] = useState<'auto' | 'manual'>('auto');
 	const [selectedAccountId, setSelectedAccountId] = useState('');
 	const [eligible, setEligible] = useState<EligibleAccount[]>([]);
@@ -55,7 +83,7 @@ export function ManualBetCard({
 
 	const [strategy, setStrategy] = useState<TicketStrategy>('cluster');
 	const [difficulty, setDifficulty] = useState<TicketDifficulty>('medium');
-	const [ticketStake, setTicketStake] = useState('2');
+	const [ticketStake, setTicketStake] = useState('5');
 	const [staticTicket, setStaticTicket] = useState(true);
 	const [savedTickets, setSavedTickets] = useState<BotTicket[]>([]);
 	const [genCount, setGenCount] = useState(0);
@@ -153,6 +181,7 @@ export function ManualBetCard({
 	}
 
 	const chips = suggestionChips(recurrence ?? null, spotsCount);
+	const mlGroups = mlTicketGroups(recurrence ?? null, spotsCount);
 	const markers: Partial<Record<number, BoardMarker>> = {};
 	for (const c of chips) {
 		for (const n of c.numbers) {
@@ -177,12 +206,16 @@ export function ManualBetCard({
 		return String(Math.min(Math.max(n, 2), stakeMax));
 	}
 
+	function x2Stake() {
+		setManualStake(clampStakeInput(String(stakeNum * 2)));
+	}
+
 	return (
 		<CollapsibleCard title='Manual play — pick a ticket, set stake, place bet' defaultOpen={false}>
 			<div className='space-y-4'>
 				<p className='text-sm text-muted-foreground'>
 					Click a suggested ticket (repetitive / recurring / chain / trend) or tap the number grid like the real keno
-					board. Stake defaults to 2 ETB — with a bigger stake the server picks a wallet that can cover it.
+					board. Stake defaults to 5 ETB (min 2) — with a bigger stake the server picks a wallet that can cover it.
 				</p>
 
 				<div>
@@ -199,6 +232,41 @@ export function ManualBetCard({
 						</div>
 					)}
 				</div>
+
+				{mlGroups.length > 0 && (
+					<div className='space-y-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3'>
+						<div className='text-xs font-medium uppercase tracking-wide text-purple-300'>ML tickets — one-click groups</div>
+						{mlGroups.map((g) => (
+							<div key={g.key}>
+								<div className='flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-purple-300'>
+									{g.label}
+									<span className='rounded-full bg-purple-500/20 px-1.5 py-0.5 text-[9px] text-purple-200'>{g.chips.length}</span>
+								</div>
+								<div className='mt-1.5 flex flex-wrap gap-2'>
+									{g.chips.map((c) => (
+										<Button
+											key={c.id}
+											size='sm'
+											variant='outline'
+											className='border-purple-500/30 bg-purple-600/20 font-mono text-[11px] text-purple-100 hover:bg-purple-500/40'
+											title={`Apply [${c.numbers.join(',')}] to the board · ${c.stake} ETB — right-click for options`}
+											onClick={() => applySuggested(c.numbers)}
+											onContextMenu={(e) => {
+												e.preventDefault();
+												setSelectedSpots(c.numbers.slice(0, spotsCount).sort((a, b) => a - b));
+												setTicketStake(String(c.stake));
+												onMessage(`Applied ML ticket [${c.numbers.join(',')}] · ${c.stake} ETB — setting the ticket stake to 5 ETB.`);
+											}}
+										>
+											[{c.numbers.join(',')}] <span className='ml-1 text-[9px] opacity-70'>{c.hint} · {c.stake} ETB</span>
+										</Button>
+									))}
+								</div>
+							</div>
+						))}
+						<p className='text-[10px] text-purple-200/50'>Click a chip to load it onto the board — right-click applies it and sets the ticket stake to 5 ETB.</p>
+					</div>
+				)}
 
 				<div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
 					<div>
@@ -224,7 +292,50 @@ export function ManualBetCard({
 							</div>
 							<div className='space-y-1.5'>
 								<Label>Stake (ETB)</Label>
-								<Input type='number' min='2' max={stakeMax} value={manualStake} onChange={(e) => setManualStake(clampStakeInput(e.target.value))} placeholder='2' />
+								<div className='flex items-center gap-1'>
+									<button
+										type='button'
+										onClick={() => setStakeMode('custom')}
+										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+									>
+										Custom
+									</button>
+									<button
+										type='button'
+										onClick={() => setStakeMode('quick')}
+										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'quick' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+									>
+										Quick
+									</button>
+									<Button size='xs' variant='outline' className='ml-auto h-6 px-1.5 text-[10px]' onClick={x2Stake} title='Double the current stake'>
+										×2
+									</Button>
+								</div>
+								{stakeMode === 'custom' ? (
+									<Input type='number' min='2' max={stakeMax} value={manualStake} onChange={(e) => setManualStake(clampStakeInput(e.target.value))} placeholder='5' />
+								) : (
+									<details className='rounded-lg border border-border bg-white/3'>
+										<summary className='cursor-pointer select-none px-2 py-1.5 text-[11px] font-bold text-slate-300'>
+											Quick stakes: 2 / 5 / 8 / 10 / 20 ETB
+										</summary>
+										<div className='flex flex-wrap gap-1.5 px-2 pb-2 pt-1'>
+											{[2, 5, 8, 10, 20].map((n) => (
+												<Button
+													key={n}
+													size='xs'
+													variant={stakeNum === n ? 'default' : 'outline'}
+													className='h-7 min-w-11 px-2 font-mono'
+													onClick={() => setManualStake(clampStakeInput(String(n)))}
+												>
+													{n}
+												</Button>
+											))}
+											<Button size='xs' variant='outline' className='h-7 px-2 font-mono' onClick={x2Stake}>
+												×2
+											</Button>
+										</div>
+									</details>
+								)}
 								<p className='text-[10px] text-muted-foreground'>Min 2 · Max {stakeMax} ETB (richest wallet)</p>
 							</div>
 						</div>
