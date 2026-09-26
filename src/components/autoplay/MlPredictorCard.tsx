@@ -13,8 +13,8 @@ function NumberChip({ n, tone }: { n: number; tone: 'blue' | 'amber' | 'slate' }
     tone === 'amber'
       ? 'bg-amber-400 text-black ring-2 ring-amber-300'
       : tone === 'blue'
-        ? 'bg-blue-500/30 text-blue-200 ring-1 ring-blue-400/30'
-        : 'bg-white/10 text-slate-300';
+        ? 'bg-blue-500/30 text-blue-700 ring-1 ring-blue-400/30 dark:text-blue-200'
+        : 'bg-muted text-slate-600 dark:bg-white/10 dark:text-slate-300';
   return (
     <span className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-extrabold ${cls}`}>
       {n}
@@ -107,7 +107,7 @@ export function MlPredictorCard({ siteId }: { siteId: string }) {
     <CollapsibleCard title='ML prediction & recurrence — predictor output & ticket recurrence averages' defaultOpen={true}>
       <div className='space-y-3'>
         {/* Prediction */}
-        <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
+        <div className='rounded-lg border border-border bg-black/5 p-3 dark:border-white/10 dark:bg-white/5'>
           <div className='flex flex-wrap items-center gap-1'>
             {pred.numbers.map((n) => (
               <NumberChip key={n} n={n} tone={pred.ticket.includes(n) ? 'amber' : 'blue'} />
@@ -139,7 +139,7 @@ export function MlPredictorCard({ siteId }: { siteId: string }) {
                 <NumberChip n={r.number} tone='slate' />
                 <div className='min-w-0'>
                   <div className='flex items-center gap-2'>
-                    <div className='h-2 flex-1 overflow-hidden rounded-full bg-white/10'>
+                    <div className='h-2 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10'>
                       <div
                         className='h-full rounded-full bg-blue-400/70 transition-all duration-500'
                         style={{ width: `${Math.max(4, (r.probability / maxProb) * 100)}%` }}
@@ -177,7 +177,7 @@ export function MlPredictorCard({ siteId }: { siteId: string }) {
             {recNums.length > 0 ? (
               <div className='grid grid-cols-1 gap-1.5 sm:grid-cols-2'>
                 {recNums.map((r) => (
-                  <div key={r.num} className='rounded border border-white/5 bg-white/3 px-2 py-1.5 text-xs'>
+                  <div key={r.num} className='rounded border border-border bg-black/5 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5'>
                     <div className='flex items-center justify-between gap-2'>
                       <span className='flex items-center gap-1.5'>
                         <NumberChip n={r.num} tone='slate' />
@@ -218,7 +218,7 @@ export function MlPredictorCard({ siteId }: { siteId: string }) {
                 <div className='space-y-1'>
                   {runs.slice(0, 8).map((r, i) => (
                     <div key={i} className='flex items-center gap-2 text-xs'>
-                      <span className='shrink-0 font-mono text-blue-300'>[{r.run.join(',')}]</span>
+                      <span className='shrink-0 font-mono text-blue-600 dark:text-blue-300'>[{r.run.join(',')}]</span>
                       <span className='text-muted-foreground'>
                         {r.type} · lift ×{r.lift} · every ~{r.avg_gap_min} min
                       </span>

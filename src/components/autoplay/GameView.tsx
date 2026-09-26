@@ -125,13 +125,13 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   const getPhaseInfo = (phase: GameState['phase']) => {
     switch (phase) {
       case 'betting_open':
-        return { color: 'text-emerald-400', label: 'BETTING OPEN', bgColor: 'bg-emerald-500/20' };
+        return { color: 'text-emerald-600 dark:text-emerald-400', label: 'BETTING OPEN', bgColor: 'bg-emerald-500/20' };
       case 'drawing':
-        return { color: 'text-amber-400', label: 'DRAWING', bgColor: 'bg-amber-500/20' };
+        return { color: 'text-amber-600 dark:text-amber-400', label: 'DRAWING', bgColor: 'bg-amber-500/20' };
       case 'settled':
-        return { color: 'text-blue-400', label: 'SETTLED', bgColor: 'bg-blue-500/20' };
+        return { color: 'text-blue-600 dark:text-blue-400', label: 'SETTLED', bgColor: 'bg-blue-500/20' };
       default:
-        return { color: 'text-slate-400', label: 'UNKNOWN', bgColor: 'bg-slate-500/20' };
+        return { color: 'text-slate-500 dark:text-slate-400', label: 'UNKNOWN', bgColor: 'bg-slate-500/20' };
     }
   };
 
@@ -278,11 +278,11 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   const done = drawn.length >= 20;
 
   return (
-    <div className='overflow-hidden rounded-xl border border-white/10 bg-[#0b0f19] text-slate-100'>
+    <div className='overflow-hidden rounded-xl border border-border bg-card text-card-foreground dark:border-white/10 dark:bg-[#0b0f19] dark:text-slate-100'>
       <style>{BOARD_CSS}</style>
 
       {/* Enhanced Header with Game State and Timer */}
-      <div className='flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5'>
+      <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 dark:border-white/10'>
         <div className='flex items-center gap-3'>
           {/* Game Status Indicator */}
           <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${phaseInfo.bgColor}`}>
@@ -295,21 +295,21 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           {/* Timer */}
           {gameState.timer > 0 && (
             <div className='flex items-center gap-2'>
-              <div className='rounded bg-white/5 px-3 py-1.5 font-mono text-sm font-bold text-white'>
+              <div className='rounded bg-black/5 px-3 py-1.5 font-mono text-sm font-bold text-foreground dark:bg-white/5 dark:text-white'>
                 {formatTimer(gameState.timer)}
               </div>
               {gameState.roundNumber && (
-                <span className='text-xs text-slate-400'>Round #{gameState.roundNumber}</span>
+                <span className='text-xs text-slate-500 dark:text-slate-400'>Round #{gameState.roundNumber}</span>
               )}
             </div>
           )}
 
           {/* Draw Progress */}
           <div className='flex items-center gap-2'>
-            <span className={`rounded bg-white/5 px-2 py-0.5 font-mono text-[10px] font-bold ${done ? 'text-slate-300' : 'text-amber-300'}`}>
+            <span className={`rounded bg-black/5 px-2 py-0.5 font-mono text-[10px] font-bold dark:bg-white/5 ${done ? 'text-slate-600 dark:text-slate-300' : 'text-amber-600 dark:text-amber-300'}`}>
               {done ? `${drawn.length}/20` : `${drawn.length}/20`}
             </span>
-            <span className={`text-xs font-medium ${status === 'live' ? 'text-emerald-400' : 'text-slate-400'}`}>
+            <span className={`text-xs font-medium ${status === 'live' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
               {status === 'live' ? '● LIVE' : '● OFFLINE'}
             </span>
           </div>
@@ -318,7 +318,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
         <div className='flex items-center gap-2 text-xs'>
           <button
             onClick={onToggleSound}
-            className={`rounded-md border px-2 py-1 font-bold ${soundOn ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'}`}
+            className={`rounded-md border px-2 py-1 font-bold ${soundOn ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-border bg-black/5 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400'}`}
             title='Toggle win sound'
           >
             {soundOn ? '🔔 Sound on' : '🔕 Sound off'}
@@ -326,7 +326,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           {notifyOn ? (
             <button
               onClick={onToggleNotifications}
-              className='rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 font-bold text-emerald-300'
+              className='rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 font-bold text-emerald-700 dark:text-emerald-300'
               title={pushOn ? 'Push active — click to turn notifications off' : 'Notifications on — click to turn off'}
             >
               ✓ {pushOn ? 'Push on' : 'Notifications on'}
@@ -334,7 +334,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           ) : (
             <button
               onClick={onToggleNotifications}
-              className='rounded-md border border-white/10 bg-white/5 px-2 py-1 font-bold text-slate-300'
+              className='rounded-md border border-border bg-black/5 px-2 py-1 font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
               title='Enable Chrome push notifications for full matches'
             >
               Enable notifications
@@ -345,20 +345,20 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
 
       {/* Win alerts */}
       {alerts.length > 0 && (
-        <div className='space-y-1.5 border-b border-white/10 px-4 py-2'>
+        <div className='space-y-1.5 border-b border-border px-4 py-2 dark:border-white/10'>
           {alerts.map((a) => (
-            <div key={a.id} className='flex items-center justify-between gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-200'>
+            <div key={a.id} className='flex items-center justify-between gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-200'>
               <span className='min-w-0'>
                 🎉 {a.text}{' '}
                 {a.phone && (
-                  <span className='inline-flex items-center gap-0.5 font-mono font-normal text-emerald-300'>
+                  <span className='inline-flex items-center gap-0.5 font-mono font-normal text-emerald-700/80 dark:text-emerald-300'>
                     +{a.phone}
                     <CopyPhoneButton phone={a.phone} />
                   </span>
                 )}{' '}
-                <span className='font-mono font-normal text-emerald-300/70'>{new Date(a.at).toLocaleTimeString()}</span>
+                <span className='font-mono font-normal text-emerald-700/60 dark:text-emerald-300/70'>{new Date(a.at).toLocaleTimeString()}</span>
               </span>
-              <button onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))} className='shrink-0 text-emerald-300/60 hover:text-emerald-200'>
+              <button onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))} className='shrink-0 text-emerald-700/60 hover:text-emerald-900 dark:text-emerald-300/60 dark:hover:text-emerald-200'>
                 ✕
               </button>
             </div>
@@ -367,12 +367,12 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
       )}
 
       {/* Drawn balls with enhanced visual feedback */}
-      <div className='flex flex-wrap items-center gap-1.5 border-b border-white/10 px-4 py-2.5'>
+      <div className='flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5 dark:border-white/10'>
         {drawn.length === 0 ? (
           <div className='flex items-center gap-2'>
             <span className='text-xs italic text-slate-500'>Waiting for the draw…</span>
             {gameState.phase === 'betting_open' && (
-              <span className='text-xs text-emerald-400 animate-pulse'>Betting open</span>
+              <span className='text-xs text-emerald-600 animate-pulse dark:text-emerald-400'>Betting open</span>
             )}
           </div>
         ) : (
@@ -400,7 +400,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           drawn digits on top stay visible without scrolling past a full-width board */}
       <div className='grid grid-cols-1 gap-3 p-3 lg:grid-cols-2'>
         <div className='min-w-0'>
-          <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
+          <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'>
             My Tickets {current.length > 0 ? `(${current.length})` : ''}
           </div>
           {current.length === 0 ? (
@@ -422,7 +422,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                         ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
                         : isFailed
                           ? 'border-red-500/70 bg-red-500/5'
-                          : 'border-white/5 bg-white/3'
+                          : 'border-border bg-black/5 dark:border-white/10 dark:bg-white/5'
                     }`}
                   >
                     <div className='flex items-start justify-between gap-2'>
@@ -430,7 +430,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                         {(p.spots || []).map((n) => (
                           <span
                             key={n}
-                            className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold transition-all ${drawn.includes(n) ? 'bg-emerald-500 text-white scale-110' : 'bg-black/40 text-slate-300'}`}
+                            className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold transition-all ${drawn.includes(n) ? 'bg-emerald-500 text-white scale-110' : 'bg-muted text-slate-600 dark:bg-black/40 dark:text-slate-300'}`}
                           >
                             {n}
                           </span>
@@ -438,18 +438,18 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                       </div>
                       {/* Cash/free identifier: $ = cash ticket, top-right corner */}
                       <span
-                        className='shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 p-0.5 text-emerald-300'
+                        className='shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 p-0.5 text-emerald-700 dark:text-emerald-300'
                         title='Cash ticket'
                       >
                         <DollarSign className='h-3 w-3' />
                       </span>
                     </div>
                     <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
-                      <span className='truncate text-slate-400'>
+                      <span className='truncate text-slate-500 dark:text-slate-400'>
                         #{p.accountId} · {p.stake} ETB
                       </span>
                       <span
-                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${isFailed ? 'bg-red-500/15 text-red-400' : 'bg-white/5'}`}
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${isFailed ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-black/5 dark:bg-white/5'}`}
                         style={isFailed ? undefined : { color: st.tone }}
                       >
                         {isWinner ? 'WINNER' : st.text}

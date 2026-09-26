@@ -109,7 +109,7 @@ export function LastDrawsBoards({
               const s = drawStats(d);
               return (
                 <div key={d.roundId ?? i} className="space-y-1.5">
-                  <div className="draws-mini rounded-lg border border-white/10 bg-[#0b0f19] p-1.5">
+                  <div className="draws-mini rounded-lg border border-border bg-card p-1.5 dark:border-white/10 dark:bg-[#0b0f19]">
                     <div className="keno-board">
                       {Array.from({ length: 80 }, (_, k) => k + 1).map((n) => {
                         const isDrawn = nums.includes(n);

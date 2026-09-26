@@ -6,6 +6,7 @@ import { type RainAccount, type RainProvider } from '@/lib/types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { formatTime } from '@/lib/format';
+import { Power, PowerOff } from 'lucide-react';
 
 // Column definitions for the rain-claiming accounts list — mirrors the keno
 // Accounts page: accessor columns are sortable, display columns (status /
@@ -38,6 +39,7 @@ export interface RainAccountsMeta {
   onReconnect: (acc: RainAccount) => void;
   onEdit: (acc: RainAccount) => void;
   onDelete: (acc: RainAccount) => void;
+  onToggleAutoplay: (acc: RainAccount) => void;
   busyId: number | null;
 }
 
@@ -101,8 +103,25 @@ export const rainAccountColumns = columnHelper.columns([
       </span>
     ),
   }),
+  columnHelper.accessor('has_password', {
+    header: 'Shamo pw',
+    cell: ({ row }) =>
+      row.original.has_password ? (
+        <Badge className="bg-emerald-600 text-white">stored</Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      ),
+  }),
   columnHelper.accessor('rain_count', {
     header: 'Claims',
+  }),
+  columnHelper.accessor('autoplay_enabled', {
+    header: 'Autoplay',
+    cell: ({ row }) => (
+      <Badge variant={row.original.autoplay_enabled ? 'default' : 'secondary'}>
+        {row.original.autoplay_enabled ? 'Enabled' : 'Disabled'}
+      </Badge>
+    ),
   }),
   columnHelper.accessor('last_claimed_at', {
     header: 'Last claimed',
@@ -128,6 +147,16 @@ export const rainAccountColumns = columnHelper.columns([
       const busy = meta.busyId === row.original.id;
       return (
         <div className="flex justify-end gap-2">
+          <Button
+            variant={row.original.autoplay_enabled ? 'outline' : 'default'}
+            size="sm"
+            title={row.original.autoplay_enabled
+              ? 'Disable autoplay — free bets + wallet not used by the engine'
+              : 'Enable autoplay — free bets + wallet usable by the engine'}
+            onClick={() => meta.onToggleAutoplay(row.original)}
+          >
+            {row.original.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable</> : <><Power className="size-3.5" /> Enable</>}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => meta.onShowClaims(row.original)}>
             Claims
           </Button>
@@ -187,8 +216,35 @@ export function RainAccountMobileCard({
             {account.claimedThisSession > 0 ? ` · ${account.claimedThisSession} claims` : ''}
           </dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground">Autoplay</dt>
+          <dd>
+            {account.autoplay_enabled ? (
+              <span className="text-emerald-600 dark:text-emerald-400">enabled</span>
+            ) : (
+              <span className="text-muted-foreground">disabled</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Shamo pw</dt>
+          <dd>
+            {account.has_password ? (
+              <span className="text-emerald-600 dark:text-emerald-400">stored</span>
+            ) : (
+              <span className="text-muted-foreground">not set</span>
+            )}
+          </dd>
+        </div>
       </dl>
       <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          variant={account.autoplay_enabled ? 'outline' : 'default'}
+          size="sm"
+          onClick={() => meta.onToggleAutoplay(account)}
+        >
+          {account.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable autoplay</> : <><Power className="size-3.5" /> Enable autoplay</>}
+        </Button>
         <Button variant="outline" size="sm" onClick={() => meta.onShowClaims(account)}>Claims</Button>
         <Button variant="outline" size="sm" disabled={busy} onClick={() => meta.onReconnect(account)}>
           {busy ? '…' : 'Check status'}

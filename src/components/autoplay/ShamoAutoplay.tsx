@@ -8,6 +8,7 @@ import {
   getRainAccounts,
   refreshRainAccount,
   checkAllRainStatus,
+  setRainAccountAutoplayEnabled,
   getRainFreeBets,
   getRainCashBets,
   playRainFreeBet,
@@ -25,6 +26,7 @@ import type {
 } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge, Empty, Loading, StatCard, TableCell, TableRow } from '@/components/app';
+import { Power, PowerOff } from 'lucide-react';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { NumberGrid } from './NumberGrid';
@@ -225,6 +227,24 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
     }
   }
 
+  // Autoplay opt-out per rain account: disabled accounts keep claiming but
+  // their free bets + wallet are skipped by the engine (free-bet + cash mode).
+  async function onToggleAutoplay(acc: RainAccount) {
+    setBusyId(acc.id);
+    setMsg('');
+    try {
+      await setRainAccountAutoplayEnabled(acc.id, !acc.autoplay_enabled);
+      setMsg(acc.autoplay_enabled
+        ? `Autoplay disabled for "${acc.name}" — free bets + wallet no longer used by the engine.`
+        : `Autoplay enabled for "${acc.name}" — free bets + wallet usable by the engine.`);
+      void refreshAccountsAndBets();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function onPlayFreeBet(bet: RainFreeBet) {
     const existing = (bet.chosen_spots ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= 80);
     const count = existing.length >= 2 ? Math.min(existing.length, 10) : 3;
@@ -277,35 +297,38 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
   return (
     <SnapScroll>
-      <SnapSection fill>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-foreground">Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)</h2>
-        <div className="flex flex-wrap gap-2">
-          {status?.running ? (
-            <Button variant="destructive" onClick={() => void onStop()}>Stop</Button>
-          ) : (
-            <Button onClick={() => void onStart()}>Start</Button>
-          )}
-          <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
-            {bettingPrediction ? '…' : 'Bet prediction'}
-          </Button>
-          <Button variant="outline" disabled={testingRound} onClick={() => void onTestRound()}>
-            {testingRound ? '…' : 'Test round'}
-          </Button>
-          <Button variant="outline" disabled={checkingAll} onClick={() => void onCheckAll()}>
-            {checkingAll ? '…' : 'Check all rains'}
-          </Button>
-          <Button variant="outline" onClick={onShowFreeBets}>
-            Free bets{availableFb > 0 ? ` (${availableFb})` : ''}
-          </Button>
-          <Button variant="outline" onClick={() => void refreshAccountsAndBets()}>Refresh</Button>
-          <Button variant="outline" onClick={() => setShowConfig(true)}>Configure</Button>
-          <Button variant="outline" onClick={() => void onToggleNotifications()}>
-            {pushOn ? '✓ Push on' : notifyOn ? '✓ Notifications on' : 'Enable notifications'}
-          </Button>
+      {/* Sticky control bar — always reachable while the deck scrolls */}
+      <div className="sticky top-0 z-30 mb-4 rounded-xl border border-border bg-background/90 p-3 shadow-md backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-foreground">Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)</h2>
+          <div className="flex flex-wrap gap-2">
+            {status?.running ? (
+              <Button variant="destructive" onClick={() => void onStop()}>Stop</Button>
+            ) : (
+              <Button onClick={() => void onStart()}>Start</Button>
+            )}
+            <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
+              {bettingPrediction ? '…' : 'Bet prediction'}
+            </Button>
+            <Button variant="outline" disabled={testingRound} onClick={() => void onTestRound()}>
+              {testingRound ? '…' : 'Test round'}
+            </Button>
+            <Button variant="outline" disabled={checkingAll} onClick={() => void onCheckAll()}>
+              {checkingAll ? '…' : 'Check all rains'}
+            </Button>
+            <Button variant="outline" onClick={onShowFreeBets}>
+              Free bets{availableFb > 0 ? ` (${availableFb})` : ''}
+            </Button>
+            <Button variant="outline" onClick={() => void refreshAccountsAndBets()}>Refresh</Button>
+            <Button variant="outline" onClick={() => setShowConfig(true)}>Configure</Button>
+            <Button variant="outline" onClick={() => void onToggleNotifications()}>
+              {pushOn ? '✓ Push on' : notifyOn ? '✓ Notifications on' : 'Enable notifications'}
+            </Button>
+          </div>
         </div>
       </div>
 
+      <SnapSection fill>
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
 
       <CollapsibleCard title="Stats" defaultOpen={true}>
@@ -448,6 +471,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Autoplay</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Claims</TableHead>
                   <TableHead>Last claimed</TableHead>
@@ -470,6 +494,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                         {acc.balanceLive && <span className="text-[10px] text-emerald-600 dark:text-emerald-400">live balance</span>}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <Badge variant={acc.autoplay_enabled ? 'default' : 'secondary'}>
+                        {acc.autoplay_enabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       <span className={acc.balanceLive ? 'text-emerald-600 dark:text-emerald-400' : ''}>{acc.balance.toFixed(2)} ETB</span>
                     </TableCell>
@@ -481,9 +510,22 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" disabled={busyId === acc.id} onClick={() => void onRefreshStatus(acc)}>
-                        {busyId === acc.id ? '…' : 'Check status'}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant={acc.autoplay_enabled ? 'outline' : 'default'}
+                          size="sm"
+                          disabled={busyId === acc.id}
+                          title={acc.autoplay_enabled
+                            ? 'Disable autoplay — free bets + wallet not used by the engine'
+                            : 'Enable autoplay — free bets + wallet usable by the engine'}
+                          onClick={() => void onToggleAutoplay(acc)}
+                        >
+                          {busyId === acc.id ? '…' : acc.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable</> : <><Power className="size-3.5" /> Enable</>}
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={busyId === acc.id} onClick={() => void onRefreshStatus(acc)}>
+                          {busyId === acc.id ? '…' : 'Check status'}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

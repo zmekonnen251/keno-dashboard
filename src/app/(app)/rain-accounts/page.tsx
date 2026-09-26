@@ -9,6 +9,7 @@ import {
   refreshRainAccount,
   checkAllRainStatus,
   getRainClaims,
+  setRainAccountAutoplayEnabled,
   setRainAutoplayConfig,
   rainAutoplayStart,
   rainAutoplayStop,
@@ -71,13 +72,14 @@ function AccountForm({
   onCancel,
 }: {
   initial: RainAccount | null;
-  onSave: (input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) => void;
+  onSave: (input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? 'fungames_shamo');
   const [wsToken, setWsToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [password, setPassword] = useState('');
   const [enabled, setEnabled] = useState(initial?.is_enabled ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -94,6 +96,10 @@ function AccountForm({
         provider,
         is_enabled: enabled,
         ...(accessToken.trim() ? { access_token: accessToken.trim() } : {}),
+        // Optional shamo.bet login password. Blank keeps the stored password
+        // (mirrors the access_token field); the PATCH route only clears when
+        // given an explicit '' — that stays possible via the API alone.
+        ...(password ? { password } : {}),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -141,6 +147,17 @@ function AccountForm({
           </p>
         )}
         <Input id="rain-access-token" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder={initial ? '••••••••' : 'optional account access token'} />
+      </div>
+      <div>
+        <Label htmlFor="rain-password">
+          Shamo login password (optional) {initial && <span className="font-normal text-muted-foreground">(blank keeps the current password)</span>}
+        </Label>
+        {initial && (
+          <p className="mb-1 text-xs text-muted-foreground">
+            Current: {initial.has_password ? 'stored' : 'not set'} — used by the mobile “login to shamo website” flow.
+          </p>
+        )}
+        <Input id="rain-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={initial ? '••••••••' : 'optional shamo.bet login password'} />
       </div>
       <div>
         <Label htmlFor="rain-enabled">Enabled</Label>
@@ -400,17 +417,18 @@ export default function RainAccountsPage() {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  async function onAdd(input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) {
+  async function onAdd(input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) {
     await createRainAccount(input);
     setAdding(false);
     refresh();
   }
 
-  async function onEdit(acc: RainAccount, input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string }) {
+  async function onEdit(acc: RainAccount, input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) {
     await updateRainAccount(acc.id, {
       name: input.name,
       ...(input.ws_token ? { ws_token: input.ws_token } : {}),
       ...(input.access_token ? { access_token: input.access_token } : {}),
+      ...(input.password ? { password: input.password } : {}),
       provider: input.provider,
       is_enabled: input.is_enabled,
     });
@@ -421,6 +439,14 @@ export default function RainAccountsPage() {
   async function onDelete(acc: RainAccount) {
     if (!window.confirm(`Delete "${acc.name}"?\nThis also removes its claim history.`)) return;
     await deleteRainAccount(acc.id);
+    refresh();
+  }
+
+  async function onToggleAutoplay(acc: RainAccount) {
+    if (!window.confirm(acc.autoplay_enabled
+      ? `Disable autoplay for "${acc.name}"?\nIt will keep claiming rain, but its free bets and wallet will NOT be used by the autoplay engine (free-bet plays and cash-mode bets).`
+      : `Enable autoplay for "${acc.name}"?\nIts free bets and wallet will be usable by the autoplay engine again.`)) return;
+    await setRainAccountAutoplayEnabled(acc.id, !acc.autoplay_enabled);
     refresh();
   }
 
@@ -605,6 +631,7 @@ export default function RainAccountsPage() {
               onReconnect,
               onEdit: setEditing,
               onDelete,
+              onToggleAutoplay,
               busyId,
             }}
             renderMobileRowCard={(acc) => (
@@ -615,6 +642,7 @@ export default function RainAccountsPage() {
                   onReconnect,
                   onEdit: setEditing,
                   onDelete,
+                  onToggleAutoplay,
                   busyId,
                 }}
               />

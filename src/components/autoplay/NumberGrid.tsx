@@ -23,10 +23,10 @@ export function NumberGrid({
 		<div className='keno-board-panel'>
 			<style>{BOARD_CSS}</style>
 			<div className='mb-2 flex items-center justify-between'>
-				<span className='text-xs font-semibold text-slate-300'>
+				<span className='text-xs font-semibold text-slate-600 dark:text-slate-300'>
 					{selected.length}/{max} selected
 				</span>
-				<Button variant='ghost' size='xs' onClick={onClear} className='text-slate-300'>
+				<Button variant='ghost' size='xs' onClick={onClear} className='text-slate-600 dark:text-slate-300'>
 					Clear
 				</Button>
 			</div>
@@ -48,7 +48,7 @@ export function NumberGrid({
 					);
 				})}
 			</div>
-			<p className='mt-2 text-[11px] text-slate-400'>
+			<p className='mt-2 text-[11px] text-slate-500 dark:text-slate-400'>
 				<span className='mr-3 inline-flex items-center gap-1'>
 					<span className='inline-block h-1.5 w-1.5 rounded-full bg-sky-400' /> suggested pick
 				</span>

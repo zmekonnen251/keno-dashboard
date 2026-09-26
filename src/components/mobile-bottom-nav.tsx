@@ -12,7 +12,7 @@ import {
   Repeat,
   Users,
   CloudRain,
-  PawPrint,
+  // PawPrint,
   TrendingDown,
 } from 'lucide-react';
 import { useSite } from './site-provider';
@@ -35,7 +35,7 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/accounts', label: 'Accounts', icon: Users, excludeSites: ['fungames_shamo'] },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
-  { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint, sites: ['fungames_shamo'] },
+  // { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
 ];
 

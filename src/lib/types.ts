@@ -789,7 +789,14 @@ export interface RainAccount {
 	ws_token_masked: string | null;
 	access_token_masked: string | null;
 	has_access_token: boolean;
+	// Shamo.bet login password stored for this account (never echoed back —
+	// only the has_password flag; raw password is admin-only via
+	// GET /api/rain/accounts/credentials for the mobile login flow).
+	has_password: boolean;
 	is_enabled: boolean;
+	// Per-account autoplay opt-out: false keeps claiming rain (is_enabled) but
+	// excludes this account's free bets + wallet from the autoplay engine.
+	autoplay_enabled: boolean;
 	status: string;
 	connected: boolean;
 	lastError: string | null;

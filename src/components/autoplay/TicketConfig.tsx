@@ -154,7 +154,7 @@ export function TicketConfig({ siteId }: { siteId: string }) {
             className={`flex items-center gap-3 p-3 rounded-lg border ${
               ticket.enabled
                 ? 'border-emerald-500/30 bg-emerald-500/10'
-                : 'border-white/10 bg-white/5 opacity-50'
+                : 'border-border bg-black/5 opacity-50 dark:border-white/10 dark:bg-white/5'
             }`}
           >
             <input

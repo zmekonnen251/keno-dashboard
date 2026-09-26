@@ -28,8 +28,8 @@ function freeBetStatusLabel(b: RainFreeBet): { text: string; cls: string } {
 function betTypeBadge(b: RainFreeBet): { text: string; cls: string } {
   const isFreeBet = b.bet_type !== 'cash';
   return isFreeBet
-    ? { text: '🎁 FREE BET', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/40' }
-    : { text: '💰 CASH', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+    ? { text: '🎁 FREE BET', cls: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40' }
+    : { text: '💰 CASH', cls: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/40' };
 }
 
 export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean }) {
@@ -91,13 +91,13 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
   const getPhaseInfo = (phase: FreeBetGameState['phase']) => {
     switch (phase) {
       case 'betting_open':
-        return { color: 'text-emerald-400', label: 'BETTING OPEN', bgColor: 'bg-emerald-500/20' };
+        return { color: 'text-emerald-600 dark:text-emerald-400', label: 'BETTING OPEN', bgColor: 'bg-emerald-500/20' };
       case 'drawing':
-        return { color: 'text-amber-400', label: 'DRAWING', bgColor: 'bg-amber-500/20' };
+        return { color: 'text-amber-600 dark:text-amber-400', label: 'DRAWING', bgColor: 'bg-amber-500/20' };
       case 'settled':
-        return { color: 'text-blue-400', label: 'SETTLED', bgColor: 'bg-blue-500/20' };
+        return { color: 'text-blue-600 dark:text-blue-400', label: 'SETTLED', bgColor: 'bg-blue-500/20' };
       default:
-        return { color: 'text-slate-400', label: 'UNKNOWN', bgColor: 'bg-slate-500/20' };
+        return { color: 'text-slate-500 dark:text-slate-400', label: 'UNKNOWN', bgColor: 'bg-slate-500/20' };
     }
   };
 
@@ -134,11 +134,11 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
   }, [freeBets]);
 
   return (
-    <div className='overflow-hidden rounded-xl border border-white/10 bg-[#0b0f19] text-slate-100'>
+    <div className='overflow-hidden rounded-xl border border-border bg-card text-card-foreground dark:border-white/10 dark:bg-[#0b0f19] dark:text-slate-100'>
       <style>{BOARD_CSS}</style>
 
       {/* Enhanced Header with Game State and Timer */}
-      <div className='flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5'>
+      <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 dark:border-white/10'>
         <div className='flex items-center gap-3'>
           {/* Game Status Indicator */}
           <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${phaseInfo.bgColor}`}>
@@ -151,24 +151,24 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
           {/* Timer */}
           {gameState.timer > 0 && (
             <div className='flex items-center gap-2'>
-              <div className='rounded bg-white/5 px-3 py-1.5 font-mono text-sm font-bold text-white'>
+              <div className='rounded bg-black/5 px-3 py-1.5 font-mono text-sm font-bold text-foreground dark:bg-white/5 dark:text-white'>
                 {formatTimer(gameState.timer)}
               </div>
               {gameState.roundNumber && (
-                <span className='text-xs text-slate-400'>Round #{gameState.roundNumber}</span>
+                <span className='text-xs text-slate-500 dark:text-slate-400'>Round #{gameState.roundNumber}</span>
               )}
             </div>
           )}
         </div>
 
         <div className='flex items-center gap-2 text-xs'>
-          <span className='text-slate-400'>
+          <span className='text-slate-500 dark:text-slate-400'>
             {bettingBets.length} betting
           </span>
-          <span className='text-slate-400'>
+          <span className='text-slate-500 dark:text-slate-400'>
             •
           </span>
-          <span className='text-slate-400'>
+          <span className='text-slate-500 dark:text-slate-400'>
             {freeBets?.filter(b => b.status === 'available' || b.status === 'failed').length || 0} available
           </span>
         </div>
@@ -176,8 +176,8 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
 
       {/* Betting tickets */}
       {bettingBets.length > 0 && (
-        <div className='border-b border-white/10 px-4 py-3'>
-          <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
+        <div className='border-b border-border px-4 py-3 dark:border-white/10'>
+          <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'>
             Betting tickets ({bettingBets.length})
           </div>
           <div className='flex flex-wrap gap-2'>
@@ -211,7 +211,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
                     })}
                   </div>
                   <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
-                    <span className='truncate text-slate-400'>
+                    <span className='truncate text-slate-500 dark:text-slate-400'>
                       {b.account_name ?? `#${b.account_id}`} · +{b.wager_amount} ETB
                     </span>
                     <div className='flex items-center gap-1.5'>
@@ -226,8 +226,8 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
                         <span
                           key={i}
                           className={`flex h-5 w-5 items-center justify-center rounded font-mono text-[10px] font-bold ${
-                            matched.includes(n) ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40' :
-                            'bg-white/5 text-slate-400 border border-white/10'
+                            matched.includes(n) ? 'bg-emerald-500/30 text-emerald-700 border border-emerald-500/40 dark:text-emerald-300' :
+                            'bg-black/5 text-slate-500 border border-border dark:bg-white/5 dark:text-slate-400 dark:border-white/10'
                           }`}
                         >
                           {n}
@@ -249,7 +249,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
 
       {/* Available free bets */}
       <div className='p-3'>
-        <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
+        <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'>
           Available free bets ({freeBets?.filter(b => b.status === 'available' || b.status === 'failed').length || 0})
         </div>
         {loading && !freeBets ? (
@@ -267,7 +267,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
                 return (
                   <div
                     key={b.id}
-                    className='flex items-center justify-between gap-2 rounded-lg border border-white/5 bg-white/3 px-3 py-2'
+                    className='flex items-center justify-between gap-2 rounded-lg border border-border bg-black/5 px-3 py-2 dark:border-white/10 dark:bg-white/5'
                   >
                     <div className='min-w-0 flex-1'>
                       <div className='flex items-center gap-2'>
@@ -279,7 +279,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
                         </span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
                       </div>
-                      <div className='mt-1 flex items-center gap-3 text-xs text-slate-400'>
+                      <div className='mt-1 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400'>
                         <span>+{b.wager_amount} ETB</span>
                         {b.expires_at && (
                           <span>Expires {formatTime(b.expires_at)}</span>

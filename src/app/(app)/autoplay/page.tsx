@@ -136,7 +136,8 @@ function TolobirrAutoplay() {
 
 	return (
 		<SnapScroll>
-			<SnapSection fill>
+			{/* Sticky control bar — always reachable while the deck scrolls */}
+			<div className='sticky top-0 z-30 mb-4 rounded-xl border border-border bg-background/90 p-3 shadow-md backdrop-blur-sm'>
 				<div className='flex flex-wrap items-center justify-between gap-3'>
 					<h2 className='text-lg font-bold text-foreground'>Autoplay</h2>
 					<div className='flex flex-wrap gap-2'>
@@ -167,9 +168,11 @@ function TolobirrAutoplay() {
 						</Button>
 					</div>
 				</div>
+			</div>
 
-				<div className='alert alert-info mt-3'>
-					<strong>Game State:</strong>{' '}
+			<SnapSection fill>
+				<div className='flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm'>
+					<span className='font-semibold text-foreground'>Game State:</span>{' '}
 					{gameState === 'betting_open'
 						? 'Betting OPEN — inject tickets now'
 						: gameState === 'drawing'
@@ -179,7 +182,7 @@ function TolobirrAutoplay() {
 								: 'Unknown'}
 				</div>
 
-				{testMsg && <p className='text-sm text-muted-foreground'>{testMsg}</p>}
+				{testMsg && <p className='mt-2 text-sm text-muted-foreground'>{testMsg}</p>}
 
 				<CollapsibleCard title='Stats' defaultOpen={true}>
 					<StatOverview conn={conn ?? null} cfg={cfg ?? null} gameState={gameState} signals={signals} />

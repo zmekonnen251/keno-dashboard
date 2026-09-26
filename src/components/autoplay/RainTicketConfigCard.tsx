@@ -194,35 +194,35 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
         <>
           {/* Queue Statistics Bar */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
-              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+            <div className="bg-muted dark:bg-black/30 border border-border dark:border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-wider mb-1">
                 Configured Tickets
               </span>
-              <span className="text-base font-extrabold text-white font-mono">{tickets.length}</span>
+              <span className="text-base font-extrabold text-foreground dark:text-white font-mono">{tickets.length}</span>
             </div>
-            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
-              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+            <div className="bg-muted dark:bg-black/30 border border-border dark:border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-wider mb-1">
                 Active Tickets
               </span>
-              <span className="text-base font-extrabold text-emerald-400 font-mono">{activeCount} Playable</span>
+              <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">{activeCount} Playable</span>
             </div>
-            <div className="bg-black/30 border border-white/5 p-3 rounded-xl text-center">
-              <span className="block text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1">
+            <div className="bg-muted dark:bg-black/30 border border-border dark:border-white/5 p-3 rounded-xl text-center">
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-wider mb-1">
                 Total Round Cost
               </span>
-              <span className="text-base font-extrabold text-blue-300 font-mono">{totalCost} ETB</span>
+              <span className="text-base font-extrabold text-blue-600 dark:text-blue-300 font-mono">{totalCost} ETB</span>
             </div>
           </div>
 
           {/* Form to Add New Ticket */}
-          <div className="bg-white/5 border border-white/10 p-3 rounded-xl mb-4">
-            <span className="block text-[10px] text-slate-300 font-black uppercase tracking-wider mb-3">
+          <div className="bg-black/5 border border-border p-3 rounded-xl mb-4 dark:bg-white/5 dark:border-white/10">
+            <span className="block text-[10px] text-slate-600 dark:text-slate-300 font-black uppercase tracking-wider mb-3">
               Create & Append Ticket
             </span>
 
             {/* Quick presets: one-click add of usual picks */}
             <div className="flex flex-wrap gap-2 mb-3">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider self-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider self-center">
                 ⚡ Your tickets:
               </span>
               {QUICK_PRESETS.map((p) => (
@@ -230,7 +230,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                   key={p.label}
                   onClick={() => handleAddPreset(p.numbers)}
                   size="sm"
-                  className="bg-indigo-600/30 hover:bg-indigo-500/40 text-indigo-200 border border-indigo-500/30 text-[10px] font-mono font-bold rounded-lg cursor-pointer"
+                  className="bg-indigo-600/30 hover:bg-indigo-500/40 text-indigo-700 border border-indigo-500/30 text-[10px] font-mono font-bold rounded-lg cursor-pointer dark:text-indigo-200"
                 >
                   {p.label}
                 </Button>
@@ -239,7 +239,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
 
             {/* Manual numbers entry */}
             <div className="mb-3">
-              <Label className="text-[10px] text-slate-400">
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400">
                 Fixed numbers (comma / space / dash separated) — overrides strategy
               </Label>
               <input
@@ -247,38 +247,38 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                 value={newNumbers}
                 onChange={(e) => setNewNumbers(e.target.value)}
                 placeholder="e.g. 1,2,3 or 72,73,74 or 77,78,79"
-                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full bg-input border border-border rounded-lg p-2 text-xs text-foreground font-mono focus:outline-none focus:border-indigo-500 dark:bg-black/40 dark:border-white/10 dark:text-white"
               />
             </div>
 
             <div className="grid grid-cols-5 gap-2 items-end">
               <div>
-                <Label className="text-[10px] text-slate-400">Spots</Label>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400">Spots</Label>
                 <select
                   value={newSpots}
                   onChange={(e) => setNewSpots(Number(e.target.value))}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full bg-input border border-border rounded-lg p-2 text-xs text-foreground font-mono focus:outline-none focus:border-blue-500 cursor-pointer dark:bg-black/40 dark:border-white/10 dark:text-white"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
-                    <option key={s} value={s} className="bg-slate-900">{s} Spots</option>
+                    <option key={s} value={s} className="bg-background dark:bg-slate-900">{s} Spots</option>
                   ))}
                 </select>
               </div>
               <div>
-                <Label className="text-[10px] text-slate-400">Strategy</Label>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400">Strategy</Label>
                 <select
                   value={newStrategy}
                   onChange={(e) => setNewStrategy(e.target.value as 'cluster' | 'standard' | 'pattern' | 'manual')}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full bg-input border border-border rounded-lg p-2 text-xs text-foreground font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer dark:bg-black/40 dark:border-white/10 dark:text-white"
                 >
-                  <option value="manual" className="bg-slate-900">✋ Manual / Fixed</option>
-                  <option value="cluster" className="bg-slate-900">🧠 ML Cluster</option>
-                  <option value="standard" className="bg-slate-900">📊 Standard</option>
-                  <option value="pattern" className="bg-slate-900">🧬 Pattern Trend</option>
+                  <option value="manual" className="bg-background dark:bg-slate-900">✋ Manual / Fixed</option>
+                  <option value="cluster" className="bg-background dark:bg-slate-900">🧠 ML Cluster</option>
+                  <option value="standard" className="bg-background dark:bg-slate-900">📊 Standard</option>
+                  <option value="pattern" className="bg-background dark:bg-slate-900">🧬 Pattern Trend</option>
                 </select>
               </div>
               <div>
-                <Label className="text-[10px] text-slate-400">Stake (ETB)</Label>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400">Stake (ETB)</Label>
                 <div className="relative">
                   <input
                     type="number"
@@ -286,20 +286,20 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                     max="10000"
                     value={newStake}
                     onChange={(e) => setNewStake(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 pr-6 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full bg-input border border-border rounded-lg p-2 pr-6 text-xs text-foreground font-mono focus:outline-none focus:border-blue-500 dark:bg-black/40 dark:border-white/10 dark:text-white"
                   />
                   <span className="absolute right-2 top-2 text-[9px] text-slate-500 font-mono font-bold">ETB</span>
                 </div>
               </div>
               <div>
-                <Label className="text-[10px] text-slate-400">Bet Type</Label>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400">Bet Type</Label>
                 <select
                   value={String(newFreeBet)}
                   onChange={(e) => setNewFreeBet(e.target.value === 'true')}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full bg-input border border-border rounded-lg p-2 text-xs text-foreground font-bold uppercase focus:outline-none focus:border-blue-500 cursor-pointer dark:bg-black/40 dark:border-white/10 dark:text-white"
                 >
-                  <option value="true" className="bg-slate-900">🎁 Free Bet</option>
-                  <option value="false" className="bg-slate-900">💰 Cash</option>
+                  <option value="true" className="bg-background dark:bg-slate-900">🎁 Free Bet</option>
+                  <option value="false" className="bg-background dark:bg-slate-900">💰 Cash</option>
                 </select>
               </div>
               <div>
@@ -338,8 +338,8 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
               return (
                 <div
                   key={ticket.id}
-                  className={`bg-black/35 border p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all ${
-                    ticket.enabled ? 'border-white/10 opacity-100' : 'border-white/5 opacity-50'
+                  className={`bg-muted/40 dark:bg-black/35 border p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all ${
+                    ticket.enabled ? 'border-border dark:border-white/10 opacity-100' : 'border-border/60 dark:border-white/5 opacity-50'
                   }`}
                 >
                   {/* Status Toggle & Info */}
@@ -348,20 +348,20 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                       type="checkbox"
                       checked={ticket.enabled}
                       onChange={() => handleToggleTicket(ticket.id)}
-                      className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-black/40 border-white/10 cursor-pointer accent-emerald-500"
+                      className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-muted border-border cursor-pointer accent-emerald-500 dark:bg-black/40 dark:border-white/10"
                     />
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-white font-mono">Ticket #{idx + 1}</span>
+                        <span className="text-xs font-black text-foreground font-mono dark:text-white">Ticket #{idx + 1}</span>
                         <span
                           className={`text-[8px] font-black uppercase px-1 rounded font-mono ${
                             ticket.strategy === 'manual'
-                              ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
+                              ? 'bg-indigo-500/10 text-indigo-700 border border-indigo-500/20 dark:text-indigo-300'
                               : ticket.strategy === 'cluster'
-                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                              ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 dark:text-emerald-300'
                               : ticket.strategy === 'pattern'
-                              ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
-                              : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+                              ? 'bg-purple-500/10 text-purple-700 border border-purple-500/20 dark:text-purple-300'
+                              : 'bg-blue-500/10 text-blue-700 border border-blue-500/20 dark:text-blue-300'
                           }`}
                         >
                           {ticket.strategy === 'manual'
@@ -373,10 +373,10 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                             : 'Heuristic'}
                         </span>
                         {ticket.useFreeBet && (
-                          <span className="text-[8px] font-bold text-amber-400 ml-1 px-1 rounded bg-amber-500/10 border border-amber-500/20">FREE</span>
+                          <span className="text-[8px] font-bold text-amber-600 ml-1 px-1 rounded bg-amber-500/10 border border-amber-500/20 dark:text-amber-400">FREE</span>
                         )}
                         {!ticket.useFreeBet && (
-                          <span className="text-[8px] font-bold text-blue-400 ml-1 px-1 rounded bg-blue-500/10 border border-blue-500/20">CASH</span>
+                          <span className="text-[8px] font-bold text-blue-600 ml-1 px-1 rounded bg-blue-500/10 border border-blue-500/20 dark:text-blue-400">CASH</span>
                         )}
                       </div>
 
@@ -391,10 +391,10 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                               Number(e.target.value),
                             )
                           }
-                          className="bg-transparent border border-white/5 rounded text-[10px] font-mono text-slate-400 focus:outline-none cursor-pointer"
+                          className="bg-transparent border border-border dark:border-white/5 rounded text-[10px] font-mono text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer"
                         >
                           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
-                            <option key={s} value={s} className="bg-slate-900 text-white">
+                            <option key={s} value={s} className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">
                               {s} Spots
                             </option>
                           ))}
@@ -408,12 +408,12 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                               e.target.value,
                             )
                           }
-                          className="bg-transparent border border-white/5 rounded text-[10px] text-slate-400 focus:outline-none cursor-pointer"
+                          className="bg-transparent border border-border dark:border-white/5 rounded text-[10px] text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer"
                         >
-                          <option value="manual" className="bg-slate-900 text-white">✋ Manual</option>
-                          <option value="cluster" className="bg-slate-900 text-white">🧠 ML</option>
-                          <option value="standard" className="bg-slate-900 text-white">📊 Standard</option>
-                          <option value="pattern" className="bg-slate-900 text-white">🧬 Pattern</option>
+                          <option value="manual" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">✋ Manual</option>
+                          <option value="cluster" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">🧠 ML</option>
+                          <option value="standard" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">📊 Standard</option>
+                          <option value="pattern" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">🧬 Pattern</option>
                         </select>
                         <select
                           value={String(ticket.useFreeBet)}
@@ -424,10 +424,10 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                               e.target.value === 'true',
                             )
                           }
-                          className="bg-transparent border border-white/5 rounded text-[10px] text-slate-400 focus:outline-none cursor-pointer"
+                          className="bg-transparent border border-border dark:border-white/5 rounded text-[10px] text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer"
                         >
-                          <option value="true" className="bg-slate-900 text-white">🎁 Free Bet</option>
-                          <option value="false" className="bg-slate-900 text-white">💰 Cash</option>
+                          <option value="true" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">🎁 Free Bet</option>
+                          <option value="false" className="bg-popover text-popover-foreground dark:bg-slate-900 dark:text-white">💰 Cash</option>
                         </select>
                       </div>
                     </div>
@@ -440,7 +440,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                         <span
                           key={`${ticket.id}-${pi}`}
                           title="Fixed number (edit in numbers field below)"
-                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-indigo-500/15 border border-indigo-500/30 text-indigo-200"
+                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-indigo-500/15 border border-indigo-500/30 text-indigo-700 dark:text-indigo-200"
                         >
                           {num}
                         </span>
@@ -449,7 +449,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                       preview.map((num, pi) => (
                         <span
                           key={`${ticket.id}-${pi}`}
-                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-white/5 border border-white/5 text-slate-300"
+                          className="flex h-6 w-6 items-center justify-center rounded font-mono text-[10px] font-extrabold bg-black/5 border border-border text-slate-600 dark:bg-white/5 dark:border-white/5 dark:text-slate-300"
                         >
                           {num}
                         </span>
@@ -484,13 +484,13 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                         }
                       }}
                       placeholder={`Fixed numbers (e.g. 1,2,3)${ticket.numbers ? '' : ' or empty for ML'}`}
-                      className="w-full bg-black/40 border border-indigo-500/20 rounded-lg p-1.5 text-[10px] text-white font-mono focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-muted border border-border rounded-lg p-1.5 text-[10px] text-foreground font-mono focus:outline-none focus:border-indigo-500 dark:bg-black/40 dark:border-indigo-500/20 dark:text-white"
                     />
                   </div>
 
                   {/* Stake and Deletion */}
                   <div className="flex items-center gap-2 justify-end">
-                    <div className="flex items-center bg-black/40 border border-white/10 rounded-lg px-2 py-1 max-w-20">
+                    <div className="flex items-center bg-muted border border-border rounded-lg px-2 py-1 max-w-20 dark:bg-black/40 dark:border-white/10">
                       <input
                         type="number"
                         min="1"
@@ -503,7 +503,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                             Math.max(1, Number(e.target.value)),
                           )
                         }
-                        className="bg-transparent w-full text-right font-mono font-bold text-xs text-white focus:outline-none"
+                        className="bg-transparent w-full text-right font-mono font-bold text-xs text-foreground focus:outline-none dark:text-white"
                       />
                       <span className="text-[8px] text-slate-500 font-bold ml-1">ETB</span>
                     </div>
@@ -512,7 +512,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
                       onClick={() => handleDeleteTicket(ticket.id)}
                       variant="ghost"
                       size="sm"
-                      className="p-2 bg-black/40 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg border border-white/5 hover:border-rose-500/20 transition-all cursor-pointer"
+                      className="p-2 bg-muted hover:bg-rose-500/20 text-slate-500 hover:text-rose-600 rounded-lg border border-border hover:border-rose-500/20 transition-all cursor-pointer dark:bg-black/40 dark:text-slate-400 dark:hover:text-rose-400 dark:border-white/5"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -530,8 +530,8 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
           </div>
 
           {/* Auto-Bet Settings */}
-          <div className="mt-4 p-3 rounded-lg border border-white/10 bg-white/3 space-y-3">
-            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="mt-4 p-3 rounded-lg border border-border bg-black/5 space-y-3 dark:border-white/10 dark:bg-white/5">
+            <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
               Auto-Bet Engine Settings
             </span>
             <div className="grid grid-cols-2 gap-4">

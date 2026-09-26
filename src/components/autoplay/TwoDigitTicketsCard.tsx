@@ -120,7 +120,7 @@ export function TwoDigitTicketsCard({
                   {di > 0 && <span className='text-muted-foreground/50 text-xs'>←</span>}
                   <span className='flex flex-wrap gap-0.5'>
                     {d.results.map((n) => (
-                      <span key={n} className='flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 font-mono text-[10px] font-extrabold text-emerald-300'>
+                      <span key={n} className='flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 font-mono text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300'>
                         {n}
                       </span>
                     ))}
@@ -143,7 +143,7 @@ export function TwoDigitTicketsCard({
               const key = `${t.numbers[0]}-${t.numbers[1]}`;
               const placingThis = placing === key;
               return (
-                <div key={key} className='min-w-44 flex-1 rounded-lg border border-white/10 bg-[#0b0f19] p-2'>
+                <div key={key} className='min-w-44 flex-1 rounded-lg border border-border bg-black/5 p-2 dark:border-white/10 dark:bg-[#0b0f19]'>
                   <div className='flex items-start justify-between gap-2'>
                     <div className='flex gap-1'>
                       {t.numbers.map((n) => (
@@ -152,13 +152,13 @@ export function TwoDigitTicketsCard({
                         </span>
                       ))}
                     </div>
-                    <span className='shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 p-0.5 text-emerald-300' title='Cash ticket'>
+                    <span className='shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 p-0.5 text-emerald-700 dark:text-emerald-300' title='Cash ticket'>
                       $
                     </span>
                   </div>
                   <div className='mt-1.5 flex flex-wrap gap-1'>
                     {t.reasons.slice(0, 3).map((r) => (
-                      <span key={r} className='rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-slate-300'>
+                      <span key={r} className='rounded bg-black/5 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:bg-white/5 dark:text-slate-300'>
                         {r}
                       </span>
                     ))}

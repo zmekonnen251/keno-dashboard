@@ -189,6 +189,17 @@ export async function setAccountEnabled(id: number, enabled: boolean) {
   });
 }
 
+// Enable/disable autoplay participation for one rain account. Disabled
+// accounts keep claiming rain but their free bets + wallet are excluded from
+// the rain autoplay engine (free-bet plays AND cash-mode betting). Mirrors the
+// tolobirr accounts setAccountEnabled toggle.
+export async function setRainAccountAutoplayEnabled(id: number, enabled: boolean) {
+  return apiFetch<{ ok: boolean; id: number; autoplay_enabled: boolean }>(`api/rain/accounts/${id}/autoplay-enabled`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export async function createAccounts(count: number): Promise<CreateAccountsResponse> {
   return apiFetch<CreateAccountsResponse>('api/accounts/create', {
     method: 'POST',
@@ -341,6 +352,7 @@ export async function createRainAccount(input: {
   ws_token: string;
   provider: RainProvider;
   access_token?: string;
+  password?: string;
 }) {
   return apiFetch('api/rain/accounts', {
     method: 'POST',
@@ -356,6 +368,7 @@ export async function updateRainAccount(
     provider: RainProvider;
     is_enabled: boolean;
     access_token: string | null;
+    password: string | null;
   }>,
 ) {
   return apiFetch(`api/rain/accounts/${id}`, {

@@ -607,7 +607,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
         </span>
         {/* Click-to-play affordance */}
         <span
-          className="flex shrink-0 cursor-pointer items-center rounded border border-emerald-500/40 bg-emerald-500/15 p-0.5 text-emerald-300 transition-colors group-hover/ticket:bg-emerald-500/30"
+          className="flex shrink-0 cursor-pointer items-center rounded border border-emerald-500/40 bg-emerald-500/15 p-0.5 text-emerald-700 transition-colors group-hover/ticket:bg-emerald-500/30 dark:text-emerald-300"
           title="Click to place this bet now"
         >
           <Play className="h-3 w-3" />
@@ -670,14 +670,14 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   /** One collapsible ticket group (Cash or Free Bet) with its own sort button. */
   const ticketGroup = (kind: 'cash' | 'free') => {
     const group = kind === 'cash' ? cashTickets : freeTickets;
-    const icon = kind === 'cash' ? <Coins className="h-3.5 w-3.5 text-blue-400" /> : <Gift className="h-3.5 w-3.5 text-amber-400" />;
+    const icon = kind === 'cash' ? <Coins className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <Gift className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />;
     const title = kind === 'cash' ? 'Cash One-Click Tickets' : 'Free Bet One-Click Tickets';
     return (
-      <details className="rounded-lg border border-border bg-white/3" open>
-        <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+      <details className="rounded-lg border border-border bg-black/5 dark:bg-white/5" open>
+        <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
           {icon}
           <span>{title}</span>
-          <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] text-slate-300">{group.length}</span>
+          <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] text-slate-600 dark:bg-white/10 dark:text-slate-300">{group.length}</span>
           <span className="ml-auto flex items-center gap-1">
             <Button
               size="xs"
@@ -738,7 +738,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             <Gift className="h-3.5 w-3.5 mr-1" /> Free Bet
           </Button>
           {betMode === 'free' && (
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-300">
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={freeBetAuto}
@@ -754,7 +754,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
           {/* LEFT — keno board */}
           <div className="rounded-lg border border-border p-3 lg:self-start">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Keno Board — tap up to 10 numbers</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Keno Board — tap up to 10 numbers</span>
               <Button variant="outline" size="sm" onClick={handleClearPicks} disabled={picks.length === 0} className="h-7 px-2 text-xs">
                 <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear ({picks.length})
               </Button>
@@ -800,14 +800,14 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                       <button
                         type="button"
                         onClick={() => setStakeMode('custom')}
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-black/10 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}
                       >
                         Custom
                       </button>
                       <button
                         type="button"
                         onClick={() => setStakeMode('quick')}
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'quick' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'quick' ? 'bg-blue-600 text-white' : 'bg-black/10 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}
                       >
                         Quick
                       </button>
@@ -828,8 +828,8 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                     />
                   ) : (
                     // Quick-stake presets live in a collapsible container.
-                    <details className="rounded-lg border border-border bg-white/3">
-                      <summary className="cursor-pointer select-none px-2 py-1.5 text-[11px] font-bold text-slate-300">
+                    <details className="rounded-lg border border-border bg-black/5 dark:bg-white/5">
+                      <summary className="cursor-pointer select-none px-2 py-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
                         Quick stakes: {CASH_PRESETS.join(' / ')} ETB
                       </summary>
                       <div className="flex flex-wrap gap-1.5 px-2 pb-2 pt-1">
@@ -889,7 +889,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                   ))}
                 </select>
                 {playableFreeBets.length === 0 ? (
-                  <p className="text-[10px] text-amber-500/90">
+                  <p className="text-[10px] text-amber-600 dark:text-amber-500/90">
                     No playable free bets right now — new rain bonuses on enabled accounts unlock automatically.
                   </p>
                 ) : (
@@ -908,8 +908,8 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                 {mlGroups.map((g) => (
                   <div key={g.key} className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
                     <div className="mb-2 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-purple-400" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-purple-300">{g.label}</span>
+                      <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">{g.label}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {g.chips.map((c) => (
@@ -917,7 +917,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                           key={c.id}
                           size="sm"
                           variant="outline"
-                          className="bg-purple-600/20 hover:bg-purple-500/40 text-purple-100 border border-purple-500/30 text-[11px] font-mono cursor-pointer"
+                          className="bg-purple-600/20 hover:bg-purple-500/40 text-purple-800 dark:text-purple-100 border border-purple-500/30 text-[11px] font-mono cursor-pointer"
                           title={`Apply [${c.numbers.join(',')}] to the board (${c.stake} ETB) — right-click for more`}
                           onClick={() => {
                             setPicks(c.numbers.slice(0, 10));
@@ -938,7 +938,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                         </Button>
                       ))}
                     </div>
-                    <p className="mt-1.5 text-[10px] text-purple-200/50">
+                    <p className="mt-1.5 text-[10px] text-purple-800/70 dark:text-purple-200/50">
                       Click to load onto the board · right-click to save as a cash one-click ticket ({DEFAULT_STAKE} ETB)
                     </p>
                   </div>
@@ -951,7 +951,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-indigo-400" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">One-Click Saved Tickets</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">One-Click Saved Tickets</span>
                   <span className="ml-auto text-[10px] text-muted-foreground">click = play · right-click = menu · drag = reorder</span>
                 </div>
                 {ticketGroup('cash')}
@@ -961,8 +961,8 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
               <div className="flex items-center gap-2 mb-2">
-                <Plus className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-300">Add custom one-click ticket</span>
+                <Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Add custom one-click ticket</span>
               </div>
               {/* Ticket type: Cash or Free Bet */}
               <div className="mb-2 flex items-center gap-2 text-xs">
@@ -1028,7 +1028,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                   disabled={betting}
                   variant="outline"
                   size="sm"
-                  className="border-amber-500/40 text-amber-200"
+                  className="border-amber-500/40 text-amber-700 dark:text-amber-200"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" /> Add ticket
                 </Button>
@@ -1045,15 +1045,15 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
               <div className="flex items-center gap-2 mb-2">
-                <Play className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                <Play className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   One-Click Pre-Configured Tickets
                 </span>
                 <span className="ml-auto flex items-center gap-1">
                   <Button
                     size="xs"
                     variant="ghost"
-                    className="h-6 px-1.5 text-[10px] text-emerald-300/70 hover:text-emerald-200"
+                    className="h-6 px-1.5 text-[10px] text-emerald-700/70 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-200"
                     onClick={resetPresets}
                     title="Restore the default chips"
                   >
@@ -1070,7 +1070,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="px-2 py-1 text-[11px] font-mono text-emerald-100 cursor-pointer hover:bg-emerald-500/30"
+                      className="px-2 py-1 text-[11px] font-mono text-emerald-800 cursor-pointer hover:bg-emerald-500/30 hover:text-white dark:text-emerald-100"
                       onClick={() => void handlePlayPreset(p.numbers)}
                       disabled={betting}
                       title={`Play [${p.numbers.join(', ')}] · ${stake} ETB — click to place now`}
@@ -1081,7 +1081,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                     <button
                       type="button"
                       onClick={() => removePreset(p)}
-                      className="rounded-sm px-1 text-[11px] font-bold text-emerald-200/60 hover:bg-red-500/30 hover:text-white"
+                      className="rounded-sm px-1 text-[11px] font-bold text-emerald-700/70 hover:bg-red-500/30 hover:text-rose-800 dark:text-emerald-200/60 dark:hover:text-white"
                       title={`Remove ${p.label} from presets`}
                     >
                       ✕
@@ -1119,7 +1119,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                   </Button>
                 )}
               </div>
-              <p className="mt-1.5 text-[10px] text-emerald-200/50">
+              <p className="mt-1.5 text-[10px] text-emerald-700/60 dark:text-emerald-200/50">
                 Click a chip to place it instantly at the current stake · ✕ removes a chip · your list is
                 saved in this browser (defaults on first run).
               </p>
@@ -1160,9 +1160,9 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
               </Button>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-white/3 p-3">
+            <div className="rounded-lg border border-border bg-black/5 p-3 dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Selected Numbers ({picks.length})
                 </span>
                 {lastPrediction && (
@@ -1180,7 +1180,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                   picks.map((num, idx) => (
                     <span
                       key={`${num}-${idx}`}
-                      className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-mono font-bold text-sm"
+                      className="flex h-8 w-8 items-center justify-center rounded bg-blue-500/20 border border-blue-500/40 text-blue-700 dark:text-blue-300 font-mono font-bold text-sm"
                     >
                       {num}
                     </span>
@@ -1192,13 +1192,13 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
         </div>
 
         {lastPrediction && (
-          <details className="group rounded-lg border border-white/10 bg-white/3 p-3">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-400">
-              <Sparkles className="w-4 h-4 text-purple-400" />
+          <details className="group rounded-lg border border-border bg-black/5 p-3 dark:border-white/10 dark:bg-white/5">
+            <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 dark:text-slate-400">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               <span>Prediction Details</span>
               <span className="ml-auto text-[10px] text-slate-500">Click to expand</span>
             </summary>
-            <div className="mt-3 space-y-2 text-[10px] text-slate-300">
+            <div className="mt-3 space-y-2 text-[10px] text-slate-600 dark:text-slate-300">
               <div><strong>Repetitive Patterns:</strong> {lastPrediction.repetitivePatterns.slice(0, 3).map(p => `[${p.numbers.join(',')}]×${p.frequency}`).join(' · ') || 'None'}</div>
               <div><strong>Top Clusters:</strong> {lastPrediction.clusters.slice(0, 2).map(c => `Cluster ${c.id} (${c.numbers.slice(0, 5).join(',')})`).join(' · ')}</div>
             </div>
@@ -1206,12 +1206,12 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
         )}
 
         {status && (
-          <div className="rounded-lg border border-white/10 bg-white/3 p-3 text-[11px] text-slate-300">
+          <div className="rounded-lg border border-border bg-black/5 p-3 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
             <div className="flex flex-wrap gap-4 text-xs">
-              <span>Free bets played: <strong className="text-emerald-400">{status.freeBetsPlayed}</strong></span>
-              <span>Cash bets played: <strong className="text-blue-400">{status.cashBetsPlayed}</strong></span>
+              <span>Free bets played: <strong className="text-emerald-600 dark:text-emerald-400">{status.freeBetsPlayed}</strong></span>
+              <span>Cash bets played: <strong className="text-blue-600 dark:text-blue-400">{status.cashBetsPlayed}</strong></span>
               <span>Total: <strong>{status.totalPlayed}</strong></span>
-              <span>Pending: <strong className="text-amber-400">{status.pendingAcks}</strong></span>
+              <span>Pending: <strong className="text-amber-600 dark:text-amber-400">{status.pendingAcks}</strong></span>
             </div>
           </div>
         )}

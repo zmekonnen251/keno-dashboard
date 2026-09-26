@@ -296,14 +296,14 @@ export function ManualBetCard({
 									<button
 										type='button'
 										onClick={() => setStakeMode('custom')}
-										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-black/5 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}
 									>
 										Custom
 									</button>
 									<button
 										type='button'
 										onClick={() => setStakeMode('quick')}
-										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'quick' ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300'}`}
+										className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${stakeMode === 'quick' ? 'bg-blue-600 text-white' : 'bg-black/5 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}
 									>
 										Quick
 									</button>
@@ -314,8 +314,8 @@ export function ManualBetCard({
 								{stakeMode === 'custom' ? (
 									<Input type='number' min='2' max={stakeMax} value={manualStake} onChange={(e) => setManualStake(clampStakeInput(e.target.value))} placeholder='5' />
 								) : (
-									<details className='rounded-lg border border-border bg-white/3'>
-										<summary className='cursor-pointer select-none px-2 py-1.5 text-[11px] font-bold text-slate-300'>
+									<details className='rounded-lg border border-border bg-black/5 dark:bg-white/5'>
+										<summary className='cursor-pointer select-none px-2 py-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300'>
 											Quick stakes: 2 / 5 / 8 / 10 / 20 ETB
 										</summary>
 										<div className='flex flex-wrap gap-1.5 px-2 pb-2 pt-1'>
