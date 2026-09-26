@@ -10,6 +10,7 @@ import {
   Waypoints,
   Sparkles,
   Repeat,
+  Users,
   CloudRain,
   PawPrint,
   TrendingDown,
@@ -21,6 +22,9 @@ interface NavItem {
   label: string;
   icon: any;
   sites?: string[];
+  // Hide the item for these sites (mirrors the Expo app's tab filter, e.g.
+  // fungames_shamo has no regular Accounts nav item).
+  excludeSites?: string[];
 }
 
 const MOBILE_NAV: NavItem[] = [
@@ -29,6 +33,7 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/patterns', label: 'Patterns', icon: Waypoints },
   { href: '/predictions', label: 'Predictions', icon: Sparkles },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
+  { href: '/accounts', label: 'Accounts', icon: Users, excludeSites: ['fungames_shamo'] },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
   { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
@@ -39,8 +44,12 @@ export function MobileBottomNav() {
   const { siteId, setSiteId, sites } = useSite();
   const [showSiteSelector, setShowSiteSelector] = useState(false);
 
-  // Filter navigation items based on current site
-  const filteredNav = MOBILE_NAV.filter(item => !item.sites || item.sites.includes(siteId));
+  // Filter navigation items based on current site (exclude rules win).
+  const filteredNav = MOBILE_NAV.filter(
+    item =>
+      (!item.excludeSites || !item.excludeSites.includes(siteId)) &&
+      (!item.sites || item.sites.includes(siteId)),
+  );
 
   return (
     <>

@@ -269,6 +269,31 @@ export interface MlLiveResponse {
 	insights?: MlInsights | null;
 }
 
+// Two-digit (2-spot) dynamic tickets generated from the last 1–3 draws
+// (repeat/carryover) + recurrence patterns. Mirrors the server's
+// twoDigitPredictor.ts output.
+export interface TwoDigitTicket {
+	numbers: [number, number];
+	score: number;
+	reasons: string[];
+	source: 'repeat' | 'pattern';
+}
+
+export interface TwoDigitPoolEntry {
+	number: number;
+	score: number;
+	reasons: string[];
+	source: 'repeat' | 'pattern';
+}
+
+export interface TwoDigitTicketsResponse {
+	siteId: string;
+	generatedAt: string;
+	draws: Array<{ roundId: string; roundNo: number; results: number[]; drawnAt: string }>;
+	pool: TwoDigitPoolEntry[];
+	tickets: TwoDigitTicket[];
+}
+
 export interface PredictionsResponse {
 	siteId: string;
 	prediction: Prediction | null;

@@ -9,6 +9,7 @@ import { isPushActive, pushSupported, subscribePush, unsubscribePush, rePostSubs
 import { getNotifyPref, setNotifyPref, getSoundPref, setSoundPref } from '@/lib/notifyPrefs';
 import { useNotifications } from '@/lib/notifications';
 import { useLiveDraw } from '@/lib/useLiveDraw';
+import { DollarSign, CloudRain } from 'lucide-react';
 import { BOARD_CSS } from './boardStyles';
 
 const BETTING_WINDOW_MS = 70000;
@@ -20,26 +21,14 @@ interface GameState {
   roundNumber?: number;
 }
 
-function freeBetStatusLabel(b: { status: RainFreeBet['status']; winAmount?: number | null }): { text: string; cls: string } {
-  if (b.status === 'won') return { text: 'Won', cls: 'bg-emerald-600 text-white' };
-  if (b.status === 'lost') return { text: 'Lost', cls: 'bg-zinc-600 text-white' };
-  if (b.status === 'failed') return { text: 'Failed', cls: 'bg-rose-600 text-white' };
-  if (b.status === 'bet_placed') return { text: 'Bet placed', cls: 'bg-sky-600 text-white' };
-  if (b.status === 'claiming') return { text: 'Claiming', cls: 'bg-amber-500 text-black' };
-  if (b.status === 'expired') return { text: 'Expired', cls: 'bg-muted text-muted-foreground' };
-  return { text: 'Available', cls: 'bg-emerald-600 text-white' };
-}
-
-function cashStatusLabel(b: RainCashBet): { text: string; tone: string } {
+function statusInfo(b: { status: RainFreeBet['status'] | RainCashBet['status']; winAmount?: number | null }): { text: string; tone: string } {
   if (b.status === 'won') return { text: 'Won', tone: '#4ade80' };
+  if (b.status === 'lost') return { text: 'Lost', tone: '#64748b' };
   if (b.status === 'failed') return { text: 'Failed', tone: '#f87171' };
-  return { text: 'Lost', tone: '#64748b' };
-}
-
-function betTypeBadge(betType: 'free_bet' | 'cash'): { text: string; cls: string } {
-  return betType === 'free_bet'
-    ? { text: '🎁 FREE BET', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/40' }
-    : { text: '💰 CASH', cls: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+  if (b.status === 'bet_placed') return { text: 'Bet placed', tone: '#38bdf8' };
+  if (b.status === 'claiming') return { text: 'Claiming', tone: '#f59e0b' };
+  if (b.status === 'expired') return { text: 'Expired', tone: '#94a3b8' };
+  return { text: 'Available', tone: '#4ade80' };
 }
 
 interface UnifiedBet {
@@ -288,9 +277,48 @@ export function RainBetView({
     setSoundPref(next);
   }
 
-  const currentRound = gameState.roundNumber ?? 0;
-  const currentRoundBets = unifiedBets.filter(b => b.roundNumber === currentRound);
-  
+  // Round bucket keyed to the live-draw stream: tickets stay visible while the
+  // same draw is running (betting / drawing / settled / between games) and are
+  // only dropped once the stream shows a brand-new draw start (resets 20 -> 0).
+  const roundResetRef = useRef<number>(Date.now());
+  const seededRef = useRef(false);
+  const prevDrawnLenRef = useRef<number>(0);
+  const [drawEpoch, setDrawEpoch] = useState(0);
+
+  const newestBet = useMemo(() => {
+    let max = 0;
+    for (const b of unifiedBets) {
+      const ts = typeof b.betPlacedAt === 'number' ? b.betPlacedAt : b.betPlacedAt ? new Date(b.betPlacedAt).getTime() : 0;
+      if (ts > max) max = ts;
+    }
+    return max;
+  }, [unifiedBets]);
+
+  useEffect(() => {
+    if (!seededRef.current && newestBet > 0) {
+      seededRef.current = true;
+      roundResetRef.current = newestBet - (BETTING_WINDOW_MS + DRAWING_DURATION_MS);
+    }
+  }, [newestBet]);
+
+  useEffect(() => {
+    const prev = prevDrawnLenRef.current;
+    prevDrawnLenRef.current = drawn.length;
+    if (prev >= 20 && drawn.length === 0) {
+      roundResetRef.current = Date.now();
+      setDrawEpoch((e) => e + 1);
+    }
+  }, [drawn]);
+
+  const currentRoundBets = useMemo(
+    () =>
+      unifiedBets.filter((b) => {
+        const ts = typeof b.betPlacedAt === 'number' ? b.betPlacedAt : b.betPlacedAt ? new Date(b.betPlacedAt).getTime() : 0;
+        return ts >= roundResetRef.current;
+      }),
+    [unifiedBets, drawEpoch],
+  );
+
   const activeBets = currentRoundBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
   const settledBets = currentRoundBets.filter(b => b.status === 'won' || b.status === 'lost');
 
@@ -363,7 +391,7 @@ export function RainBetView({
             the draw lands (live stream), plus a compact account/wager/status line. */}
         <div className='min-w-0'>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-400'>
-            Round {currentRound} Tickets ({currentRoundBets.length})
+            Live Tickets ({currentRoundBets.length})
             {activeBets.length > 0 && <span className='ml-1.5 font-bold text-emerald-400'>· {activeBets.length} betting</span>}
           </div>
           {currentRoundBets.length === 0 ? (
@@ -372,36 +400,56 @@ export function RainBetView({
             <div className='flex flex-col gap-2'>
               {currentRoundBets.map((b) => {
                 const isFreeBet = b.betType === 'free_bet';
-                const s = freeBetStatusLabel({ status: b.status, winAmount: b.winAmount });
-                const bt = betTypeBadge(b.betType);
+                const s = statusInfo({ status: b.status, winAmount: b.winAmount });
                 const isWinner = b.status === 'won';
+                const isFailed = b.status === 'failed';
                 // Highlight digits from the LIVE draw stream so they light up in
                 // real time during the draw (all 20 land by settlement).
-                const hits = b.spots.filter((n) => drawn.includes(n)).length;
-
                 return (
-                  <div key={b.id} className={`rounded-lg border p-2 ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : isFreeBet ? 'border-sky-500/40 bg-sky-500/10' : 'border-white/5 bg-white/3'}`}>
-                    <div className='flex flex-wrap items-center gap-1'>
-                      {b.spots.map((n, idx) => {
-                        const isHit = drawn.includes(n);
-                        return (
-                          <span key={idx} className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-extrabold transition-all duration-300 ${
-                            isHit ? 'scale-110 bg-amber-400 text-black ring-2 ring-amber-300' : isFreeBet ? 'bg-sky-600/40 text-sky-100' : 'bg-black/40 text-slate-200'
-                          }`}>{n}</span>
-                        );
-                      })}
-                      {hits > 0 && (
-                        <span className='ml-auto pr-0.5 text-[10px] font-bold text-amber-300'>✓ {hits}/{b.spots.length}</span>
-                      )}
+                  <div
+                    key={b.id}
+                    title={isFailed && b.failReason ? b.failReason : undefined}
+                    className={`rounded-lg border p-2 transition-all ${
+                      isWinner
+                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+                        : isFailed
+                          ? 'border-red-500/70 bg-red-500/5'
+                          : isFreeBet
+                            ? 'border-sky-500/40 bg-sky-500/10'
+                            : 'border-white/5 bg-white/3'
+                    }`}
+                  >
+                    <div className='flex items-start justify-between gap-2'>
+                      <div className='flex flex-wrap items-center gap-1'>
+                        {b.spots.map((n, idx) => {
+                          const isHit = drawn.includes(n);
+                          return (
+                            <span
+                              key={idx}
+                              className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-extrabold transition-all duration-300 ${
+                                isHit ? 'scale-110 bg-amber-400 text-black ring-2 ring-amber-300' : isFreeBet ? 'bg-sky-600/40 text-sky-100' : 'bg-black/40 text-slate-200'
+                              }`}
+                            >{n}</span>
+                          );
+                        })}
+                      </div>
+                      {/* Cash/free identifier, top-right: $ = cash, cloud/rain = free */}
+                      <span
+                        className={`shrink-0 rounded border p-0.5 ${isFreeBet ? 'border-sky-500/40 bg-sky-500/15 text-sky-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}
+                        title={isFreeBet ? 'Free ticket' : 'Cash ticket'}
+                      >
+                        {isFreeBet ? <CloudRain className='h-3.5 w-3.5' /> : <DollarSign className='h-3.5 w-3.5' />}
+                      </span>
                     </div>
                     <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
                       <span className='truncate text-slate-400'>{b.accountName} · {isFreeBet ? `+${b.wagerAmount} ETB` : `${b.stake} ETB`}</span>
-                      <div className='flex items-center gap-1.5'>
-                        <span className={`shrink-0 font-bold ${s.cls}`}>{isWinner ? `WINNER +${b.winAmount ?? ''}` : s.text}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${bt.cls}`}>{bt.text}</span>
-                      </div>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${isFailed ? 'bg-red-500/15 text-red-400' : 'bg-white/5'}`}
+                        style={isFailed ? undefined : { color: s.tone }}
+                      >
+                        {isWinner ? 'WINNER' : s.text}
+                      </span>
                     </div>
-                    {b.failReason && <div className='mt-1 truncate text-[11px] text-red-400/90' title={b.failReason}>{b.failReason}</div>}
                   </div>
                 );
               })}

@@ -35,6 +35,7 @@ import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
 import { MlPredictorCard } from './MlPredictorCard';
 import { RainConfigCard } from './RainConfigCard';
+import { TwoDigitTicketsCard } from './TwoDigitTicketsCard';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -351,6 +352,12 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
 
       <MlPredictorCard siteId="fungames_shamo" />
+
+      <TwoDigitTicketsCard
+        siteId="fungames_shamo"
+        onMessage={setMsg}
+        onRefresh={() => void refreshAccountsAndBets()}
+      />
 
       <RainManualBetCard
         running={status?.running ?? false}

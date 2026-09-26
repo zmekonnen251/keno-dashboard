@@ -9,9 +9,13 @@ import { getNotifyPref, setNotifyPref, getSoundPref, setSoundPref } from '@/lib/
 import { useNotifications } from '@/lib/notifications';
 import { useLiveDraw } from '@/lib/useLiveDraw';
 import { CopyPhoneButton } from '@/components/accounts-columns';
+import { DollarSign } from 'lucide-react';
 import { BOARD_CSS } from './boardStyles';
 
-// "Current game" = bets placed within one round window of the newest bet.
+// "Current game" = bets placed since the websocket observed the current draw
+// begin. The window is keyed to the live draw rather than a fixed 30s wall
+// clock, so tickets of an in-progress draw stay visible (with their status)
+// until the next game actually starts on the stream.
 const ROUND_WINDOW_MS = 30000;
 const ROUND_DURATION_MS = 30000; // 30 seconds per round
 const BETTING_WINDOW_MS = 20000; // 20 seconds for betting
@@ -148,9 +152,40 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   }, []);
 
   const newest = useMemo(() => bets.reduce((m, b) => Math.max(m, b.placedAt ?? 0), 0), [bets]);
+
+  // Round bucket keyed to the websocket draw state: bets stay "current" while
+  // the live draw is running (any phase — drawing / settled / between games)
+  // and are only dropped once the stream shows a brand-new draw beginning
+  // (drawn reset from a completed 20 back to 0). This stops live tickets from
+  // disappearing mid-draw just because a wall-clock window elapsed.
+  const roundResetRef = useRef<number>(Date.now());
+  const seededRef = useRef(false);
+  const prevDrawnLenRef = useRef<number>(0);
+  const [drawEpoch, setDrawEpoch] = useState(0);
+
+  // Seed the bucket from the newest known bet once tickets are first loaded
+  // (before any ws transition has been observed).
+  useEffect(() => {
+    if (!seededRef.current && newest > 0) {
+      seededRef.current = true;
+      roundResetRef.current = newest - ROUND_WINDOW_MS;
+    }
+  }, [newest]);
+
+  // A fresh draw frame arriving after a completed draw (20 -> 0) means the next
+  // game has started: close the previous round's bucket.
+  useEffect(() => {
+    const prev = prevDrawnLenRef.current;
+    prevDrawnLenRef.current = drawn.length;
+    if (prev >= 20 && drawn.length === 0) {
+      roundResetRef.current = Date.now();
+      setDrawEpoch((e) => e + 1);
+    }
+  }, [drawn]);
+
   const current = useMemo(
-    () => bets.filter((b) => (b.placedAt ?? 0) >= newest - ROUND_WINDOW_MS),
-    [bets, newest],
+    () => bets.filter((b) => (b.placedAt ?? 0) >= roundResetRef.current),
+    [bets, drawn, drawEpoch],
   );
 
   // Celebrate ONLY gateway-settled wins. Pending ("Sent") tickets are frames
@@ -358,34 +393,49 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
               {current.map((p) => {
                 const st = statusLabel(p);
                 const isWinner = winners.tickets.some((w) => w.accountId === p.accountId && w.requestId === p.requestId);
+                const isFailed = p.status === 'failed' || p.ok === false;
                 return (
                   <div
                     key={`${p.accountId}-${p.requestId}-${p.placedAt}`}
-                    className={`min-w-44 flex-1 rounded-lg border p-2 transition-all ${isWinner ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'border-white/5 bg-white/3'}`}
+                    title={isFailed && p.failReason ? p.failReason : undefined}
+                    className={`min-w-44 flex-1 rounded-lg border p-2 transition-all ${
+                      isWinner
+                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+                        : isFailed
+                          ? 'border-red-500/70 bg-red-500/5'
+                          : 'border-white/5 bg-white/3'
+                    }`}
                   >
-                    <div className='flex flex-wrap gap-1'>
-                      {(p.spots || []).map((n) => (
-                        <span
-                          key={n}
-                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold transition-all ${drawn.includes(n) ? 'bg-emerald-500 text-white scale-110' : 'bg-black/40 text-slate-300'}`}
-                        >
-                          {n}
-                        </span>
-                      ))}
+                    <div className='flex items-start justify-between gap-2'>
+                      <div className='flex flex-wrap gap-1'>
+                        {(p.spots || []).map((n) => (
+                          <span
+                            key={n}
+                            className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold transition-all ${drawn.includes(n) ? 'bg-emerald-500 text-white scale-110' : 'bg-black/40 text-slate-300'}`}
+                          >
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                      {/* Cash/free identifier: $ = cash ticket, top-right corner */}
+                      <span
+                        className='shrink-0 rounded border border-emerald-500/30 bg-emerald-500/10 p-0.5 text-emerald-300'
+                        title='Cash ticket'
+                      >
+                        <DollarSign className='h-3 w-3' />
+                      </span>
                     </div>
                     <div className='mt-1.5 flex items-center justify-between gap-2 text-xs'>
                       <span className='truncate text-slate-400'>
-                        #{p.accountId} · Bet {p.stake}
+                        #{p.accountId} · {p.stake} ETB
                       </span>
-                      <span className='shrink-0 font-bold' style={{ color: st.tone }}>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${isFailed ? 'bg-red-500/15 text-red-400' : 'bg-white/5'}`}
+                        style={isFailed ? undefined : { color: st.tone }}
+                      >
                         {isWinner ? 'WINNER' : st.text}
                       </span>
                     </div>
-                    {p.status === 'failed' && p.failReason && (
-                      <div className='mt-1 truncate text-[11px] text-red-400/90' title={p.failReason}>
-                        {p.failReason}
-                      </div>
-                    )}
                   </div>
                 );
               })}

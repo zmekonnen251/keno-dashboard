@@ -43,6 +43,7 @@ import type {
   RainWsTokensResponse,
   TicketPlan,
   RainPredictionResponse,
+  TwoDigitTicketsResponse,
   RainTicketConfig,
   BotTicket,
   ChickenRoadAccountsResponse,
@@ -291,6 +292,12 @@ export async function setTicketPlan(siteId: string, ticketPlan: TicketPlan): Pro
     method: 'PATCH',
     body: JSON.stringify({ ticketPlan }),
   });
+}
+
+// Two-digit (2-spot) dynamic tickets generated from the last 1–3 draws
+// (repeat/carryover) + recurrence patterns.
+export async function getTwoDigitTickets(siteId: string, limit = 8): Promise<TwoDigitTicketsResponse> {
+  return apiFetch<TwoDigitTicketsResponse>(`api/predictions/${siteId}/two-digit?limit=${limit}`);
 }
 
 export async function getEligibleAccounts(stake?: number): Promise<EligibleAccountsResponse> {
