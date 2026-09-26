@@ -220,10 +220,19 @@ export function RainBetView({
       celebratedRef.current.add(key);
       saveCelebrated();
       const spots = b.spots || [];
-      const winAmount = b.winAmount ?? paytableWin(spots.length, spots.length, b.stake) ?? 0;
-      const text = `🎁 Free Bet Full Match! [${spots.join(',')}] on ${b.accountName} — +${winAmount} ETB`;
+      const matched =
+        b.matched ??
+        (b.drawnSpots && b.drawnSpots.length > 0
+          ? spots.filter((n) => b.drawnSpots.includes(n)).length
+          : spots.length);
+      const winAmount = b.winAmount ?? paytableWin(spots.length, Math.max(1, matched), b.stake) ?? 0;
+      const full = spots.length > 0 && matched >= spots.length;
+      const text = full
+        ? `🎁 Free Bet Full Match! [${spots.join(',')}] on ${b.accountName} — +${winAmount} ETB`
+        : `🎁 Free Bet won ${matched}/${spots.length}! [${spots.join(',')}] on ${b.accountName} — +${winAmount} ETB`;
       if (soundOn) playWinSound();
-      if (!pushOn && notifyOn) pushWinNotification('Free Bet Full Match!', text);
+      if (!pushOn && notifyOn)
+        pushWinNotification(full ? 'Free Bet Full Match!' : 'Free Bet Won!', text);
       notify({ id: `rainwin-${key}`, kind: 'win', text, phone: b.accountName });
       setAlerts((prev) => [{ id: key, text, at: Date.now() }, ...prev].slice(0, 5));
     }
@@ -242,10 +251,19 @@ export function RainBetView({
       celebratedRef.current.add(key);
       saveCelebrated();
       const spots = b.spots || [];
-      const est = paytableWin(spots.length, spots.length, b.stake) ?? b.winAmount ?? 0;
-      const text = `💰 Cash Full Match! [${spots.join(',')}] on ${b.accountName} — +${est} ETB`;
+      const matched =
+        b.matched ??
+        (b.drawnSpots && b.drawnSpots.length > 0
+          ? spots.filter((n) => b.drawnSpots.includes(n)).length
+          : spots.length);
+      const est = b.winAmount ?? paytableWin(spots.length, Math.max(1, matched), b.stake) ?? 0;
+      const full = spots.length > 0 && matched >= spots.length;
+      const text = full
+        ? `💰 Cash Full Match! [${spots.join(',')}] on ${b.accountName} — +${est} ETB`
+        : `💰 Cash win ${matched}/${spots.length}! [${spots.join(',')}] on ${b.accountName} — +${est} ETB`;
       if (soundOn) playWinSound();
-      if (!pushOn && notifyOn) pushWinNotification('Cash Full Match!', text);
+      if (!pushOn && notifyOn)
+        pushWinNotification(full ? 'Cash Full Match!' : `Cash Win — ${matched}/${spots.length}!`, text);
       notify({ id: `rainwin-${key}`, kind: 'win', text, phone: b.accountName });
       setAlerts((prev) => [{ id: key, text, at: Date.now() }, ...prev].slice(0, 5));
     }

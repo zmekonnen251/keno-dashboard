@@ -187,10 +187,19 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
       celebratedRef.current.add(key);
       saveCelebrated();
       const spots = b.spots || [];
-      const est = paytableWin(spots.length, spots.length, b.stake) ?? b.winAmount ?? 0;
-      const text = `Cash full match! [${spots.join(',')}] on #${b.accountId} — +${est} ETB`;
+      const matched =
+        b.matched ??
+        (b.drawnSpots && b.drawnSpots.length > 0
+          ? spots.filter((n) => (b.drawnSpots as number[]).includes(n)).length
+          : spots.length);
+      const est = b.winAmount ?? paytableWin(spots.length, Math.max(1, matched), b.stake) ?? 0;
+      const full = spots.length > 0 && matched >= spots.length;
+      const text = full
+        ? `Cash full match! [${spots.join(',')}] on #${b.accountId} — +${est} ETB`
+        : `Cash win ${matched}/${spots.length}! [${spots.join(',')}] on #${b.accountId} — +${est} ETB`;
       if (soundOn) playWinSound();
-      if (!pushOn && notifyOn) pushWinNotification('Keno full match!', text);
+      if (!pushOn && notifyOn)
+        pushWinNotification(full ? 'Keno full match!' : `Keno win — ${matched}/${spots.length}!`, text);
       notify({ id: `rainwin-${key}`, kind: 'win', text, phone: b.accountName });
       setAlerts((prev) => [{ id: key, text, at: Date.now() }, ...prev].slice(0, 5));
     }
