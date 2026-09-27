@@ -52,7 +52,7 @@ const NAV = [
   { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
-  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr'] },
   { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
   { href: '/clients', label: 'Clients', icon: Handshake },

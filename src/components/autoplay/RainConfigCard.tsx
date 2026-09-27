@@ -18,7 +18,7 @@ import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 
-const PROVIDERS: RainProvider[] = ['fungames_shamo', 'phoenixbet'];
+const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
 
 export function RainConfigCard({
   cfg,

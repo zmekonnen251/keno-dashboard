@@ -51,10 +51,11 @@ import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-acc
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
   fungames_shamo: 'gateway.fungames.live',
+  fungames_tolobirr: 'gateway.fungames.live',
   phoenixbet: 'gateway.phoenixbet.io',
 };
 
-const PROVIDERS: RainProvider[] = ['fungames_shamo', 'phoenixbet'];
+const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },

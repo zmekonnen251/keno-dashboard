@@ -16,7 +16,16 @@ const columnHelper = createColumnHelper<DataTableFeatures, RainAccount>();
 
 function ProviderBadge({ provider }: { provider: RainProvider }) {
   return (
-    <Badge className={provider === 'phoenixbet' ? 'bg-fuchsia-600 text-white' : ''} variant={provider === 'fungames_shamo' ? 'default' : 'secondary'}>
+    <Badge
+      className={
+        provider === 'phoenixbet'
+          ? 'bg-fuchsia-600 text-white'
+          : provider === 'fungames_tolobirr'
+            ? 'bg-sky-600 text-white'
+            : ''
+      }
+      variant={provider === 'fungames_shamo' ? 'default' : 'secondary'}
+    >
       {provider}
     </Badge>
   );

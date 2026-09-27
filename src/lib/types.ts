@@ -779,7 +779,7 @@ export interface LiveBalancesResponse {
 // toApiAccount(): the ws_token is never echoed back, only masked. Rain
 // accounts play the shamo-hosted fungames game, so the plain 'fungames'
 // (draws/autoplay/tolobirr) id never appears here.
-export type RainProvider = 'fungames_shamo' | 'phoenixbet';
+export type RainProvider = 'fungames_shamo' | 'fungames_tolobirr' | 'phoenixbet';
 
 export interface RainAccount {
 	id: number;

@@ -34,7 +34,7 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/predictions', label: 'Predictions', icon: Sparkles },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/accounts', label: 'Accounts', icon: Users, excludeSites: ['fungames_shamo'] },
-  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo'] },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr'] },
   // { href: '/chicken-road-accounts', label: 'Chicken Rd', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
 ];
