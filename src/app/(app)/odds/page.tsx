@@ -362,6 +362,8 @@ function DropsTab({
             const dropPct = Math.abs(d.pctChange);
             const outcome = dropOutcomeDisplay(d);
             const market = dropMarketDisplay(d);
+            const melbetUrl = d.melbetUrl ?? (d.source === 'melbet' ? d.url : null) ?? undefined;
+            const shamoUrl = d.shamoUrl ?? (d.source === 'shamo' ? d.url : null) ?? undefined;
             return (
               <div
                 key={d.id ?? `${d.externalId}-${i}`}
@@ -388,13 +390,20 @@ function DropsTab({
                     <Badge variant="outline" className="font-mono" title={`market ${d.marketKey}`}>
                       {market}
                     </Badge>
-                    {d.url && (
+                    {melbetUrl ? (
                       <Button asChild variant="outline" size="xs">
-                        <a href={d.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink /> {d.source === 'melbet' ? 'Melbet' : 'Shamo'}
+                        <a href={melbetUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Open in Melbet
                         </a>
                       </Button>
-                    )}
+                    ) : null}
+                    {shamoUrl ? (
+                      <Button asChild variant="outline" size="xs">
+                        <a href={shamoUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink /> Open in Shamo
+                        </a>
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

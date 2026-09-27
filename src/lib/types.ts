@@ -1243,6 +1243,10 @@ export interface OddsDrop {
 	sport: string;
 	/** Deep link to the event on the source site (melbet for drop signals). */
 	url?: string | null;
+	/** Deep link to the same event on melbet, when known (server-enriched). */
+	melbetUrl?: string | null;
+	/** Deep link to the same event on shamo, when known (server-enriched). */
+	shamoUrl?: string | null;
 	marketKey: string;
 	marketLabel?: string | null;
 	outcome: string;
