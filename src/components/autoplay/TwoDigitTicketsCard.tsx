@@ -40,8 +40,8 @@ export function TwoDigitTicketsCard({
   const [freeBetAuto, setFreeBetAuto] = useState(true);
   const [selectedFreeBetId, setSelectedFreeBetId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = true) => {
+    if (!silent) setLoading(true);
     try {
       const res = await getTwoDigitTickets(siteId, 8);
       setData(res);
@@ -49,7 +49,7 @@ export function TwoDigitTicketsCard({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [siteId]);
 
@@ -62,8 +62,12 @@ export function TwoDigitTicketsCard({
     }
   }, []);
 
+  // Auto-refresh the two-digit picks every 30s (silent — no spinner) so the
+  // ticket teams track freshly settled draws without a manual Refresh tap.
   useEffect(() => {
-    void load();
+    void load(true);
+    const t = setInterval(() => void load(true), 30000);
+    return () => clearInterval(t);
   }, [load]);
 
   useEffect(() => {
@@ -109,6 +113,7 @@ export function TwoDigitTicketsCard({
         );
         onRefresh?.();
         void loadFreeBets();
+        void load(true);
       } else {
         onMessage?.(`Free-bet play failed: ${res.result?.error || 'unknown error'}`);
       }
@@ -138,6 +143,7 @@ export function TwoDigitTicketsCard({
         const account = 'accountId' in res && res.accountId ? `#${res.accountId}` : 'auto-account';
         onMessage?.(`2-digit ticket [${spots.join(',')}] placed at ${stakeNum} ETB on ${account}.`);
         onRefresh?.();
+        void load(true);
       } else {
         const failReason = isShamo && 'result' in res && res.result && 'error' in res.result
           ? res.result.error
@@ -256,7 +262,7 @@ export function TwoDigitTicketsCard({
             </div>
           )}
           <div className='flex items-end gap-2'>
-            <Button variant='outline' onClick={() => void load()} disabled={loading}>
+            <Button variant='outline' onClick={() => void load(false)} disabled={loading}>
               {loading ? 'Loading…' : data ? 'Refresh' : 'Generate'}
             </Button>
           </div>

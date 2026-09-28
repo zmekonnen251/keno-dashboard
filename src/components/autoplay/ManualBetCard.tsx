@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,7 +88,29 @@ export function ManualBetCard({
 	const [savedTickets, setSavedTickets] = useState<BotTicket[]>([]);
 	const [genCount, setGenCount] = useState(0);
 
+	// AI one-click tickets: dedicated stake + auto-refresh of the signal picks.
+	const [aiStake, setAiStake] = useState('5');
+	const [placingKey, setPlacingKey] = useState<string | null>(null);
+	const [autoRefresh, setAutoRefresh] = useState(true);
+
 	const stakeNum = parseFloat(manualStake) || 2;
+	const aiStakeNum = parseFloat(aiStake) || 2;
+
+	// Keep the latest onRefresh without re-arming the interval on every parent
+	// re-render (the parent re-creates the handler on each status poll).
+	const onRefreshRef = useRef(onRefresh);
+	useEffect(() => {
+		onRefreshRef.current = onRefresh;
+	}, [onRefresh]);
+
+	// Auto-refresh the AI ticket picks every 30s (in addition to the parent's
+	// status poll) so Repetitive / Recurring / Chain / Trend chips track fresh
+	// signals without a manual refresh of the page.
+	useEffect(() => {
+		if (!autoRefresh) return;
+		const t = setInterval(() => onRefreshRef.current(), 30000);
+		return () => clearInterval(t);
+	}, [autoRefresh]);
 
 	useEffect(() => {
 		onPicksChange?.(selectedSpots);
@@ -180,6 +202,36 @@ export function ManualBetCard({
 		}
 	}
 
+	/** One-click AI ticket: place a Repetitive/Recurring/Chain/Trend chip
+	 *  immediately at the configured AI ticket stake. */
+	async function placeAiChip(numbers: number[], label: string, chipId: string) {
+		if (numbers.length < 2) {
+			onMessage('AI ticket needs at least 2 numbers.');
+			return;
+		}
+		if (aiStakeNum < 2) {
+			onMessage('AI ticket stake must be >= 2 ETB.');
+			return;
+		}
+		const accountId = accountMode === 'manual' && selectedAccountId !== '' ? parseInt(selectedAccountId, 10) : undefined;
+		if (accountMode === 'manual' && (accountId == null || !Number.isFinite(accountId))) {
+			onMessage('Pick an account first, or switch to Auto so the server selects one.');
+			return;
+		}
+		setPlacingKey(chipId);
+		try {
+			const res = await placeManualBet(numbers, aiStakeNum, accountId);
+			if (res.ok) {
+				onMessage(`AI ${label} ticket [${numbers.join(',')}] placed · ${aiStakeNum} ETB · account #${res.accountId ?? 'auto'}.`);
+				onRefresh();
+			} else {
+				onMessage(`AI ${label} ticket failed: ${res.failReason || 'unknown error'}`);
+			}
+		} finally {
+			setPlacingKey(null);
+		}
+	}
+
 	const chips = suggestionChips(recurrence ?? null, spotsCount);
 	const mlGroups = mlTicketGroups(recurrence ?? null, spotsCount);
 	const markers: Partial<Record<number, BoardMarker>> = {};
@@ -215,8 +267,41 @@ export function ManualBetCard({
 			<div className='space-y-4'>
 				<p className='text-sm text-muted-foreground'>
 					Click a suggested ticket (repetitive / recurring / chain / trend) or tap the number grid like the real keno
-					board. Stake defaults to 5 ETB (min 2) — with a bigger stake the server picks a wallet that can cover it.
+					board. Each suggested ticket also has a one-click <span className='font-bold text-emerald-600 dark:text-emerald-400'>Bet</span> button
+					that places it instantly at the AI stake below (min 2 ETB). With a bigger stake the server picks a wallet that
+					can cover it.
 				</p>
+
+				<div className='flex flex-wrap items-center gap-2'>
+					<div className='flex items-center gap-2'>
+						<Label>AI stake (ETB)</Label>
+						<Input
+							type='number'
+							min='2'
+							max={stakeMax}
+							value={aiStake}
+							onChange={(e) => {
+								const n = parseFloat(e.target.value);
+								if (!Number.isFinite(n) && e.target.value !== '') return;
+								setAiStake(String(Math.min(Math.max(n || 2, 2), stakeMax)));
+							}}
+							placeholder='5'
+							className='w-24'
+						/>
+					</div>
+					<button
+						type='button'
+						onClick={() => setAutoRefresh((v) => !v)}
+						title='Auto-refresh the AI ticket picks every 30s'
+						className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+							autoRefresh
+								? 'border-emerald-600 bg-emerald-600 text-white'
+								: 'border-border bg-muted/40 text-foreground hover:bg-muted/70'
+						}`}
+					>
+						{autoRefresh ? '✓' : '○'} Auto-refresh picks (30s)
+					</button>
+				</div>
 
 				<div>
 					<div className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Suggested tickets</div>
@@ -225,9 +310,21 @@ export function ManualBetCard({
 					) : (
 						<div className='mt-2 flex flex-wrap gap-2'>
 							{chips.map((c) => (
-								<Button key={c.key} variant='outline' size='sm' onClick={() => applySuggested(c.numbers)}>
-									{c.label}: [{c.numbers.join(',')}]
-								</Button>
+								<div key={c.key} className='flex items-center gap-2'>
+									<Button variant='outline' size='sm' onClick={() => applySuggested(c.numbers)}>
+										{c.label}: [{c.numbers.join(',')}]
+									</Button>
+									<Button
+										size='sm'
+										variant='default'
+										className='bg-emerald-600 font-mono text-[11px] hover:bg-emerald-500'
+										disabled={placingKey !== null}
+										title={`Place [${c.numbers.join(',')}] instantly at ${aiStakeNum} ETB`}
+										onClick={() => void placeAiChip(c.numbers, c.label, `chip-${c.key}`)}
+									>
+										{placingKey === `chip-${c.key}` ? 'Placing…' : `Bet ${aiStakeNum} ETB`}
+									</Button>
+								</div>
 							))}
 						</div>
 					)}
@@ -244,27 +341,38 @@ export function ManualBetCard({
 								</div>
 								<div className='mt-1.5 flex flex-wrap gap-2'>
 									{g.chips.map((c) => (
-										<Button
-											key={c.id}
-											size='sm'
-											variant='outline'
-											className='border-purple-500/30 bg-purple-600/20 font-mono text-[11px] text-purple-100 hover:bg-purple-500/40'
-											title={`Apply [${c.numbers.join(',')}] to the board · ${c.stake} ETB — right-click for options`}
-											onClick={() => applySuggested(c.numbers)}
-											onContextMenu={(e) => {
-												e.preventDefault();
-												setSelectedSpots(c.numbers.slice(0, spotsCount).sort((a, b) => a - b));
-												setTicketStake(String(c.stake));
-												onMessage(`Applied ML ticket [${c.numbers.join(',')}] · ${c.stake} ETB — setting the ticket stake to 5 ETB.`);
-											}}
-										>
-											[{c.numbers.join(',')}] <span className='ml-1 text-[9px] opacity-70'>{c.hint} · {c.stake} ETB</span>
-										</Button>
+										<div key={c.id} className='flex items-center gap-2'>
+											<Button
+												size='sm'
+												variant='outline'
+												className='border-purple-500/30 bg-purple-600/20 font-mono text-[11px] text-purple-100 hover:bg-purple-500/40'
+												title={`Apply [${c.numbers.join(',')}] to the board · right-click for options`}
+												onClick={() => applySuggested(c.numbers)}
+												onContextMenu={(e) => {
+													e.preventDefault();
+													setSelectedSpots(c.numbers.slice(0, spotsCount).sort((a, b) => a - b));
+													setTicketStake(String(c.stake));
+													onMessage(`Applied ML ticket [${c.numbers.join(',')}] · ${c.stake} ETB — setting the ticket stake to ${c.stake} ETB.`);
+												}}
+											>
+												[{c.numbers.join(',')}] <span className='ml-1 text-[9px] opacity-70'>{c.hint} · {c.stake} ETB</span>
+											</Button>
+											<Button
+												size='sm'
+												variant='default'
+												className='bg-emerald-600 font-mono text-[11px] hover:bg-emerald-500'
+												disabled={placingKey !== null}
+												title={`Place [${c.numbers.join(',')}] instantly at ${aiStakeNum} ETB`}
+												onClick={() => void placeAiChip(c.numbers, g.label, `ml-${g.key}-${c.id}`)}
+											>
+												{placingKey === `ml-${g.key}-${c.id}` ? 'Placing…' : `Bet ${aiStakeNum} ETB`}
+											</Button>
+										</div>
 									))}
 								</div>
 							</div>
 						))}
-						<p className='text-[10px] text-purple-200/50'>Click a chip to load it onto the board — right-click applies it and sets the ticket stake to 5 ETB.</p>
+						<p className='text-[10px] text-purple-200/50'>Click a chip to load it onto the board — right-click applies it and sets the ticket stake. The green Bet button places it instantly at the AI stake.</p>
 					</div>
 				)}
 
