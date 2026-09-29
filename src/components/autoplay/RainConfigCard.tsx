@@ -149,6 +149,7 @@ export function RainConfigCard({
                 <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Manual spots below</SelectItem>
+                  <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
                   <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
                   <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
                 </SelectContent>

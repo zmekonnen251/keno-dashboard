@@ -893,7 +893,7 @@ export interface RainAutoplayConfig {
 	enabled: boolean;
 	provider: RainProvider;
 	tickets_per_round: number;
-	spots_mode: 'prediction' | 'prediction_tickets' | 'manual';
+	spots_mode: 'prediction' | 'prediction_tickets' | 'recurrence' | 'manual';
 	manual_spots: number[];
 	round_interval: number;
 	use_cash_after_free_bets: boolean;
