@@ -248,6 +248,7 @@ function AutoplayCard() {
         manual_spots: parseManualSpots(manualDraft),
         round_interval: config.round_interval,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
+        tickets_per_account: config.tickets_per_account ?? 1,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -333,6 +334,21 @@ function AutoplayCard() {
               value={config.tickets_per_round}
               onChange={(e) => setConfig({ ...config, tickets_per_round: Number(e.target.value) })}
             />
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-tickets-per-account">Cash tickets per account / round</Label>
+            <Input
+              id="rain-auto-tickets-per-account"
+              type="number"
+              min={1}
+              max={20}
+              value={config.tickets_per_account ?? 1}
+              onChange={(e) => setConfig({ ...config, tickets_per_account: Number(e.target.value) })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each eligible account places this many cash tickets; a balance that would strand less than 2 Birr is
+              played all-in.
+            </p>
           </div>
           <div>
             <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>

@@ -82,6 +82,7 @@ export function RainConfigCard({
         use_cash_after_free_bets: config.use_cash_after_free_bets,
         cash_stake: config.cash_stake,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
+        tickets_per_account: config.tickets_per_account ?? 1,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -203,13 +204,30 @@ export function RainConfigCard({
                 disabled={!config.use_cash_after_free_bets}
               />
             </div>
+            <div>
+              <Label htmlFor="rain-auto-tickets-per-account">Cash tickets per account / round</Label>
+              <Input
+                id="rain-auto-tickets-per-account"
+                type="number"
+                min={1}
+                max={20}
+                value={config.tickets_per_account ?? 1}
+                onChange={(e) => setConfig({ ...config, tickets_per_account: Number(e.target.value) })}
+                disabled={!config.use_cash_after_free_bets}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Each eligible account places this many cash tickets (total = accounts × this). When the next stake
+                would leave less than 2 Birr — below the minimum bet — the whole remaining balance is played as one
+                all-in ticket.
+              </p>
+            </div>
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-muted-foreground">
               {config.tickets_per_round === 0
                 ? '0 tickets/round = all plan tickets'
-                : `${config.tickets_per_round} ticket(s)/round`}{' '}
-              · Updated {formatTime(config.updated_at)}
+                : `${config.tickets_per_round} free bet(s)/round`}{' '}
+              · {config.tickets_per_account ?? 1} cash ticket(s) per account · Updated {formatTime(config.updated_at)}
             </div>
             <Button onClick={onSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save configuration'}

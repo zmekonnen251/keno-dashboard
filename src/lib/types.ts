@@ -434,6 +434,8 @@ export interface AutoplayConfig {
 	// Auto-bet the generated prediction tickets each round (0 = all of them).
 	prediction_ticket_betting: boolean;
 	prediction_tickets_per_round: number;
+	// How many tickets EACH account places per round (1 = one per account).
+	tickets_per_account: number;
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
@@ -905,6 +907,8 @@ export interface RainAutoplayConfig {
 	use_cash_after_free_bets: boolean;
 	cash_stake: number;
 	recurrence_tickets_per_round: number;
+	// How many CASH tickets each eligible account places per round.
+	tickets_per_account: number;
 	updated_at: string;
 }
 

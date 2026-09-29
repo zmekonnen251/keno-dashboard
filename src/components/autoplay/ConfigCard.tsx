@@ -27,6 +27,7 @@ export function ConfigCard({
 	const [loaded, setLoaded] = useState(false);
 	const [stake, setStake] = useState('');
 	const [batch, setBatch] = useState('');
+	const [ticketsPerAccount, setTicketsPerAccount] = useState('1');
 	const [mode, setMode] = useState<'A' | 'B' | 'C'>('A');
 	const [splitRatio, setSplitRatio] = useState<'uniform' | '1/2' | '1/3'>('uniform');
 	const [digitCount, setDigitCount] = useState<2 | 3>(3);
@@ -40,6 +41,7 @@ export function ConfigCard({
 	function onLoadCurrent() {
 		setStake(String(cfg?.stake ?? ''));
 		setBatch(String(cfg?.batch_size ?? ''));
+		setTicketsPerAccount(String(cfg?.tickets_per_account ?? 1));
 		setMode(cfg?.mode ?? 'A');
 		setSplitRatio(cfg?.split_ratio ?? 'uniform');
 		setDigitCount(cfg?.digit_count ?? 3);
@@ -55,6 +57,7 @@ export function ConfigCard({
 	function onNew() {
 		setStake('');
 		setBatch('');
+		setTicketsPerAccount('1');
 		setMode('C');
 		setSplitRatio('uniform');
 		setDigitCount(3);
@@ -74,6 +77,7 @@ export function ConfigCard({
 			await setAutoplayConfig(siteId || 'fungames_tolobirr', {
 				stake: stake !== '' ? parseFloat(stake) : undefined,
 				batch_size: batch !== '' ? parseInt(batch, 10) : undefined,
+				tickets_per_account: ticketsPerAccount !== '' ? parseInt(ticketsPerAccount, 10) : 1,
 				mode,
 				split_ratio: splitRatio,
 				...(mode === 'C' ? { digit_count: digitCount } : {}),
@@ -165,6 +169,24 @@ export function ConfigCard({
 								<Label>Batch size</Label>
 								<Input type='number' min='1' value={batch} onChange={(e) => setBatch(e.target.value)} placeholder='1' />
 							</div>
+						</div>
+						<div className='mt-4 space-y-1.5'>
+							<Label htmlFor='ticketsPerAccount'>Tickets per account / round</Label>
+							<Input
+								id='ticketsPerAccount'
+								type='number'
+								min='1'
+								max='20'
+								className='w-32'
+								value={ticketsPerAccount}
+								onChange={(e) => setTicketsPerAccount(e.target.value)}
+							/>
+							<p className='text-xs text-muted-foreground'>
+								Every eligible account places this many tickets each round (total = accounts × this). A wallet
+								bets as many as it can cover: when the next stake would leave less than 2 Birr — below the
+								minimum bet — the whole remaining balance is played as one all-in ticket instead of being
+								stranded.
+							</p>
 						</div>
 					</div>
 
