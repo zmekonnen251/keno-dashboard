@@ -37,7 +37,7 @@ export default function Header() {
             <ChevronDown className="h-4 w-4" />
           </Button>
           {showMobileSiteSelector && (
-            <div className="absolute right-0 top-full mt-2 z-50 bg-background border border-border rounded-lg shadow-lg p-2 min-w-[200px]">
+            <div className="absolute right-0 top-full mt-2 z-50 bg-background border border-border rounded-lg shadow-lg p-2 min-w-50">
               {sites.map((s) => (
                 <button
                   key={s.id}

@@ -7,6 +7,7 @@ import { checkAuth, getDraws } from '@/lib/api';
 import type { Draw } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { BOARD_CSS } from '@/components/autoplay/boardStyles';
+import { useRouter } from 'next/navigation';
 
 // The public draw-history page. No login required — the keno boards render the
 // actual draws recorded by the collectors, newest first, with pagination.
@@ -51,11 +52,14 @@ export default function PublicHomePage() {
   const [busy, setBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const topRef = useRef<HTMLDivElement | null>(null);
-
+  const router = useRouter()
   useEffect(() => {
     checkAuth()
       .then((r) => setAuthed(!!r.authenticated))
-      .catch(() => setAuthed(false));
+      .catch(() => {
+        setAuthed(false);
+    
+      });
   }, []);
 
   // Fetch the current page; re-runs whenever the site, page size, page, or a
@@ -83,6 +87,14 @@ export default function PublicHomePage() {
       alive = false;
     };
   }, [siteId, pageSize, page, refreshTick]);
+
+
+  useEffect(() => {
+    if (!authed) {
+      router.push('/login')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
