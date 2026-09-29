@@ -247,6 +247,7 @@ function AutoplayCard() {
         spots_mode: config.spots_mode,
         manual_spots: parseManualSpots(manualDraft),
         round_interval: config.round_interval,
+        recurrence_tickets_per_round: config.recurrence_tickets_per_round,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -350,12 +351,26 @@ function AutoplayCard() {
               <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="manual">Manual spots below</SelectItem>
+                <SelectItem value="mixed">Mixed — queue + recurrence tickets</SelectItem>
                 <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
                 <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
                 <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {config.spots_mode === 'mixed' && (
+            <div>
+              <Label htmlFor="rain-auto-recurrence-tickets">Recurrence tickets / round (rest = preconfigured queue)</Label>
+              <Input
+                type="number"
+                id="rain-auto-recurrence-tickets"
+                min={0}
+                max={50}
+                value={config.recurrence_tickets_per_round}
+                onChange={(e) => setConfig({ ...config, recurrence_tickets_per_round: Number(e.target.value) })}
+              />
+            </div>
+          )}
           <div>
             <Label htmlFor="rain-auto-manual-spots">Manual spots / ticket (1–80, comma or space separated)</Label>
             <Input
