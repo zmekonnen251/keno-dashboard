@@ -61,6 +61,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
   const [bettingPrediction, setBettingPrediction] = useState(false);
   const [testingRound, setTestingRound] = useState(false);
+  // Exactly what the last Test round played (account, free bet, numbers, round)
+  // — so the result is never confused with the ever-growing play history.
+  const [lastTestRound, setLastTestRound] = useState<{ accountId: number; freeBetId: string; spots: number[]; roundId: string | null }[] | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
@@ -141,14 +144,25 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
     try {
       const res = await rainTestRound();
       if (!res.ok) {
+        setLastTestRound([]);
         setMsg('Test round failed — is the claimer running with eligible free-bets?');
       } else {
+        // Show the tickets THIS test round played, not the whole ledger.
+        setLastTestRound(
+          res.result.bets.map((b) => ({
+            accountId: b.accountId,
+            freeBetId: b.freeBetId,
+            spots: b.spots ?? [],
+            roundId: b.roundId ?? null,
+          })),
+        );
         setMsg(res.result.played > 0
           ? `Test round played ${res.result.played} free-bet${res.result.played === 1 ? '' : 's'}.`
           : 'Test round completed — no eligible free-bets to play.');
       }
       void refreshAccountsAndBets();
     } catch (e) {
+      setLastTestRound([]);
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setTestingRound(false);
@@ -330,6 +344,38 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
       <SnapSection fill>
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+
+      {/* Exactly what the last Test round played — its own list, so the result
+          never reads as "the same tickets as last time" from the history card. */}
+      {lastTestRound !== null && (
+        <div className="mb-3 rounded-lg border border-sky-500/40 bg-sky-500/5 p-2.5">
+          <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+            Last test round — {lastTestRound.length} ticket{lastTestRound.length === 1 ? '' : 's'}
+          </div>
+          {lastTestRound.length === 0 ? (
+            <p className="text-xs italic text-muted-foreground">No eligible free-bets were played.</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {lastTestRound.map((b, i) => (
+                <div key={`${b.freeBetId}-${i}`} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-mono text-[11px] text-muted-foreground">#{b.accountId}</span>
+                  <span className="flex flex-wrap gap-1">
+                    {(b.spots ?? []).map((n) => (
+                      <span key={n} className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-600/40 font-mono text-[10px] font-extrabold text-sky-800 dark:text-sky-100">
+                        {n}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="font-mono text-[10px] text-muted-foreground">{b.freeBetId}</span>
+                  <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-600 dark:bg-white/5 dark:text-amber-300">
+                    {b.roundId ? `Round ${b.roundId}` : 'Round —'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <CollapsibleCard title="Stats" defaultOpen={true}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

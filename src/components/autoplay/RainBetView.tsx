@@ -15,20 +15,30 @@ import { BOARD_CSS } from './boardStyles';
 const BETTING_WINDOW_MS = 70000;
 const DRAWING_DURATION_MS = 10000;
 
+// Ticket states that are still in play for the current round. Settled tickets
+// (won / lost / failed) are not part of the live list — they leave the board as
+// soon as the gateway settles them, so no lost badge lingers.
+const LIVE_STATUSES = new Set<string>(['claiming', 'bet_placed', 'pending']);
+
 interface GameState {
   phase: 'betting_open' | 'drawing' | 'settled' | 'unknown';
   timer: number;
   roundNumber?: number;
 }
 
-function statusInfo(b: { status: RainFreeBet['status'] | RainCashBet['status']; winAmount?: number | null }): { text: string; tone: string } {
+// Live ticket for the current round: "Betting" while the gateway has the
+// betting window open, "Pending" once the draw is running (still in play until
+// the gateway settles it). Never shown as a win/loss before that.
+function statusInfo(
+  b: { status: RainFreeBet['status'] | RainCashBet['status']; winAmount?: number | null },
+  phase?: GameState['phase'],
+): { text: string; tone: string } {
   if (b.status === 'won') return { text: 'Won', tone: '#4ade80' };
   if (b.status === 'lost') return { text: 'Lost', tone: '#64748b' };
   if (b.status === 'failed') return { text: 'Failed', tone: '#f87171' };
-  if (b.status === 'bet_placed') return { text: 'Bet placed', tone: '#38bdf8' };
-  if (b.status === 'claiming') return { text: 'Claiming', tone: '#f59e0b' };
   if (b.status === 'expired') return { text: 'Expired', tone: '#94a3b8' };
-  return { text: 'Available', tone: '#4ade80' };
+  if (phase === 'betting_open') return { text: 'Betting', tone: '#facc15' };
+  return { text: 'Pending', tone: '#facc15' };
 }
 
 interface UnifiedBet {
@@ -48,6 +58,9 @@ interface UnifiedBet {
   betPlacedAt: string | number | null;
   failReason?: string;
   roundNumber: number;
+  // Gateway round id the server stamped on the ticket at send time — the
+  // ticket→round relation that buckets the live list to the current round.
+  roundId: string | null;
 }
 
 export function RainBetView({ 
@@ -61,7 +74,7 @@ export function RainBetView({
   config?: RainAutoplayConfig | null;
   autoRefresh?: boolean;
 }) {
-  const { status, observer, drawn, updatedAt } = useLiveDraw('shamo');
+  const { status, observer, drawn, updatedAt, phase: livePhase, phaseAt, roundId } = useLiveDraw('shamo');
   const [soundOn, setSoundOn] = useState(() => getSoundPref());
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
@@ -120,6 +133,7 @@ export function RainBetView({
             betPlacedAt: b.bet_placed_at ?? null,
             failReason: b.error ?? undefined,
             roundNumber: getRoundNumber(b.bet_placed_at),
+            roundId: b.round_id ?? null,
           });
         }
       }
@@ -143,6 +157,7 @@ export function RainBetView({
           betPlacedAt: b.placedAt,
           failReason: b.failReason,
           roundNumber: getRoundNumber(b.placedAt),
+          roundId: b.roundId ?? null,
         });
       }
     }
@@ -154,7 +169,11 @@ export function RainBetView({
     });
   }, [freeBets, cashBets]);
 
-  // Game state detection
+  // Game state + round timer. The live stream's own phase is the source of
+  // truth; the timer counts the phase down from the moment it started
+  // (useLiveDraw anchors that to the gateway's own status timestamp), so it runs
+  // in real time instead of following a local 80s guess. The wall-clock split
+  // is only a fallback for when no phase has arrived yet.
   useEffect(() => {
     const updateGameState = () => {
       const now = Date.now();
@@ -166,7 +185,14 @@ export function RainBetView({
       let newPhase: GameState['phase'] = 'unknown';
       let timer = 0;
 
-      if (timeInRound < BETTING_WINDOW_MS) {
+      if (livePhase !== 'unknown') {
+        newPhase = livePhase;
+        const anchor = phaseAt ?? now;
+        const elapsed = Math.max(0, now - anchor);
+        if (livePhase === 'betting_open') timer = Math.max(0, BETTING_WINDOW_MS - elapsed);
+        else if (livePhase === 'drawing') timer = Math.max(0, DRAWING_DURATION_MS - elapsed);
+        else timer = 0; // round complete — the next WAITING frame opens the next round
+      } else if (timeInRound < BETTING_WINDOW_MS) {
         newPhase = 'betting_open';
         timer = BETTING_WINDOW_MS - timeInRound;
       } else if (timeInRound < roundDuration) {
@@ -189,7 +215,7 @@ export function RainBetView({
     updateGameState();
     const interval = setInterval(updateGameState, 1000);
     return () => clearInterval(interval);
-  }, [status, drawn, updatedAt, gameState.phase, soundOn]);
+  }, [status, drawn, updatedAt, gameState.phase, soundOn, livePhase, phaseAt]);
 
   const formatTimer = (ms: number) => {
     const seconds = Math.ceil(ms / 1000);
@@ -337,7 +363,17 @@ export function RainBetView({
     }
   }, [drawn]);
 
-  const currentRoundBets = useMemo(() => {
+  // Round bucket + live list, same rule as the tolobirr autoplay board: only the
+  // CURRENT round's tickets, and only while they are still in play. Bucketing is
+  // by the gateway round id the server stamped on the ticket (free bets:
+  // round_id, cash bets: roundId) — the time-cutoff heuristic above is only a
+  // fallback for when no round id is available. A ticket is listed as
+  // Betting/Pending and leaves the list the moment the gateway settles it, so no
+  // lost badge lingers on the board.
+  const roundBets = useMemo(() => {
+    if (roundId && unifiedBets.some((b) => b.roundId != null)) {
+      return unifiedBets.filter((b) => b.roundId === roundId);
+    }
     const cutoff =
       boundaryTimesRef.current.length < 2
         ? cutoffRef.current
@@ -346,10 +382,14 @@ export function RainBetView({
       const ts = typeof b.betPlacedAt === 'number' ? b.betPlacedAt : b.betPlacedAt ? new Date(b.betPlacedAt).getTime() : 0;
       return ts >= cutoff;
     });
-  }, [unifiedBets, drawn, drawEpoch]);
+  }, [unifiedBets, roundId, drawn, drawEpoch]);
 
-  const activeBets = currentRoundBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
-  const settledBets = currentRoundBets.filter(b => b.status === 'won' || b.status === 'lost');
+  const currentRoundBets = useMemo(
+    () => roundBets.filter((b) => LIVE_STATUSES.has(b.status)),
+    [roundBets],
+  );
+
+  const activeBets = currentRoundBets;
 
   return (
     <div className='overflow-hidden rounded-xl border border-border bg-card text-card-foreground dark:border-white/10 dark:bg-[#0b0f19] dark:text-slate-100'>
@@ -379,9 +419,7 @@ export function RainBetView({
         </div>
 
         <div className='flex items-center gap-2 text-xs'>
-          <span className='text-slate-500 dark:text-slate-400'>{activeBets.length} betting</span>
-          <span className='text-slate-500 dark:text-slate-400'>•</span>
-          <span className='text-slate-500 dark:text-slate-400'>{settledBets.length} settled</span>
+          <span className='text-slate-500 dark:text-slate-400'>{activeBets.length} live</span>
         </div>
       </div>
 
@@ -421,7 +459,7 @@ export function RainBetView({
         <div className='min-w-0'>
           <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'>
             Live Tickets ({currentRoundBets.length})
-            {activeBets.length > 0 && <span className='ml-1.5 font-bold text-emerald-600 dark:text-emerald-400'>· {activeBets.length} betting</span>}
+            {activeBets.length > 0 && <span className='ml-1.5 font-bold text-emerald-600 dark:text-emerald-400'>· {activeBets.length} in play</span>}
           </div>
           {currentRoundBets.length === 0 ? (
             <p className='py-4 text-center text-xs italic text-slate-500'>No tickets placed this round.</p>
@@ -429,8 +467,7 @@ export function RainBetView({
             <div className='flex flex-col gap-2'>
               {currentRoundBets.map((b) => {
                 const isFreeBet = b.betType === 'free_bet';
-                const s = statusInfo({ status: b.status, winAmount: b.winAmount });
-                const isWinner = b.status === 'won';
+                const s = statusInfo({ status: b.status, winAmount: b.winAmount }, gameState.phase);
                 const isFailed = b.status === 'failed';
                 // Highlight digits from the LIVE draw stream so they light up in
                 // real time during the draw (all 20 land by settlement).
@@ -439,13 +476,11 @@ export function RainBetView({
                     key={b.id}
                     title={isFailed && b.failReason ? b.failReason : undefined}
                     className={`rounded-lg border p-2 transition-all ${
-                      isWinner
-                        ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]'
-                        : isFailed
-                          ? 'border-red-500/70 bg-red-500/5'
-                          : isFreeBet
-                            ? 'border-sky-500/40 bg-sky-500/10'
-                            : 'border-border bg-black/5 dark:border-white/10 dark:bg-white/5'
+                      isFailed
+                        ? 'border-red-500/70 bg-red-500/5'
+                        : isFreeBet
+                          ? 'border-sky-500/40 bg-sky-500/10'
+                          : 'border-border bg-black/5 dark:border-white/10 dark:bg-white/5'
                     }`}
                   >
                     <div className='flex items-start justify-between gap-2'>
@@ -476,7 +511,7 @@ export function RainBetView({
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${isFailed ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-black/5 dark:bg-white/5'}`}
                         style={isFailed ? undefined : { color: s.tone }}
                       >
-                        {isWinner ? 'WINNER' : s.text}
+                        {s.text}
                       </span>
                     </div>
                   </div>
@@ -492,7 +527,7 @@ export function RainBetView({
             <div className='keno-board'>
               {Array.from({ length: 80 }, (_, i) => i + 1).map((n) => {
                 const isDrawn = drawn.includes(n);
-                const isWinnerNum = currentRoundBets.some(b => b.status === 'won' && b.spots.includes(n));
+                const isWinnerNum = roundBets.some(b => b.status === 'won' && b.spots.includes(n));
                 const isPick = currentRoundBets.some(b => b.spots.includes(n));
                 return (
                   <div key={n} className={isWinnerNum ? 'keno-tile hit' : isDrawn ? 'keno-tile picked' : 'keno-tile'}>

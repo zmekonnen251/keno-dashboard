@@ -874,6 +874,9 @@ export interface RainFreeBet {
 	slot_index: number | null;
 	status: RainFreeBetStatus;
 	request_id: string | null;
+	// Gateway round id the ticket was placed into (server stamps it at send
+	// time) — buckets the live ticket list to the current round.
+	round_id?: string | null;
 	chosen_spots: number[] | null;
 	bet_placed_at: string | null;
 	drawn_spots: number[] | null;
@@ -936,8 +939,9 @@ export interface PlayRainFreeBetResponse {
 
 // A manual CASH wager placed through a rain account (server Mirrors
 // server/src/rain/rainClaimer.ts RainCashBet). `status` is one of
-// won / lost / failed; `winAmount` is null while pending and on failed bets.
-export type RainCashBetStatus = 'won' | 'lost' | 'failed';
+// pending (written to the socket, not settled yet) / won / lost / failed;
+// `winAmount` is null while pending and on failed bets.
+export type RainCashBetStatus = 'pending' | 'won' | 'lost' | 'failed';
 
 export interface RainCashBet {
 	accountId: number;
@@ -949,10 +953,12 @@ export interface RainCashBet {
 	status: RainCashBetStatus;
 	winAmount: number | null;
 	matched: number | null;
-	drawnSpots: number[];
+	drawnSpots: number[] | null;
 	failReason?: string;
 	placedAt: number;
-	settledAt: number;
+	settledAt: number | null;
+	// Gateway round id the ticket was placed into — buckets the live ticket list.
+	roundId?: string | null;
 }
 
 export interface RainCashBetsResponse {
@@ -982,7 +988,10 @@ export interface RainTestRoundResponse {
 	result: {
 		ok: boolean;
 		played: number;
-		bets: { accountId: number; freeBetId: string; requestId: string }[];
+		// The exact tickets this test round played (account, free-bet id, the
+		// numbers sent, and the gateway round they went into) — so the UI can
+		// list THIS round instead of the whole history.
+		bets: { accountId: number; freeBetId: string; requestId: string; spots: number[]; roundId: string | null }[];
 	};
 }
 

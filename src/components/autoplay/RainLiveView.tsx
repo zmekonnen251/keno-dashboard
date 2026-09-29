@@ -369,7 +369,7 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
                       {b.spots.map((n) => (
                         <span
                           key={n}
-                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold ${b.drawnSpots.includes(n) ? 'bg-emerald-500 text-white' : 'bg-black/40 text-slate-300'}`}
+                          className={`flex h-6 w-6 items-center justify-center rounded font-mono text-[11px] font-extrabold ${(b.drawnSpots ?? []).includes(n) ? 'bg-emerald-500 text-white' : 'bg-black/40 text-slate-300'}`}
                         >
                           {n}
                         </span>
