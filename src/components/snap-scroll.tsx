@@ -16,6 +16,25 @@ export function SnapScroll({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0);
   const [count, setCount] = useState(0);
 
+  // The element that actually scrolls. Normally this IS `ref.current` (the
+  // shell owns the scrollbar once the app layout pins the scroll region to the
+  // viewport height), but we walk up from the shell so the control keeps
+  // working if some ancestor — e.g. <main> on small screens — ends up being
+  // the real scroller instead.
+  const getScroller = useCallback((): HTMLElement | null => {
+    const el = ref.current;
+    if (!el) return null;
+    let node: HTMLElement | null = el;
+    while (node) {
+      if (node.scrollHeight > node.clientHeight + 1) {
+        const cs = getComputedStyle(node);
+        if (/(auto|scroll|overlay)/.test(cs.overflowY)) return node;
+      }
+      node = node.parentElement;
+    }
+    return document.scrollingElement as HTMLElement | null;
+  }, []);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -24,14 +43,15 @@ export function SnapScroll({ children }: { children: ReactNode }) {
       Array.from(el.querySelectorAll<HTMLElement>('[data-snap-section]'));
 
     const measure = () => {
+      const scroller = getScroller();
       const secs = sections();
       setCount(secs.length);
-      if (!secs.length) return;
-      const tops = secs.map((s) => s.offsetTop - el.offsetTop);
+      if (!scroller || !secs.length) return;
+      const scrollerTop = scroller.getBoundingClientRect().top;
       let idx = 0;
       let best = Infinity;
-      for (let i = 0; i < tops.length; i++) {
-        const gap = Math.abs(tops[i] - el.scrollTop);
+      for (let i = 0; i < secs.length; i++) {
+        const gap = Math.abs(secs[i].getBoundingClientRect().top - scrollerTop);
         if (gap < best) {
           best = gap;
           idx = i;
@@ -41,23 +61,39 @@ export function SnapScroll({ children }: { children: ReactNode }) {
     };
 
     measure();
-    el.addEventListener('scroll', measure, { passive: true });
+    // Scroll events don't bubble, but they do pass through ancestors' capture
+    // phase — a capture listener on window catches scrolls from any container,
+    // including the shell itself, <main>, or the document.
+    window.addEventListener('scroll', measure, { capture: true, passive: true });
+    window.addEventListener('resize', measure);
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => {
-      el.removeEventListener('scroll', measure);
+      window.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions);
+      window.removeEventListener('resize', measure);
       ro.disconnect();
     };
-  }, []);
+  }, [getScroller]);
 
-  const goTo = useCallback((idx: number) => {
-    const el = ref.current;
-    if (!el) return;
-    const secs = Array.from(el.querySelectorAll<HTMLElement>('[data-snap-section]'));
-    const target = secs[Math.max(0, Math.min(idx, secs.length - 1))];
-    if (!target) return;
-    el.scrollTo({ top: target.offsetTop - el.offsetTop, behavior: 'smooth' });
-  }, []);
+  const goTo = useCallback(
+    (idx: number) => {
+      const el = ref.current;
+      const scroller = getScroller();
+      if (!el || !scroller) return;
+      const secs = Array.from(el.querySelectorAll<HTMLElement>('[data-snap-section]'));
+      const clamped = Math.max(0, Math.min(idx, secs.length - 1));
+      const target = secs[clamped];
+      if (!target) return;
+      const scrollerTop = scroller.getBoundingClientRect().top;
+      // Absolute scroll position that puts the section's top flush with the
+      // scroller's top edge — correct whether the scroller is the shell, an
+      // ancestor like <main>, or the document.
+      const dest = scroller.scrollTop + target.getBoundingClientRect().top - scrollerTop;
+      scroller.scrollTo({ top: Math.max(0, dest), behavior: 'smooth' });
+      setActive(clamped);
+    },
+    [getScroller],
+  );
 
   const atTop = active <= 0;
   const atBottom = count > 0 && active >= count - 1;

@@ -44,7 +44,7 @@ function statusLabel(p: AutoplayPlacedBet): { text: string; tone: string } {
 }
 
 export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: number[] }) {
-  const { status, observer, drawn, updatedAt } = useLiveDraw();
+  const { status, observer, drawn, updatedAt, roundId, phase: livePhase } = useLiveDraw();
   const [soundOn, setSoundOn] = useState(() => getSoundPref());
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());
@@ -69,30 +69,32 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   });
   const [lastPhaseChange, setLastPhaseChange] = useState<number>(Date.now());
 
-  // Enhanced game state detection with timer
+  // Enhanced game state detection with timer. The observer websocket's own
+  // phase (status.type from the gateway's GAME_STATE frames) is the source of
+  // truth: betting open (WAITING), drawing, or round complete. The wall-clock
+  // inference below is only a fallback until a frame with a phase arrives.
   useEffect(() => {
     const updateGameState = () => {
       const now = Date.now();
       const timeSinceUpdate = updatedAt ? now - new Date(updatedAt).getTime() : Infinity;
 
-      let newPhase: GameState['phase'] = 'unknown';
+      let newPhase: GameState['phase'] = livePhase !== 'unknown' ? livePhase : 'unknown';
       let timer = 0;
 
-      if (status === 'live' && drawn.length === 0) {
-        // Live but no numbers drawn yet - betting phase
-        newPhase = 'betting_open';
-        timer = Math.max(0, BETTING_WINDOW_MS - timeSinceUpdate);
-      } else if (status === 'live' && drawn.length > 0 && drawn.length < 20) {
-        // Drawing in progress
-        newPhase = 'drawing';
-        timer = Math.max(0, DRAWING_DURATION_MS - (drawn.length * (DRAWING_DURATION_MS / 20)));
-      } else if (drawn.length >= 20) {
-        // Draw complete
-        newPhase = 'settled';
-        timer = Math.max(0, ROUND_DURATION_MS - (timeSinceUpdate % ROUND_DURATION_MS));
-      } else {
-        newPhase = 'unknown';
-        timer = 0;
+      if (newPhase === 'unknown') {
+        if (status === 'live' && drawn.length === 0) {
+          // Live but no numbers drawn yet - betting phase
+          newPhase = 'betting_open';
+          timer = Math.max(0, BETTING_WINDOW_MS - timeSinceUpdate);
+        } else if (status === 'live' && drawn.length > 0 && drawn.length < 20) {
+          // Drawing in progress
+          newPhase = 'drawing';
+          timer = Math.max(0, DRAWING_DURATION_MS - (drawn.length * (DRAWING_DURATION_MS / 20)));
+        } else if (drawn.length >= 20) {
+          // Draw complete
+          newPhase = 'settled';
+          timer = Math.max(0, ROUND_DURATION_MS - (timeSinceUpdate % ROUND_DURATION_MS));
+        }
       }
 
       // Detect phase changes and play sounds
@@ -111,7 +113,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
     updateGameState();
     const interval = setInterval(updateGameState, 1000);
     return () => clearInterval(interval);
-  }, [status, drawn, updatedAt, gameState.phase, soundOn]);
+  }, [status, drawn, updatedAt, gameState.phase, soundOn, livePhase]);
 
   // Format timer as MM:SS
   const formatTimer = (ms: number) => {
@@ -189,12 +191,21 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
   }, [drawn]);
 
   const current = useMemo(() => {
+    // Preferred bucketing: match tickets to the round id the websocket is
+    // currently broadcasting. Tickets for the live round stay visible through
+    // betting-open + drawing + settlement, and drop off the moment the NEXT
+    // round's betting window opens (round id advances). Used only when the
+    // observer has seen a round id AND the bets carry one (the server stamps
+    // roundId on placement); otherwise fall back to the time-cutoff heuristic.
+    if (roundId && bets.some((b) => b.roundId != null)) {
+      return bets.filter((b) => b.roundId === roundId);
+    }
     const cutoff =
       boundaryTimesRef.current.length < 2
         ? cutoffRef.current
         : boundaryTimesRef.current[0];
     return bets.filter((b) => (b.placedAt ?? 0) >= cutoff);
-  }, [bets, drawn, drawEpoch]);
+  }, [bets, roundId, drawn, drawEpoch]);
 
   // Celebrate ONLY gateway-settled wins. Pending ("Sent") tickets are frames
   // written to a socket — the game server may never have accepted them — so
@@ -299,7 +310,9 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
                 {formatTimer(gameState.timer)}
               </div>
               {gameState.roundNumber && (
-                <span className='text-xs text-slate-500 dark:text-slate-400'>Round #{gameState.roundNumber}</span>
+                <span className='text-xs text-slate-500 dark:text-slate-400'>
+                  {roundId ? `Round ${roundId}` : `Round #${gameState.roundNumber}`}
+                </span>
               )}
             </div>
           )}
@@ -405,7 +418,13 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           </div>
           {current.length === 0 ? (
             <p className='py-4 text-center text-xs italic text-slate-500'>
-              {gameState.phase === 'betting_open' ? 'Betting open — place your tickets now!' : 'No bets placed in the current game yet.'}
+              {gameState.phase === 'betting_open'
+                ? 'Betting open — place your tickets now!'
+                : gameState.phase === 'drawing'
+                  ? 'No tickets in the drawing round.'
+                  : roundId
+                    ? 'No tickets placed in this round.'
+                    : 'No bets placed in the current game yet.'}
             </p>
           ) : (
             <div className='flex flex-wrap gap-2 lg:max-h-120 lg:overflow-y-auto lg:pr-1'>

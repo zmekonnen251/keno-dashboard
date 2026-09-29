@@ -483,6 +483,9 @@ export interface AutoplayPlacedBet {
 	balanceAfter?: number | null;
 	placedAt?: number;
 	settledAt?: number | null;
+	// Gateway round id the ticket was placed into — buckets the live tickets
+	// list to the current round (betting open + drawing) instead of wall-clock.
+	roundId?: string | null;
 }
 
 export interface CheckBalanceItem {
