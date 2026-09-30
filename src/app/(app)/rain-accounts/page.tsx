@@ -249,6 +249,7 @@ function AutoplayCard() {
         round_interval: config.round_interval,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
         tickets_per_account: config.tickets_per_account ?? 1,
+        use_two_digit_tickets: config.use_two_digit_tickets ?? false,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -349,6 +350,18 @@ function AutoplayCard() {
               Each eligible account places this many cash tickets; a balance that would strand less than 2 Birr is
               played all-in.
             </p>
+          </div>
+          <div className="flex items-center gap-2 self-end">
+            <input
+              id="rain-auto-two-digit"
+              type="checkbox"
+              checked={config.use_two_digit_tickets ?? false}
+              onChange={(e) => setConfig({ ...config, use_two_digit_tickets: e.target.checked })}
+              className="h-4 w-4 accent-blue-600"
+            />
+            <Label htmlFor="rain-auto-two-digit" className="cursor-pointer">
+              2-digit ML dynamic tickets (2-spot pairs)
+            </Label>
           </div>
           <div>
             <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>

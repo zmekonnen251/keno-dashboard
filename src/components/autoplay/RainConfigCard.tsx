@@ -83,6 +83,7 @@ export function RainConfigCard({
         cash_stake: config.cash_stake,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
         tickets_per_account: config.tickets_per_account ?? 1,
+        use_two_digit_tickets: config.use_two_digit_tickets ?? false,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -221,6 +222,23 @@ export function RainConfigCard({
                 all-in ticket.
               </p>
             </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+            <input
+              id="rain-auto-two-digit"
+              type="checkbox"
+              checked={config.use_two_digit_tickets ?? false}
+              onChange={(e) => setConfig({ ...config, use_two_digit_tickets: e.target.checked })}
+              className="h-4 w-4 accent-blue-600"
+            />
+            <Label htmlFor="rain-auto-two-digit" className="cursor-pointer">
+              2-digit ML dynamic tickets — free bets and cash bets play ranked 2-spot pairs
+            </Label>
+            <span className="w-full text-[11px] text-muted-foreground">
+              Pairs predicted from the last 1–3 draws (same digits can redraw next game) plus overdue/time patterns —
+              the same pairs the 2-digit ticket card places manually. Overrides the ticket source above; falls back to
+              it when no completed draw is on record.
+            </span>
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-muted-foreground">

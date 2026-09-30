@@ -36,6 +36,7 @@ export function ConfigCard({
 	const [manualAccountSelection, setManualAccountSelection] = useState(false);
 	const [predTicketBetting, setPredTicketBetting] = useState(false);
 	const [predTicketsPerRound, setPredTicketsPerRound] = useState('');
+	const [useTwoDigitTickets, setUseTwoDigitTickets] = useState(false);
 	const [saving, setSaving] = useState(false);
 
 	function onLoadCurrent() {
@@ -50,6 +51,7 @@ export function ConfigCard({
 		setManualAccountSelection(cfg?.manual_account_selection ?? false);
 		setPredTicketBetting(cfg?.prediction_ticket_betting ?? false);
 		setPredTicketsPerRound(String(cfg?.prediction_tickets_per_round ?? 0));
+		setUseTwoDigitTickets(cfg?.use_two_digit_tickets ?? false);
 		setLoaded(true);
 		onSaved('');
 	}
@@ -66,6 +68,7 @@ export function ConfigCard({
 		setManualAccountSelection(false);
 		setPredTicketBetting(false);
 		setPredTicketsPerRound('');
+		setUseTwoDigitTickets(false);
 		setLoaded(true);
 		onSaved('');
 	}
@@ -86,6 +89,7 @@ export function ConfigCard({
 				manual_account_selection: manualAccountSelection,
 				prediction_ticket_betting: predTicketBetting,
 				prediction_tickets_per_round: predTicketsPerRound !== '' ? parseInt(predTicketsPerRound, 10) : 0,
+				use_two_digit_tickets: useTwoDigitTickets,
 			});
 			onSaved('Configuration saved.');
 			onRefresh();
@@ -202,6 +206,25 @@ export function ConfigCard({
 							Auto-bet recent repetitive tickets (recurrence &amp; pattern-trend picks lead the round)
 						</Label>
 						<span className='ml-auto text-xs text-muted-foreground'>Chains · overdue/time patterns · carryover</span>
+					</div>
+
+					<div className='mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5'>
+						<input
+							id='useTwoDigitTickets'
+							type='checkbox'
+							checked={useTwoDigitTickets}
+							onChange={(e) => setUseTwoDigitTickets(e.target.checked)}
+							className='h-4 w-4 accent-blue-600'
+						/>
+						<Label htmlFor='useTwoDigitTickets' className='cursor-pointer'>
+							2-digit ML dynamic tickets — every ticket is a ranked 2-spot pair from the last draws
+						</Label>
+						<span className='ml-auto text-xs text-muted-foreground'>2-spot pairs · repeat-number + pattern signals</span>
+						<span className='w-full text-[11px] text-muted-foreground'>
+							Overrides the mode number source (and the digits-per-ticket choice) while the pairs are
+							available; the stake and tickets-per-account rules are unchanged. Falls back to the mode
+							tickets when no completed draw is on record.
+						</span>
 					</div>
 
 					<div className='mt-2 flex items-center gap-3 rounded-lg border border-border px-3 py-2.5'>

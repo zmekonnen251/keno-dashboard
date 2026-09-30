@@ -436,6 +436,9 @@ export interface AutoplayConfig {
 	prediction_tickets_per_round: number;
 	// How many tickets EACH account places per round (1 = one per account).
 	tickets_per_account: number;
+	// Bet the "2-digit ML dynamic tickets" (ranked 2-spot pairs from the last
+	// 1-3 draws + recurrence patterns) instead of the mode A/B/C number source.
+	use_two_digit_tickets: boolean;
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
@@ -909,6 +912,9 @@ export interface RainAutoplayConfig {
 	recurrence_tickets_per_round: number;
 	// How many CASH tickets each eligible account places per round.
 	tickets_per_account: number;
+	// Bet the "2-digit ML dynamic tickets" (ranked 2-spot pairs) on both the
+	// free-bet and cash paths instead of the spots_mode sources.
+	use_two_digit_tickets: boolean;
 	updated_at: string;
 }
 
