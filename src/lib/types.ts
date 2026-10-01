@@ -1136,117 +1136,147 @@ export interface ChickenRoadFreeBetsResponse {
 	bets: ChickenRoadFreeBet[];
 }
 
+// Chicken Road is a crash/lane game: the risk knob is the lane the chicken must reach
+// before the round cashes out. `risk_level` is only a named shortcut for a lane, and a
+// hand-edited lane is reported as 'custom'.
+export type ChickenRoadDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXTREME';
+export type ChickenRoadRiskLevel = 'safe' | 'balanced' | 'aggressive' | 'high_risk' | 'custom';
+
+export interface ChickenRoadRiskPreset {
+	level: Exclude<ChickenRoadRiskLevel, 'custom'>;
+	label: string;
+	base_lane: number;
+	/** A rough figure for the preset's lane; the live ladder is authoritative. */
+	reference_multiplier: number;
+	blurb: string;
+}
+
+export interface ChickenRoadDifficultyLanes {
+	key: ChickenRoadDifficulty;
+	lanes: number;
+}
+
+// The presets and per-difficulty lane counts travel with every config/status response so
+// the UI never hardcodes a copy that can drift from the server's.
+export interface ChickenRoadReference {
+	riskLevels: ChickenRoadRiskPreset[];
+	difficulties: ChickenRoadDifficultyLanes[];
+}
+
 export interface ChickenRoadAutoplayConfig {
 	id: 1;
 	enabled: boolean;
 	provider: ChickenRoadProvider;
-	tickets_per_round: number;
-	spots_mode: 'prediction' | 'prediction_tickets' | 'manual';
-	manual_spots: number[];
-	round_interval: number;
-	use_cash_after_free_bets: boolean;
-	cash_stake: number;
+	difficulty: ChickenRoadDifficulty;
+	risk_level: ChickenRoadRiskLevel;
+	base_lane: number;
+	rng_variance: number;
+	base_wager: number;
+	stake_mode: 'fixed' | 'percent';
+	stake_value: number;
+	max_stake: number | null;
+	loss_streak_stop: number;
+	daily_loss_stop: number | null;
+	free_bet_only: boolean;
+	delay_between_rounds_ms: number;
 	updated_at: string;
 }
 
-export interface ChickenRoadAutoplayConfigResponse {
+export interface ChickenRoadAutoplayConfigResponse extends ChickenRoadReference {
 	ok: boolean;
 	config: ChickenRoadAutoplayConfig;
 }
 
-export interface ChickenRoadAutoplayStatus {
-	running: boolean;
-	intervalMs: number;
-	lastRoundAt: number | null;
-	lastRoundDurationMs: number | null;
-	lastRoundPlayed: number;
-	totalPlayed: number;
-	lastError: string | null;
-	pendingAcks: number;
-	freeBetsPlayed: number;
-	cashBetsPlayed: number;
+export interface ChickenRoadAccountStatus {
+	accountId: number;
+	name: string;
+	phase: string;
+	connected: boolean;
+	gameConfigReady: boolean;
+	currentLane: number;
+	multiplier: number | null;
+	targetLane: number | null;
+	baseLane: number;
+	variance: number;
+	balance: number | null;
+	freeBetsAvailable: number;
+	nextEligibleAt: number | null;
+	lastSkipReason: string | null;
+	played: number;
+	won: number;
+	lost: number;
+	failed: number;
+	lossStreak: number;
+	netCash: number;
+	deathLanes: number[];
 }
 
-export interface ChickenRoadAutoplayStatusResponse {
+export interface ChickenRoadAutoplayStatus {
+	running: boolean;
+	stoppedReason: string | null;
+	lastError: string | null;
+	lastTickAt: number | null;
+	riskLevel: ChickenRoadRiskLevel;
+	riskLabel: string;
+	difficulty: ChickenRoadDifficulty;
+	baseLane: number;
+	rngVariance: number;
+	nextTargetLane: number;
+	nextTargetMultiplier: number | null;
+	impliedWinProbability: number | null;
+	baseWager: number;
+	stakeMode: 'fixed' | 'percent';
+	stakeValue: number;
+	freeBetOnly: boolean;
+	delayBetweenRoundsMs: number;
+	totalPlayed: number;
+	cashBetsPlayed: number;
+	freeBetsPlayed: number;
+	wins: number;
+	losses: number;
+	failed: number;
+	cashStaked: number;
+	cashReturned: number;
+	netCash: number;
+	lossStreak: number;
+	lossStreakStop: number;
+	dailyLossStop: number | null;
+	accounts: ChickenRoadAccountStatus[];
+}
+
+export interface ChickenRoadAutoplayStatusResponse extends ChickenRoadReference {
 	ok: boolean;
 	status: ChickenRoadAutoplayStatus;
 	config: ChickenRoadAutoplayConfig;
 }
 
-export interface PlayChickenRoadFreeBetResponse {
-	ok: boolean;
-	result: { ok: boolean; found: boolean; request_id?: string; error?: string };
-}
-
-export type ChickenRoadCashBetStatus = 'won' | 'lost' | 'failed';
-
-export interface ChickenRoadCashBet {
-	accountId: number;
-	phone: string;
-	accountName: string;
-	spots: number[];
-	stake: number;
-	requestId: string;
-	status: ChickenRoadCashBetStatus;
-	winAmount: number | null;
-	matched: number | null;
-	drawnSpots: number[];
-	failReason?: string;
-	placedAt: number;
-	settledAt: number;
-}
-
-export interface ChickenRoadCashBetsResponse {
-	ok: boolean;
-	count: number;
-	bets: ChickenRoadCashBet[];
-}
-
-export interface ChickenRoadManualBetResponse {
-	ok: boolean;
-	result: {
-		ok: boolean;
-		requestId: string;
-		balance: number | null;
-		error?: string;
-	};
-}
-
-export interface ChickenRoadTestRoundResponse {
-	ok: boolean;
-	result: {
-		ok: boolean;
-		played: number;
-		bets: { accountId: number; freeBetId: string; requestId: string }[];
-	};
-}
-
-export interface ChickenRoadWsToken {
+// One settled lane round from the server ledger. The dashboard reads these to show what
+// the engine actually did (target vs reached, payout, profit) rather than a prediction.
+export interface ChickenRoadRound {
 	id: number;
-	name: string;
-	phone: string;
-	provider: ChickenRoadProvider;
-	gateway_host: string;
-	ws_token: string | null;
+	account_id: number;
+	request_id: string;
+	free_bet_id: string | null;
+	difficulty: ChickenRoadDifficulty | null;
+	wager_type: 'CASH' | 'FREE_BET';
+	stake: number;
+	target_multiplier: number;
+	target_lane: number | null;
+	cash_out_lane: number | null;
+	multiplier: number | null;
+	payout: number;
+	profit: number;
+	outcome: string | null;
+	status: 'placed' | 'cashed_out' | 'died' | 'reached_end' | 'failed';
+	placed_at: string;
+	settled_at: string | null;
 }
 
-export interface ChickenRoadWsTokensResponse {
+export interface ChickenRoadRoundsResponse {
 	ok: boolean;
+	source: 'live' | 'ledger';
 	count: number;
-	tokens: ChickenRoadWsToken[];
-}
-
-export interface ChickenRoadPredictionResponse {
-	ok: boolean;
-	prediction?: {
-		picks: number[];
-		strategy: 'cluster' | 'standard' | 'pattern';
-		difficulty: { level: string; confidence: number; recommendedSpotRange: { min: number; max: number }; recommendedStrategy: string; dominantPattern: string };
-		repetitivePatterns: any[];
-		clusters: any[];
-		metrics: any[];
-		volatility: any;
-	};
+	rounds: ChickenRoadRound[];
 }
 
 // ---- Odds drop monitor + soccer suggester (mirrors server/src/odds/types.ts) ----

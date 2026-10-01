@@ -53,12 +53,7 @@ import type {
   ChickenRoadAutoplayConfigResponse,
   ChickenRoadAutoplayStatusResponse,
   ChickenRoadFreeBetsResponse,
-  PlayChickenRoadFreeBetResponse,
-  ChickenRoadCashBetsResponse,
-  ChickenRoadManualBetResponse,
-  ChickenRoadTestRoundResponse,
-  ChickenRoadWsTokensResponse,
-  ChickenRoadPredictionResponse,
+  ChickenRoadRoundsResponse,
   OddsDrop,
   OddsSuggestion,
   OddsWatcherConfig,
@@ -548,13 +543,31 @@ export async function getChickenRoadClaims(id: number): Promise<ChickenRoadClaim
   return apiFetch<ChickenRoadClaimsResponse>(`api/chicken-road/accounts/${id}/claims`);
 }
 
-// ---- chicken road autoplay (clock-driven free-bet rounds) ----
+// ---- chicken road autoplay (lane-based crash game) ----
 export async function getChickenRoadAutoplayConfig(): Promise<ChickenRoadAutoplayConfigResponse> {
   return apiFetch<ChickenRoadAutoplayConfigResponse>('api/chicken-road/autoplay/config');
 }
 
 export async function setChickenRoadAutoplayConfig(
-  patch: Partial<Pick<ChickenRoadAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake'>>,
+  patch: Partial<
+    Pick<
+      ChickenRoadAutoplayConfig,
+      | 'enabled'
+      | 'provider'
+      | 'difficulty'
+      | 'risk_level'
+      | 'base_lane'
+      | 'rng_variance'
+      | 'base_wager'
+      | 'stake_mode'
+      | 'stake_value'
+      | 'max_stake'
+      | 'loss_streak_stop'
+      | 'daily_loss_stop'
+      | 'free_bet_only'
+      | 'delay_between_rounds_ms'
+    >
+  >,
 ): Promise<ChickenRoadAutoplayConfigResponse> {
   return apiFetch<ChickenRoadAutoplayConfigResponse>('api/chicken-road/autoplay/config', {
     method: 'PATCH',
@@ -574,77 +587,27 @@ export async function getChickenRoadAutoplayStatus(): Promise<ChickenRoadAutopla
   return apiFetch<ChickenRoadAutoplayStatusResponse>('api/chicken-road/autoplay/status');
 }
 
+export async function playNowChickenRoadRound(accountId: number): Promise<{ ok: boolean; result?: unknown; error?: string }> {
+  return apiFetch<{ ok: boolean; result?: unknown; error?: string }>('api/chicken-road/autoplay/play-now', {
+    method: 'POST',
+    body: JSON.stringify({ account_id: accountId }),
+  });
+}
+
 export async function getChickenRoadFreeBets(): Promise<ChickenRoadFreeBetsResponse> {
   return apiFetch<ChickenRoadFreeBetsResponse>('api/chicken-road/free-bets');
 }
 
-export async function playChickenRoadFreeBet(id: number, spots?: number[]): Promise<PlayChickenRoadFreeBetResponse> {
-  return apiFetch<PlayChickenRoadFreeBetResponse>(`api/chicken-road/free-bets/${id}/play`, {
-    method: 'POST',
-    body: spots && spots.length ? JSON.stringify({ spots }) : undefined,
-  });
-}
-
-// Manual "Bet Prediction" for chicken road: plays the latest prediction's preferred
-// ticket on one eligible free bet (wager = the free bet's own amount).
-export async function chickenRoadBetPrediction(): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
-  return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/chicken-road/bet-prediction', {
-    method: 'POST',
-  });
-}
-
-// Get AI prediction for chicken road autoplay (uses DB draws + extension-like logic)
-export async function getChickenRoadPrediction(provider = 'chicken_road', k = 3) {
-  return apiFetch<ChickenRoadPredictionResponse>(`api/chicken-road/prediction?provider=${encodeURIComponent(provider)}&k=${k}`);
-}
-
-// Forced test round: the engine immediately plays as many eligible free-bets
-// as the current config allows, whether or not it is running.
-export async function chickenRoadTestRound(): Promise<ChickenRoadTestRoundResponse> {
-  return apiFetch<ChickenRoadTestRoundResponse>('api/chicken-road/autoplay/test-round', { method: 'POST' });
-}
-
-// Manual CASH wager through a chicken road account. Spots are the keno numbers
-// (1–10 of 1–80), stake is the amount to bet.
-export async function chickenRoadManualCashBet(
-  accountId: number,
-  spots: number[],
-  stake: number,
-): Promise<ChickenRoadManualBetResponse> {
-  return apiFetch<ChickenRoadManualBetResponse>('api/chicken-road/autoplay/manual-bet', {
-    method: 'POST',
-    body: JSON.stringify({ account_id: accountId, spots, stake }),
-  });
-}
-
-// Recent manual CASH wagers across all chicken road accounts (newest first).
-export async function getChickenRoadCashBets(limit = 100): Promise<ChickenRoadCashBetsResponse> {
-  return apiFetch<ChickenRoadCashBetsResponse>(`api/chicken-road/cash-bets?limit=${limit}`);
-}
-
-// Raw ws_tokens for the live-drawing observer (admin-only). Never rendered.
-export async function getChickenRoadWsTokens(): Promise<ChickenRoadWsTokensResponse> {
-  return apiFetch<ChickenRoadWsTokensResponse>('api/chicken-road/accounts/ws-tokens');
-}
-
-// Chicken Road ticket config (multi-ticket queue like extension)
-export async function getChickenRoadTicketConfig(): Promise<{ ok: boolean; config: RainTicketConfig }> {
-  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/chicken-road/autoplay/ticket-config');
-}
-
-export async function setChickenRoadTicketConfig(patch: { tickets: BotTicket[] }): Promise<{ ok: boolean; config: RainTicketConfig }> {
-  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/chicken-road/autoplay/ticket-config', {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
-  });
-}
-
-// Generate preview picks for all tickets
-export async function getChickenRoadTicketPreview(tickets: BotTicket[], provider: string, ticketsPerRound: number): Promise<{ ok: boolean; previews: Record<string, number[]> }> {
-  return apiFetch<{ ok: boolean; previews: Record<string, number[]> }>('api/chicken-road/autoplay/ticket-preview', {
-    method: 'POST',
-    body: JSON.stringify({ tickets, provider, tickets_per_round: ticketsPerRound }),
-  });
+// Recent lane rounds, newest first. `live` reads the claimer's in-memory ring; the
+// default reads the durable ledger that survives a restart.
+export async function getChickenRoadRounds(
+  limit = 50,
+  opts: { live?: boolean; accountId?: number } = {},
+): Promise<ChickenRoadRoundsResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (opts.live) params.set('live', '1');
+  if (opts.accountId != null) params.set('account_id', String(opts.accountId));
+  return apiFetch<ChickenRoadRoundsResponse>(`api/chicken-road/rounds?${params.toString()}`);
 }
 
 // ---- proxies ----

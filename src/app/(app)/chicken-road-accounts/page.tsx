@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,9 +13,9 @@ import {
   chickenRoadAutoplayStart,
   chickenRoadAutoplayStop,
   getChickenRoadAutoplayStatus,
+  playNowChickenRoadRound,
   getChickenRoadFreeBets,
-  playChickenRoadFreeBet,
-  chickenRoadBetPrediction,
+  getChickenRoadRounds,
 } from '@/lib/api';
 import type {
   ChickenRoadAccount,
@@ -25,6 +24,9 @@ import type {
   ChickenRoadAutoplayConfig,
   ChickenRoadFreeBet,
   ChickenRoadAutoplayStatus,
+  ChickenRoadRiskLevel,
+  ChickenRoadRiskPreset,
+  ChickenRoadRound,
 } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -61,6 +63,14 @@ const SPOT_STATUS_LABEL: Record<ChickenRoadFreeBet['status'], { label: string; c
   lost: { label: 'Lost', cls: 'bg-zinc-600 text-white' },
   failed: { label: 'Failed', cls: 'bg-rose-600 text-white' },
   expired: { label: 'Expired', cls: 'bg-muted text-muted-foreground' },
+};
+
+const ROUND_STATUS_LABEL: Record<ChickenRoadRound['status'], string> = {
+  placed: 'Placed',
+  cashed_out: 'Cashed out',
+  died: 'Died',
+  reached_end: 'Reached end',
+  failed: 'Failed',
 };
 
 function ProviderBadge({ provider }: { provider: ChickenRoadProvider }) {
@@ -184,23 +194,24 @@ function AccountForm({
   );
 }
 
-// Clock-driven chicken road autoplay: a single config row gates the engine on the
-// server, which plays eligible chicken road free-bets each round.
+// An optional numeric field (max_stake / daily_loss_stop): a blank string is "off", which
+// the config surface represents as null.
+function toNullableNumber(text: string): number | null {
+  const t = text.trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Lane-based chicken road autoplay. The risk dial is the cash-out LANE; a named preset is
+// only a shortcut for one, and a hand-edited lane is reported as 'custom'. The engine runs
+// server-side over the gateway socket, so this card reads/writes config and mirrors status.
 function AutoplayCard() {
   const [config, setConfig] = useState<ChickenRoadAutoplayConfig | null>(null);
   const [status, setStatus] = useState<ChickenRoadAutoplayStatus | null>(null);
+  const [presets, setPresets] = useState<ChickenRoadRiskPreset[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [manualDraft, setManualDraft] = useState<string | null>(null);
-
-  function parseManualSpots(text: string): number[] {
-    return text
-      .split(/[,;\n\r]+/)
-      .flatMap((part) => part.trim().split(/\s+/))
-      .map((s) => Number(s))
-      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80)
-      .slice(0, 20);
-  }
 
   useEffect(() => {
     let alive = true;
@@ -209,6 +220,7 @@ function AutoplayCard() {
         const res = await getChickenRoadAutoplayStatus();
         if (!alive) return;
         setStatus(res.status);
+        setPresets(res.riskLevels ?? []);
         setConfig((c) => (c ? { ...c, ...res.config } : res.config));
       } catch (e) {
         if (!alive) return;
@@ -216,12 +228,31 @@ function AutoplayCard() {
       }
     };
     void tick();
-    const timer = setInterval(() => { void tick(); }, 10000);
+    const timer = setInterval(() => { void tick(); }, 5000);
     return () => {
       alive = false;
       clearInterval(timer);
     };
   }, []);
+
+  function patch<K extends keyof ChickenRoadAutoplayConfig>(key: K, value: ChickenRoadAutoplayConfig[K]) {
+    setConfig((c) => (c ? { ...c, [key]: value } : c));
+  }
+
+  // A preset rewrites the lane; editing the lane demotes the level to custom. Keeping the
+  // two in step here means the server never has to reject a contradictory save.
+  function chooseRisk(level: ChickenRoadRiskLevel) {
+    setConfig((c) => {
+      if (!c) return c;
+      if (level === 'custom') return { ...c, risk_level: 'custom' };
+      const preset = presets.find((p) => p.level === level);
+      return { ...c, risk_level: level, base_lane: preset ? preset.base_lane : c.base_lane };
+    });
+  }
+
+  function editLane(value: number) {
+    setConfig((c) => (c ? { ...c, base_lane: value, risk_level: 'custom' } : c));
+  }
 
   async function save() {
     if (!config) return;
@@ -231,13 +262,21 @@ function AutoplayCard() {
       const res = await setChickenRoadAutoplayConfig({
         enabled: config.enabled,
         provider: config.provider,
-        tickets_per_round: config.tickets_per_round,
-        spots_mode: config.spots_mode,
-        manual_spots: parseManualSpots(manualDraft ?? ''),
-        round_interval: config.round_interval,
+        difficulty: config.difficulty,
+        risk_level: config.risk_level,
+        base_lane: config.base_lane,
+        rng_variance: config.rng_variance,
+        base_wager: config.base_wager,
+        stake_mode: config.stake_mode,
+        stake_value: config.stake_value,
+        max_stake: config.max_stake,
+        loss_streak_stop: config.loss_streak_stop,
+        daily_loss_stop: config.daily_loss_stop,
+        free_bet_only: config.free_bet_only,
+        delay_between_rounds_ms: config.delay_between_rounds_ms,
       });
       setConfig(res.config);
-      setManualDraft(null);
+      if (res.riskLevels) setPresets(res.riskLevels);
       setMsg('Autoplay config saved.');
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -272,6 +311,20 @@ function AutoplayCard() {
     }
   }
 
+  async function playNow(accountId: number) {
+    setMsg('');
+    try {
+      const res = await playNowChickenRoadRound(accountId);
+      setMsg(res.ok ? `Round placed on account #${accountId}.` : res.error || 'Could not place the round.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  const nextMult = status?.nextTargetMultiplier ?? null;
+  const implied = status?.impliedWinProbability ?? null;
+  const activePreset = presets.find((p) => p.level === config?.risk_level);
+
   return (
     <Card
       title="Chicken Road Autoplay"
@@ -292,7 +345,7 @@ function AutoplayCard() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Label htmlFor="cr-auto-enabled">Enabled</Label>
-            <Select value={String(config.enabled)} onValueChange={(v) => setConfig({ ...config, enabled: v === 'true' })}>
+            <Select value={String(config.enabled)} onValueChange={(v) => patch('enabled', v === 'true')}>
               <SelectTrigger id="cr-auto-enabled"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Enabled — run rounds when started</SelectItem>
@@ -301,69 +354,187 @@ function AutoplayCard() {
             </Select>
           </div>
           <div>
-            <Label htmlFor="cr-auto-provider">Provider</Label>
-            <Select value={config.provider} onValueChange={(v) => setConfig({ ...config, provider: v as ChickenRoadProvider })}>
-              <SelectTrigger id="cr-auto-provider"><SelectValue /></SelectTrigger>
+            <Label htmlFor="cr-auto-difficulty">Difficulty</Label>
+            <Select value={config.difficulty} onValueChange={(v) => patch('difficulty', v as ChickenRoadAutoplayConfig['difficulty'])}>
+              <SelectTrigger id="cr-auto-difficulty"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {PROVIDERS.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                {(['EASY', 'MEDIUM', 'HARD', 'EXTREME'] as const).map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="cr-auto-tickets">Tickets per round</Label>
+            <Label htmlFor="cr-auto-risk">Risk level</Label>
+            <Select value={config.risk_level} onValueChange={(v) => chooseRisk(v as ChickenRoadRiskLevel)}>
+              <SelectTrigger id="cr-auto-risk"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {presets.map((p) => (
+                  <SelectItem key={p.level} value={p.level}>{p.label} — lane {p.base_lane}</SelectItem>
+                ))}
+                <SelectItem value="custom">Custom lane</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {activePreset?.blurb ?? 'Custom: the cash-out lane below is the risk dial.'}
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-lane">Cash-out lane</Label>
             <Input
-              id="cr-auto-tickets"
+              id="cr-auto-lane"
+              type="number"
+              min={1}
+              value={config.base_lane}
+              onChange={(e) => editLane(Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-variance">Lane variance (±)</Label>
+            <Input
+              id="cr-auto-variance"
               type="number"
               min={0}
-              max={50}
-              value={config.tickets_per_round}
-              onChange={(e) => setConfig({ ...config, tickets_per_round: Number(e.target.value) })}
+              max={10}
+              value={config.rng_variance}
+              onChange={(e) => patch('rng_variance', Number(e.target.value))}
             />
           </div>
           <div>
-            <Label htmlFor="cr-auto-interval">Round interval (seconds)</Label>
+            <Label htmlFor="cr-auto-wager">Base wager (ETB)</Label>
             <Input
-              id="cr-auto-interval"
+              id="cr-auto-wager"
               type="number"
-              min={5}
-              max={3600}
-              value={config.round_interval}
-              onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
+              min={0}
+              step="0.5"
+              value={config.base_wager}
+              onChange={(e) => patch('base_wager', Number(e.target.value))}
             />
           </div>
           <div>
-            <Label htmlFor="cr-auto-spots-mode">Chosen spots source</Label>
-            <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v as ChickenRoadAutoplayConfig['spots_mode'] })}>
-              <SelectTrigger id="cr-auto-spots-mode"><SelectValue /></SelectTrigger>
+            <Label htmlFor="cr-auto-stake-mode">Stake mode</Label>
+            <Select value={config.stake_mode} onValueChange={(v) => patch('stake_mode', v as 'fixed' | 'percent')}>
+              <SelectTrigger id="cr-auto-stake-mode"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="manual">Manual spots below</SelectItem>
-                <SelectItem value="prediction">ML prediction (chicken_road)</SelectItem>
-                <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
+                <SelectItem value="fixed">Fixed amount</SelectItem>
+                <SelectItem value="percent">Percent of balance</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="cr-auto-manual-spots">Manual spots / ticket (1–80, comma or space separated)</Label>
+            <Label htmlFor="cr-auto-stake-value">{config.stake_mode === 'percent' ? 'Stake (% of balance)' : 'Stake (ETB)'}</Label>
             <Input
-              type="text"
-              id="cr-auto-manual-spots"
-              value={manualDraft ?? config.manual_spots.join(', ')}
-              onChange={(e) => setManualDraft(e.target.value)}
-              placeholder="e.g. 5, 12, 23, 40"
-              disabled={config.spots_mode !== 'manual'}
+              id="cr-auto-stake-value"
+              type="number"
+              min={0}
+              step="0.5"
+              value={config.stake_value}
+              onChange={(e) => patch('stake_value', Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-max-stake">Max stake (blank = game max)</Label>
+            <Input
+              id="cr-auto-max-stake"
+              type="number"
+              min={0}
+              step="0.5"
+              value={config.max_stake ?? ''}
+              onChange={(e) => patch('max_stake', toNullableNumber(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-free-only">Free bets only</Label>
+            <Select value={String(config.free_bet_only)} onValueChange={(v) => patch('free_bet_only', v === 'true')}>
+              <SelectTrigger id="cr-auto-free-only"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">Spend free bets, then cash</SelectItem>
+                <SelectItem value="true">Free bets only — never the wallet</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-delay">Pause between rounds (ms)</Label>
+            <Input
+              id="cr-auto-delay"
+              type="number"
+              min={0}
+              max={60000}
+              step={250}
+              value={config.delay_between_rounds_ms}
+              onChange={(e) => patch('delay_between_rounds_ms', Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-loss-stop">Stop after N losses (0 = off)</Label>
+            <Input
+              id="cr-auto-loss-stop"
+              type="number"
+              min={0}
+              max={50}
+              value={config.loss_streak_stop}
+              onChange={(e) => patch('loss_streak_stop', Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cr-auto-daily-stop">Daily loss stop (ETB, blank = off)</Label>
+            <Input
+              id="cr-auto-daily-stop"
+              type="number"
+              min={0}
+              step="1"
+              value={config.daily_loss_stop ?? ''}
+              onChange={(e) => patch('daily_loss_stop', toNullableNumber(e.target.value))}
             />
           </div>
         </div>
       )}
       {status && (
-        <div className="mt-3 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-          <span>Rounds played total: <b>{status.totalPlayed}</b></span>
-          <span>Last round: <b>{status.lastRoundPlayed}</b> bet{status.lastRoundPlayed === 1 ? '' : 's'}</span>
-          <span>Last round at: <b>{status.lastRoundAt ? formatTime(new Date(status.lastRoundAt).toISOString()) : '—'}</b></span>
-          <span>Pending acks: <b>{status.pendingAcks}</b></span>
-          {status.lastError && <span className="text-rose-600 dark:text-rose-400 sm:col-span-2 lg:col-span-4">Last error: {status.lastError}</span>}
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+            <span>
+              Next target: <b>lane {status.nextTargetLane}</b>
+              {nextMult != null && <> at <b>×{nextMult.toFixed(2)}</b></>}
+              {implied != null && <> (~{(implied * 100).toFixed(1)}% implied)</>}
+            </span>
+            <span>Rounds: <b>{status.totalPlayed}</b> (cash {status.cashBetsPlayed} / free {status.freeBetsPlayed})</span>
+            <span>W / L / F: <b>{status.wins} / {status.losses} / {status.failed}</b></span>
+            <span>
+              Net cash:{' '}
+              <b className={status.netCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                {status.netCash.toFixed(2)} ETB
+              </b>
+            </span>
+            <span>Loss streak: <b>{status.lossStreak}</b>{status.lossStreakStop > 0 ? <> / {status.lossStreakStop}</> : ' (stop off)'}</span>
+            <span>Daily loss stop: <b>{status.dailyLossStop != null ? `${status.dailyLossStop} ETB` : 'off'}</b></span>
+            {status.stoppedReason && (
+              <span className="text-rose-600 dark:text-rose-400 sm:col-span-2 lg:col-span-4">Stopped: {status.stoppedReason}</span>
+            )}
+            {status.lastError && (
+              <span className="text-rose-600 dark:text-rose-400 sm:col-span-2 lg:col-span-4">Last error: {status.lastError}</span>
+            )}
+          </div>
+          {status.accounts.length > 0 && (
+            <div className="space-y-2">
+              {status.accounts.map((a) => (
+                <div key={a.accountId} className="flex items-center justify-between rounded-lg border p-2 text-xs">
+                  <div className="flex-1">
+                    <b>{a.name}</b>
+                    <span className="text-muted-foreground">
+                      {' · '}{a.connected ? a.phase : 'offline'}
+                      {a.currentLane >= 0 && <> · lane {a.currentLane}{a.multiplier != null ? ` (×${a.multiplier})` : ''}</>}
+                      {' · '}target {a.targetLane ?? '—'}
+                      {a.balance != null && <> · {a.balance.toFixed(2)} ETB</>}
+                      {a.freeBetsAvailable > 0 && <> · {a.freeBetsAvailable} free bet{a.freeBetsAvailable === 1 ? '' : 's'}</>}
+                      {' · '}{a.won}W/{a.lost}L
+                    </span>
+                    {a.lastSkipReason && <span className="text-amber-600 dark:text-amber-400"> · {a.lastSkipReason}</span>}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => playNow(a.accountId)}>Play now</Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="mt-4 flex justify-end">
@@ -381,17 +552,15 @@ export default function ChickenRoadAccountsPage() {
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [freeBets, setFreeBets] = useState<ChickenRoadFreeBet[] | null>(null);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
-  const [playHistory, setPlayHistory] = useState<ChickenRoadFreeBet[] | null>(null);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [rounds, setRounds] = useState<ChickenRoadRound[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [bettingPrediction, setBettingPrediction] = useState(false);
   const [checkingAll, setCheckingAll] = useState(false);
   const [msg, setMsg] = useState('');
 
-  async function loadPlayHistory() {
+  async function loadRounds() {
     try {
-      const res = await getChickenRoadFreeBets();
-      setPlayHistory(res.bets.filter((b) => (b.chosen_spots?.length ?? 0) > 0));
+      const res = await getChickenRoadRounds(50);
+      setRounds(res.rounds);
     } catch {
       /* keep the last list */
     }
@@ -399,9 +568,9 @@ export default function ChickenRoadAccountsPage() {
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
-      void loadPlayHistory();
+      void loadRounds();
     }, 0);
-    const timer = setInterval(() => { refresh(); void loadPlayHistory(); }, 10000);
+    const timer = setInterval(() => { refresh(); void loadRounds(); }, 10000);
     return () => {
       window.clearTimeout(initialLoad);
       clearInterval(timer);
@@ -439,7 +608,7 @@ export default function ChickenRoadAccountsPage() {
       await refreshChickenRoadAccount(acc.id);
       setMsg(`Reconnect sent for "${acc.name}".`);
       refresh();
-      void loadPlayHistory();
+      void loadRounds();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -453,7 +622,7 @@ export default function ChickenRoadAccountsPage() {
     try {
       const res = await checkAllChickenRoadStatus();
       refresh();
-      void loadPlayHistory();
+      void loadRounds();
       await new Promise((r) => setTimeout(r, 1500));
       refresh();
       setMsg(res.reconnected > 0
@@ -491,41 +660,6 @@ export default function ChickenRoadAccountsPage() {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setFreeBetsLoading(false);
-    }
-  }
-
-  async function onBetPrediction() {
-    setBettingPrediction(true);
-    setMsg('');
-    try {
-      const res = await chickenRoadBetPrediction();
-      if (!res.ok || !res.result?.ok) {
-        setMsg(res.result?.error || 'Prediction bet failed.');
-      } else {
-        setMsg('Prediction bet placed on an eligible chicken road free-bet (wager = the free-bet amount).');
-      }
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBettingPrediction(false);
-    }
-  }
-
-  async function onPlayFreeBet(bet: ChickenRoadFreeBet) {
-    setPlayingId(bet.id);
-    setMsg('');
-    try {
-      const res = await playChickenRoadFreeBet(bet.id);
-      if (!res.result.ok) {
-        setMsg(res.result.error || 'Failed to place bet.');
-      } else {
-        setMsg(`Bet placed for ${bet.free_bet_id} (row #${bet.id}).`);
-      }
-      await onShowFreeBets();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPlayingId(null);
     }
   }
 
@@ -584,15 +718,11 @@ export default function ChickenRoadAccountsPage() {
 
       <Card
         title="Free Bets"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onBetPrediction} disabled={bettingPrediction}>
-              {bettingPrediction ? 'Betting…' : 'Bet prediction'}
-            </Button>
-            <Button size="sm" onClick={onShowFreeBets}>Refresh</Button>
-          </div>
-        }
+        actions={<Button size="sm" onClick={onShowFreeBets}>Refresh</Button>}
       >
+        <p className="mb-2 text-xs text-muted-foreground">
+          The server engine spends these automatically before it touches the wallet.
+        </p>
         {freeBetsLoading ? (
           <Loading rows={3} />
         ) : !freeBets || freeBets.length === 0 ? (
@@ -611,19 +741,53 @@ export default function ChickenRoadAccountsPage() {
                     {bet.expires_at && <> · Expires: {formatTime(bet.expires_at)}</>}
                   </div>
                 </div>
-                {bet.status === 'available' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onPlayFreeBet(bet)}
-                    disabled={playingId === bet.id}
-                  >
-                    {playingId === bet.id ? 'Playing…' : 'Play'}
-                  </Button>
-                )}
               </div>
             ))}
           </div>
+        )}
+      </Card>
+
+      <Card
+        title="Recent Rounds"
+        actions={<Button size="sm" onClick={loadRounds}>Refresh</Button>}
+      >
+        {!rounds ? (
+          <Loading rows={3} />
+        ) : rounds.length === 0 ? (
+          <Empty label="No rounds played yet" />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead>Target lane</TableHead>
+                <TableHead>Cash-out lane</TableHead>
+                <TableHead>Multiplier</TableHead>
+                <TableHead>Stake</TableHead>
+                <TableHead>Payout</TableHead>
+                <TableHead>Profit</TableHead>
+                <TableHead>Result</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rounds.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>{formatTime(r.settled_at ?? r.placed_at)}</TableCell>
+                  <TableCell>{r.wager_type === 'FREE_BET' ? 'Free' : 'Cash'}</TableCell>
+                  <TableCell>{r.target_lane ?? '—'}</TableCell>
+                  <TableCell>{r.cash_out_lane ?? '—'}</TableCell>
+                  <TableCell>{r.multiplier != null ? `×${r.multiplier}` : '—'}</TableCell>
+                  <TableCell>{r.stake.toFixed(2)}</TableCell>
+                  <TableCell>{r.payout.toFixed(2)}</TableCell>
+                  <TableCell className={r.profit < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                    {r.profit >= 0 ? '+' : ''}{r.profit.toFixed(2)}
+                  </TableCell>
+                  <TableCell>{ROUND_STATUS_LABEL[r.status] ?? r.status}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Card>
 
