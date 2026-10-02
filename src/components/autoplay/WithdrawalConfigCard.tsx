@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, Empty, Loading, Badge, TableCell, TableRow } from '@/components/app';
+import { PaymentMethodSelect } from '@/components/PaymentMethodSelect';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { formatTime } from '@/lib/format';
 import {
@@ -297,12 +298,14 @@ export function WithdrawalConfigCard() {
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <div>
               <Label htmlFor="wd-pay-method">Default payment method</Label>
-              <Input
-                id="wd-pay-method"
-                value={config.default_payment_method}
-                onChange={(e) => setConfig({ ...config, default_payment_method: e.target.value })}
-                placeholder="e.g. telebirr"
-              />
+              <div className="mt-1">
+                <PaymentMethodSelect
+                  id="wd-pay-method"
+                  value={config.default_payment_method}
+                  onChange={(v) => setConfig({ ...config, default_payment_method: v })}
+                  emptyLabel="— no default —"
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="wd-pay-number">Default account number</Label>

@@ -47,24 +47,26 @@ export async function handler(req: NextRequest, ctx: Ctx) {
   const out = new NextResponse(resBody, { status: resp.status });
   out.headers.set('content-type', resp.headers.get('content-type') || 'application/json');
 
-  // On login, upstream sends Set-Cookie (keno_admin=<token>; ...). Capture just
-  // the "keno_admin=<token>" pair (up to the first ';') and store it in our own
-  // cookie. We relay that exact pair back as the upstream "cookie" header, so the
-  // keno-server's requireAdmin() (which checks for the "keno_admin=" prefix)
-  // recognizes the session.
+  // On login, upstream sends Set-Cookie (keno_admin=<token> for the legacy
+  // admin password, or keno_session=<token> for a username/password account).
+  // Capture just the auth pair and store it in our own cookie; we relay that
+  // exact pair back as the upstream "cookie" header so the keno-server's
+  // requireAdmin() recognizes the session.
   const setCookie = resp.headers.get('set-cookie');
-  if (setCookie && pathname === 'admin/login') {
-    const cookiePair = setCookie.split(';')[0];
-    out.cookies.set(AUTH_COOKIE, cookiePair, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-    });
+  if (setCookie && (pathname === 'admin/login' || pathname === 'auth/login')) {
+    const match = setCookie.match(/keno_(?:admin|session)=[^;,]+/);
+    if (match) {
+      out.cookies.set(AUTH_COOKIE, match[0], {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+      });
+    }
   }
 
   // On logout, clear the stored session cookie so the auth guard redirects
   // the user back to /login instead of letting them through with a stale token.
-  if (pathname === 'admin/logout') {
+  if (pathname === 'admin/logout' || pathname === 'auth/logout') {
     out.cookies.set(AUTH_COOKIE, '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
   }
 

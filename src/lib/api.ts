@@ -44,6 +44,9 @@ import type {
   WithdrawalConfigResponse,
   WithdrawalStatusResponse,
   WithdrawalRequestsResponse,
+  PaymentMethodsResponse,
+  UsersResponse,
+  UserResponse,
   TicketPlan,
   RainPredictionResponse,
   TwoDigitTicketsResponse,
@@ -83,6 +86,40 @@ export async function logout() {
 
 export async function checkAuth() {
   return apiFetch<{ authenticated: boolean }>('api/admin/check');
+}
+
+// Username + password login for dashboard user accounts (users table). The
+// server sets a `keno_session` cookie; the dashboard proxy stores and relays it.
+export async function loginUser(username: string, password: string) {
+  return apiFetch<{ ok: boolean; user: { id: string; username: string; role: string; displayName: string | null } }>(
+    'api/auth/login',
+    { method: 'POST', body: JSON.stringify({ username, password }) },
+  );
+}
+
+// ---- users (admin only) ----
+export async function getUsers(): Promise<UsersResponse> {
+  return apiFetch<UsersResponse>('api/users');
+}
+
+export async function createUser(input: {
+  username: string;
+  password: string;
+  role: 'admin' | 'viewer';
+  displayName?: string | null;
+}): Promise<UserResponse> {
+  return apiFetch<UserResponse>('api/users', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export async function updateUser(
+  id: string,
+  patch: Partial<{ password: string; role: 'admin' | 'viewer'; displayName: string | null; isActive: boolean }>,
+): Promise<UserResponse> {
+  return apiFetch<UserResponse>(`api/users/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+}
+
+export async function deleteUser(id: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`api/users/${id}`, { method: 'DELETE' });
 }
 
 // ---- public data ----
@@ -511,6 +548,11 @@ export async function getRainTicketPreview(tickets: BotTicket[], provider: strin
 // API, with cash-only suspension until the wallet is re-funded.
 export async function getWithdrawalConfig(): Promise<WithdrawalConfigResponse> {
   return apiFetch<WithdrawalConfigResponse>('api/rain/withdrawal/config');
+}
+
+// Canonical shamo payment methods for the global + per-account pickers.
+export async function getPaymentMethods(): Promise<PaymentMethodsResponse> {
+  return apiFetch<PaymentMethodsResponse>('api/rain/withdrawal/payment-methods');
 }
 
 export async function setWithdrawalConfig(patch: Partial<{

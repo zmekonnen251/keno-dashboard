@@ -18,6 +18,7 @@ import {
   CloudRain,
   PawPrint,
   TrendingDown,
+  UserCog,
   LogOut,
   Moon,
   Sun,
@@ -57,6 +58,7 @@ const NAV = [
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },
+  { href: '/users', label: 'Users', icon: UserCog },
 ];
 
 export default function AppSidebar() {

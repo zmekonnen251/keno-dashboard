@@ -2,7 +2,7 @@
 
 import { Suspense, useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { login } from '@/lib/api';
+import { login, loginUser } from '@/lib/api';
 import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,7 +22,13 @@ function LoginForm() {
     setBusy(true);
     setError('');
     try {
-      await login(password);
+      // With a username we authenticate a dashboard user account; without one we
+      // fall back to the legacy shared ADMIN_PASSWORD.
+      if (username.trim()) {
+        await loginUser(username.trim(), password);
+      } else {
+        await login(password);
+      }
       const next = params.get('next') || '/overview';
       router.push(next);
       router.refresh();
@@ -37,16 +44,29 @@ function LoginForm() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Keno Control Panel</CardTitle>
-          <CardDescription>Enter the admin password to continue.</CardDescription>
+          <CardDescription>
+            Sign in with your username and password, or leave the username blank to use the admin password.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="password">Admin password</Label>
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                autoFocus
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                autoFocus
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"

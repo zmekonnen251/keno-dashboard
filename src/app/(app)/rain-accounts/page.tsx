@@ -51,6 +51,7 @@ import { formatTime } from '@/lib/format';
 import { DataTable } from '@/components/ui/data-table';
 import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-accounts-columns';
 import { WithdrawalConfigCard } from '@/components/autoplay/WithdrawalConfigCard';
+import { PaymentMethodSelect } from '@/components/PaymentMethodSelect';
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
   fungames_shamo: 'gateway.fungames.live',
@@ -214,7 +215,14 @@ function AccountForm({
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <Label htmlFor="rain-pay-method">Payment method</Label>
-            <Input id="rain-pay-method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="e.g. telebirr" />
+            <div className="mt-1">
+              <PaymentMethodSelect
+                id="rain-pay-method"
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                emptyLabel="Use global default"
+              />
+            </div>
           </div>
           <div>
             <Label htmlFor="rain-pay-number">Account number</Label>

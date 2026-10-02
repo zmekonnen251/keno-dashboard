@@ -1038,6 +1038,40 @@ export interface WithdrawalStatusResponse {
 	status: WithdrawalEngineStatus;
 }
 
+// Canonical payment-method catalogue returned by
+// GET /api/rain/withdrawal/payment-methods. `key` is what the UI stores,
+// `label` is what it shows, and `id` is what shamo's API expects.
+export interface PaymentMethod {
+	id: number;
+	key: string;
+	label: string;
+	aliases: string[];
+}
+
+export interface PaymentMethodsResponse {
+	ok: boolean;
+	methods: PaymentMethod[];
+}
+
+// Dashboard login users (roles admin / viewer), managed via /api/users.
+export interface User {
+	id: string;
+	username: string;
+	role: 'admin' | 'viewer';
+	displayName: string | null;
+	isActive: boolean;
+	createdAt: string;
+	lastLoginAt: string | null;
+}
+
+export interface UsersResponse {
+	users: User[];
+}
+
+export interface UserResponse {
+	user: User;
+}
+
 export interface PlayRainFreeBetResponse {
 	ok: boolean;
 	result: { ok: boolean; found: boolean; request_id?: string; error?: string };
