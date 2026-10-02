@@ -983,7 +983,6 @@ export interface WithdrawalConfig {
 	cooldown_seconds: number;
 	daily_max_withdrawals: number;
 	dry_run: boolean;
-	headless: boolean;
 	concurrency: number;
 	updated_at: string;
 }

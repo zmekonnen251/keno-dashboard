@@ -507,8 +507,8 @@ export async function getRainTicketPreview(tickets: BotTicket[], provider: strin
 }
 
 // ---- rain withdrawal automation ----
-// Tiered auto-withdrawal of rain-account cash winnings through a headless
-// shamo.bet session, with cash-only suspension until the wallet is re-funded.
+// Tiered auto-withdrawal of rain-account cash winnings through shamo's player
+// API, with cash-only suspension until the wallet is re-funded.
 export async function getWithdrawalConfig(): Promise<WithdrawalConfigResponse> {
   return apiFetch<WithdrawalConfigResponse>('api/rain/withdrawal/config');
 }
@@ -525,7 +525,6 @@ export async function setWithdrawalConfig(patch: Partial<{
   cooldown_seconds: number;
   daily_max_withdrawals: number;
   dry_run: boolean;
-  headless: boolean;
   concurrency: number;
 }>): Promise<WithdrawalConfigResponse> {
   return apiFetch<WithdrawalConfigResponse>('api/rain/withdrawal/config', {

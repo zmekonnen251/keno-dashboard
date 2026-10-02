@@ -37,8 +37,8 @@ function money(n: number | null | undefined): string {
 }
 
 // Rain withdrawal automation: tiered sweep of cash winnings to the account's
-// payment method (headless shamo.bet), with cash-only suspension until the
-// wallet is re-funded. Config + engine control + the recent request ledger.
+// payment method through shamo's player API, with cash-only suspension until
+// the wallet is re-funded. Config + engine control + the recent request ledger.
 export function WithdrawalConfigCard() {
   const [config, setConfig] = useState<WithdrawalConfig | null>(null);
   const [status, setStatus] = useState<WithdrawalEngineStatus | null>(null);
@@ -91,7 +91,6 @@ export function WithdrawalConfigCard() {
         cooldown_seconds: Number(config.cooldown_seconds),
         daily_max_withdrawals: Number(config.daily_max_withdrawals),
         dry_run: config.dry_run,
-        headless: config.headless,
         concurrency: Number(config.concurrency),
       });
       setConfig(res.config);
@@ -223,7 +222,7 @@ export function WithdrawalConfigCard() {
               />
             </div>
             <div>
-              <Label htmlFor="wd-concurrency">Browser concurrency</Label>
+              <Label htmlFor="wd-concurrency">Concurrency</Label>
               <Input
                 id="wd-concurrency"
                 type="number"
@@ -241,18 +240,7 @@ export function WithdrawalConfigCard() {
                   onChange={(e) => setConfig({ ...config, dry_run: e.target.checked })}
                   className="h-4 w-4 accent-blue-600"
                 />
-                Dry run (fill the form, never submit)
-              </label>
-            </div>
-            <div className="flex items-end gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={config.headless}
-                  onChange={(e) => setConfig({ ...config, headless: e.target.checked })}
-                  className="h-4 w-4 accent-blue-600"
-                />
-                Headless browser
+                Dry run (validate only, never submit)
               </label>
             </div>
           </div>
