@@ -49,6 +49,8 @@ export interface RainAccountsMeta {
   onEdit: (acc: RainAccount) => void;
   onDelete: (acc: RainAccount) => void;
   onToggleAutoplay: (acc: RainAccount) => void;
+  onWithdrawNow: (acc: RainAccount) => void;
+  onResume: (acc: RainAccount) => void;
   busyId: number | null;
 }
 
@@ -132,6 +134,25 @@ export const rainAccountColumns = columnHelper.columns([
       </Badge>
     ),
   }),
+  columnHelper.accessor('withdraw_enabled', {
+    header: 'Withdrawal',
+    cell: ({ row }) => {
+      const acc = row.original;
+      if (!acc.withdraw_enabled) return <Badge variant="secondary">Off</Badge>;
+      if (acc.cash_suspended) return <Badge className="bg-amber-500 text-black">Cash paused</Badge>;
+      return (
+        <div className="flex flex-col items-start gap-0.5">
+          <Badge className="bg-emerald-600 text-white">On</Badge>
+          {!acc.has_payment_details && (
+            <span className="text-[10px] text-rose-600 dark:text-rose-400">no payment</span>
+          )}
+          {acc.last_withdraw_at && (
+            <span className="text-[10px] text-muted-foreground">last {formatTime(acc.last_withdraw_at)}</span>
+          )}
+        </div>
+      );
+    },
+  }),
   columnHelper.accessor('last_claimed_at', {
     header: 'Last claimed',
     cell: ({ row }) => {
@@ -166,6 +187,24 @@ export const rainAccountColumns = columnHelper.columns([
           >
             {row.original.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable</> : <><Power className="size-3.5" /> Enable</>}
           </Button>
+          {row.original.withdraw_enabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || row.original.cash_suspended}
+              title={row.original.cash_suspended
+                ? 'Cash is paused after a withdrawal — resume it first'
+                : 'Sweep the tiered % of the current balance now'}
+              onClick={() => meta.onWithdrawNow(row.original)}
+            >
+              Withdraw
+            </Button>
+          )}
+          {row.original.cash_suspended && (
+            <Button variant="secondary" size="sm" onClick={() => meta.onResume(row.original)}>
+              Resume cash
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => meta.onShowClaims(row.original)}>
             Claims
           </Button>
@@ -236,6 +275,20 @@ export function RainAccountMobileCard({
           </dd>
         </div>
         <div>
+          <dt className="text-muted-foreground">Withdrawal</dt>
+          <dd>
+            {!account.withdraw_enabled ? (
+              <span className="text-muted-foreground">off</span>
+            ) : account.cash_suspended ? (
+              <span className="text-amber-600 dark:text-amber-400">cash paused</span>
+            ) : account.has_payment_details ? (
+              <span className="text-emerald-600 dark:text-emerald-400">ready</span>
+            ) : (
+              <span className="text-rose-600 dark:text-rose-400">no payment</span>
+            )}
+          </dd>
+        </div>
+        <div>
           <dt className="text-muted-foreground">Shamo pw</dt>
           <dd>
             {account.has_password ? (
@@ -254,6 +307,21 @@ export function RainAccountMobileCard({
         >
           {account.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable autoplay</> : <><Power className="size-3.5" /> Enable autoplay</>}
         </Button>
+        {account.withdraw_enabled && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || account.cash_suspended}
+            onClick={() => meta.onWithdrawNow(account)}
+          >
+            Withdraw
+          </Button>
+        )}
+        {account.cash_suspended && (
+          <Button variant="secondary" size="sm" onClick={() => meta.onResume(account)}>
+            Resume cash
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={() => meta.onShowClaims(account)}>Claims</Button>
         <Button variant="outline" size="sm" disabled={busy} onClick={() => meta.onReconnect(account)}>
           {busy ? '…' : 'Check status'}

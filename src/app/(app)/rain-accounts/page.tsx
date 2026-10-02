@@ -17,6 +17,8 @@ import {
   getRainFreeBets,
   playRainFreeBet,
   rainBetPrediction,
+  withdrawRainAccountNow,
+  resumeRainAccountWithdrawal,
 } from '@/lib/api';
 import type {
   RainAccount,
@@ -48,6 +50,7 @@ import { Modal } from '@/components/ui/modal';
 import { formatTime } from '@/lib/format';
 import { DataTable } from '@/components/ui/data-table';
 import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-accounts-columns';
+import { WithdrawalConfigCard } from '@/components/autoplay/WithdrawalConfigCard';
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
   fungames_shamo: 'gateway.fungames.live',
@@ -67,13 +70,26 @@ const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: str
   expired: { label: 'Expired', cls: 'bg-muted text-muted-foreground' },
 };
 
+interface AccountFormInput {
+  name: string;
+  ws_token: string;
+  provider: RainProvider;
+  is_enabled: boolean;
+  access_token?: string;
+  password?: string;
+  withdraw_enabled: boolean;
+  payment_method: string | null;
+  payment_account_number: string | null;
+  payment_full_name: string | null;
+}
+
 function AccountForm({
   initial,
   onSave,
   onCancel,
 }: {
   initial: RainAccount | null;
-  onSave: (input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) => void;
+  onSave: (input: AccountFormInput) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
@@ -82,6 +98,10 @@ function AccountForm({
   const [accessToken, setAccessToken] = useState('');
   const [password, setPassword] = useState('');
   const [enabled, setEnabled] = useState(initial?.is_enabled ?? true);
+  const [withdrawEnabled, setWithdrawEnabled] = useState(initial?.withdraw_enabled ?? true);
+  const [paymentMethod, setPaymentMethod] = useState(initial?.payment_method ?? '');
+  const [paymentNumber, setPaymentNumber] = useState(initial?.payment_account_number ?? '');
+  const [paymentName, setPaymentName] = useState(initial?.payment_full_name ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -101,6 +121,11 @@ function AccountForm({
         // (mirrors the access_token field); the PATCH route only clears when
         // given an explicit '' — that stays possible via the API alone.
         ...(password ? { password } : {}),
+        withdraw_enabled: withdrawEnabled,
+        // Blank clears the per-account override so the global defaults apply.
+        payment_method: paymentMethod.trim() || null,
+        payment_account_number: paymentNumber.trim() || null,
+        payment_full_name: paymentName.trim() || null,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -171,6 +196,39 @@ function AccountForm({
             <SelectItem value="false">Disabled</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-3 rounded-lg border border-border p-3">
+        <p className="text-sm font-semibold">Withdrawal &amp; payment</p>
+        <div>
+          <Label htmlFor="rain-withdraw-enabled">Withdrawal automation</Label>
+          <Select value={String(withdrawEnabled)} onValueChange={(v) => setWithdrawEnabled(v === 'true')}>
+            <SelectTrigger id="rain-withdraw-enabled">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">Enabled — sweep tiered winnings and pause cash</SelectItem>
+              <SelectItem value="false">Disabled — never withdraw for this account</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <Label htmlFor="rain-pay-method">Payment method</Label>
+            <Input id="rain-pay-method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="e.g. telebirr" />
+          </div>
+          <div>
+            <Label htmlFor="rain-pay-number">Account number</Label>
+            <Input id="rain-pay-number" value={paymentNumber} onChange={(e) => setPaymentNumber(e.target.value)} placeholder="e.g. 0911223344" />
+          </div>
+          <div>
+            <Label htmlFor="rain-pay-name">Full name</Label>
+            <Input id="rain-pay-name" value={paymentName} onChange={(e) => setPaymentName(e.target.value)} placeholder="Account holder name" />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Blank fields fall back to the global payment defaults on the withdrawal card. shamo.bet&apos;s minimum
+          withdrawal is 200 ETB.
+        </p>
       </div>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex justify-end gap-2">
@@ -463,13 +521,13 @@ export default function RainAccountsPage() {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  async function onAdd(input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) {
+  async function onAdd(input: AccountFormInput) {
     await createRainAccount(input);
     setAdding(false);
     refresh();
   }
 
-  async function onEdit(acc: RainAccount, input: { name: string; ws_token: string; provider: RainProvider; is_enabled: boolean; access_token?: string; password?: string }) {
+  async function onEdit(acc: RainAccount, input: AccountFormInput) {
     await updateRainAccount(acc.id, {
       name: input.name,
       ...(input.ws_token ? { ws_token: input.ws_token } : {}),
@@ -477,6 +535,10 @@ export default function RainAccountsPage() {
       ...(input.password ? { password: input.password } : {}),
       provider: input.provider,
       is_enabled: input.is_enabled,
+      withdraw_enabled: input.withdraw_enabled,
+      payment_method: input.payment_method,
+      payment_account_number: input.payment_account_number,
+      payment_full_name: input.payment_full_name,
     });
     setEditing(null);
     refresh();
@@ -593,6 +655,44 @@ export default function RainAccountsPage() {
     }
   }
 
+  async function onWithdrawNow(acc: RainAccount) {
+    if (acc.cash_suspended) {
+      setMsg(`"${acc.name}" cash betting is paused after a withdrawal — resume it before withdrawing again.`);
+      return;
+    }
+    if (!window.confirm(
+      `Withdraw now from "${acc.name}"?\nThis sweeps the tiered percentage of the current available balance through a shamo web session and pauses cash betting.`
+    )) return;
+    setBusyId(acc.id);
+    setMsg('');
+    try {
+      const res = await withdrawRainAccountNow(acc.id);
+      const r = res.result ?? {};
+      if (r.skipped) setMsg(`Withdrawal skipped for "${acc.name}": ${r.skipped.replace(/_/g, ' ')}.`);
+      else if (r.ok) setMsg(`Withdrew ${(r.amount ?? 0).toFixed(2)} ETB from "${acc.name}" (tier ${r.tierPct ?? '—'}%).`);
+      else setMsg(`Withdrawal for "${acc.name}" did not report success.`);
+      refresh();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onResume(acc: RainAccount) {
+    setBusyId(acc.id);
+    setMsg('');
+    try {
+      await resumeRainAccountWithdrawal(acc.id);
+      setMsg(`Cash betting resumed for "${acc.name}".`);
+      refresh();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) return <Loading />;
   if (error) return <ErrorBox message={error} />;
   if (!data) return <Empty label="No rain accounts" />;
@@ -616,6 +716,8 @@ export default function RainAccountsPage() {
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
 
       <AutoplayCard />
+
+      <WithdrawalConfigCard />
 
       <Card title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
         {playHistory === null ? (
@@ -678,6 +780,8 @@ export default function RainAccountsPage() {
               onEdit: setEditing,
               onDelete,
               onToggleAutoplay,
+              onWithdrawNow,
+              onResume,
               busyId,
             }}
             renderMobileRowCard={(acc) => (
@@ -689,6 +793,8 @@ export default function RainAccountsPage() {
                   onEdit: setEditing,
                   onDelete,
                   onToggleAutoplay,
+                  onWithdrawNow,
+                  onResume,
                   busyId,
                 }}
               />

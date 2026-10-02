@@ -805,6 +805,16 @@ export interface RainAccount {
 	// Per-account autoplay opt-out: false keeps claiming rain (is_enabled) but
 	// excludes this account's free bets + wallet from the autoplay engine.
 	autoplay_enabled: boolean;
+	// Withdrawal automation (see WithdrawalConfig). withdraw_enabled opts the
+	// account into sweeping; cash_suspended is set by the engine after a
+	// withdrawal and freezes CASH betting until the wallet is re-funded.
+	withdraw_enabled: boolean;
+	cash_suspended: boolean;
+	payment_method: string | null;
+	payment_account_number: string | null;
+	payment_full_name: string | null;
+	has_payment_details: boolean;
+	last_withdraw_at: string | null;
 	status: string;
 	connected: boolean;
 	lastError: string | null;
@@ -940,6 +950,93 @@ export interface RainAutoplayStatusResponse {
 	ok: boolean;
 	status: RainAutoplayStatus;
 	config: RainAutoplayConfig;
+}
+
+// ── Rain withdrawal automation ───────────────────────────────────────────────
+// Mirrors server/src/withdrawal/*. A win above win_trigger sweeps a tiered % of
+// the available balance to the account's payment method, then freezes cash
+// betting until the wallet is re-funded (>= resume_balance).
+export interface WithdrawalTier {
+	min_win: number;
+	pct: number;
+}
+
+export type WithdrawalStatus =
+	| 'queued'
+	| 'running'
+	| 'succeeded'
+	| 'submitted'
+	| 'dry_run'
+	| 'failed'
+	| 'skipped';
+
+export interface WithdrawalConfig {
+	id: 1;
+	enabled: boolean;
+	min_balance_to_withdraw: number;
+	win_trigger: number;
+	withdraw_tiers: WithdrawalTier[];
+	resume_balance: number;
+	default_payment_method: string;
+	default_account_number: string | null;
+	default_full_name: string | null;
+	cooldown_seconds: number;
+	daily_max_withdrawals: number;
+	dry_run: boolean;
+	headless: boolean;
+	concurrency: number;
+	updated_at: string;
+}
+
+export interface WithdrawalConfigResponse {
+	ok: boolean;
+	config: WithdrawalConfig;
+}
+
+export interface WithdrawalRequest {
+	id: number;
+	account_id: number;
+	account_name: string | null;
+	trigger: string;
+	trigger_amount: number;
+	balance_before: number;
+	tier_pct: number | null;
+	amount: number;
+	payment_method: string | null;
+	payment_account_number: string | null;
+	payment_full_name: string | null;
+	status: WithdrawalStatus;
+	reference: string | null;
+	balance_after: number | null;
+	screenshot: string | null;
+	error: string | null;
+	created_at: string;
+	completed_at: string | null;
+}
+
+export interface WithdrawalRequestsResponse {
+	ok: boolean;
+	count: number;
+	requests: WithdrawalRequest[];
+}
+
+export interface WithdrawalEngineStatus {
+	running: boolean;
+	enabled: boolean | null;
+	config: WithdrawalConfig | null;
+	active: number;
+	queued: number;
+	attempted: number;
+	succeeded: number;
+	failed: number;
+	skipped: number;
+	lastError: string | null;
+	lastTickAt: number | null;
+}
+
+export interface WithdrawalStatusResponse {
+	ok: boolean;
+	status: WithdrawalEngineStatus;
 }
 
 export interface PlayRainFreeBetResponse {

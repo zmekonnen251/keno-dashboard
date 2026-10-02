@@ -41,6 +41,9 @@ import type {
   RainManualBetResponse,
   RainTestRoundResponse,
   RainWsTokensResponse,
+  WithdrawalConfigResponse,
+  WithdrawalStatusResponse,
+  WithdrawalRequestsResponse,
   TicketPlan,
   RainPredictionResponse,
   TwoDigitTicketsResponse,
@@ -350,6 +353,10 @@ export async function createRainAccount(input: {
   provider: RainProvider;
   access_token?: string;
   password?: string;
+  withdraw_enabled?: boolean;
+  payment_method?: string | null;
+  payment_account_number?: string | null;
+  payment_full_name?: string | null;
 }) {
   return apiFetch('api/rain/accounts', {
     method: 'POST',
@@ -366,6 +373,11 @@ export async function updateRainAccount(
     is_enabled: boolean;
     access_token: string | null;
     password: string | null;
+    withdraw_enabled: boolean;
+    cash_suspended: boolean;
+    payment_method: string | null;
+    payment_account_number: string | null;
+    payment_full_name: string | null;
   }>,
 ) {
   return apiFetch(`api/rain/accounts/${id}`, {
@@ -492,6 +504,59 @@ export async function getRainTicketPreview(tickets: BotTicket[], provider: strin
     method: 'POST',
     body: JSON.stringify({ tickets, provider, tickets_per_round: ticketsPerRound }),
   });
+}
+
+// ---- rain withdrawal automation ----
+// Tiered auto-withdrawal of rain-account cash winnings through a headless
+// shamo.bet session, with cash-only suspension until the wallet is re-funded.
+export async function getWithdrawalConfig(): Promise<WithdrawalConfigResponse> {
+  return apiFetch<WithdrawalConfigResponse>('api/rain/withdrawal/config');
+}
+
+export async function setWithdrawalConfig(patch: Partial<{
+  enabled: boolean;
+  min_balance_to_withdraw: number;
+  win_trigger: number;
+  withdraw_tiers: { min_win: number; pct: number }[];
+  resume_balance: number;
+  default_payment_method: string;
+  default_account_number: string | null;
+  default_full_name: string | null;
+  cooldown_seconds: number;
+  daily_max_withdrawals: number;
+  dry_run: boolean;
+  headless: boolean;
+  concurrency: number;
+}>): Promise<WithdrawalConfigResponse> {
+  return apiFetch<WithdrawalConfigResponse>('api/rain/withdrawal/config', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function getWithdrawalStatus(): Promise<WithdrawalStatusResponse> {
+  return apiFetch<WithdrawalStatusResponse>('api/rain/withdrawal/status');
+}
+
+export async function getWithdrawalRequests(limit = 100, accountId?: number): Promise<WithdrawalRequestsResponse> {
+  const q = accountId != null ? `?limit=${limit}&account_id=${accountId}` : `?limit=${limit}`;
+  return apiFetch<WithdrawalRequestsResponse>(`api/rain/withdrawal/requests${q}`);
+}
+
+export async function withdrawalStart() {
+  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/withdrawal/start', { method: 'POST' });
+}
+
+export async function withdrawalStop() {
+  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/withdrawal/stop', { method: 'POST' });
+}
+
+export async function withdrawRainAccountNow(id: number): Promise<{ ok: boolean; result: { ok?: boolean; skipped?: string; amount?: number; tierPct?: number | null } }> {
+  return apiFetch(`api/rain/withdrawal/accounts/${id}/withdraw-now`, { method: 'POST' });
+}
+
+export async function resumeRainAccountWithdrawal(id: number) {
+  return apiFetch<{ ok: boolean; id: number; cash_suspended: boolean }>(`api/rain/withdrawal/accounts/${id}/resume`, { method: 'POST' });
 }
 
 // ---- chicken road claiming ----
