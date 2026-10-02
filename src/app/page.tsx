@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
-import { checkAuth, getDraws } from '@/lib/api';
+import { ArrowLeft, ArrowRight, LogOut, RefreshCw, Sparkles } from 'lucide-react';
+import { checkUser, getDraws, logout } from '@/lib/api';
 import type { Draw } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { BOARD_CSS } from '@/components/autoplay/boardStyles';
@@ -43,6 +43,8 @@ function drawStats(d: Draw): { sum: number; odd: number; even: number } {
 
 export default function PublicHomePage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [siteId, setSiteId] = useState(KENO_SITES[0].id);
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(0);
@@ -52,15 +54,28 @@ export default function PublicHomePage() {
   const [busy, setBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const topRef = useRef<HTMLDivElement | null>(null);
-  const router = useRouter()
+  const router = useRouter();
   useEffect(() => {
-    checkAuth()
-      .then((r) => setAuthed(!!r.authenticated))
-      .catch(() => {
-        setAuthed(false);
-    
-      });
+    checkUser()
+      .then((r) => {
+        setAuthed(!!r.authenticated);
+        setIsAdmin(r.user?.role === 'admin');
+      })
+      .catch(() => setAuthed(false));
   }, []);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+    } catch {
+      // Ignore — the proxy re-checks the cookie when we navigate.
+    } finally {
+      setSigningOut(false);
+    }
+    router.push('/login');
+    router.refresh();
+  }
 
   // Fetch the current page; re-runs whenever the site, page size, page, or a
   // manual refresh changes. The setState calls all happen after the await
@@ -87,14 +102,6 @@ export default function PublicHomePage() {
       alive = false;
     };
   }, [siteId, pageSize, page, refreshTick]);
-
-
-  useEffect(() => {
-    if (!authed) {
-      router.push('/login')
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -128,10 +135,18 @@ export default function PublicHomePage() {
             <span className="text-sm font-bold sm:text-base">Live Keno Draws</span>
           </Link>
           <div className="flex items-center gap-2">
-            {authed === true ? (
+            {isAdmin ? (
               <Button asChild variant="outline">
                 <Link href="/overview">Open dashboard</Link>
               </Button>
+            ) : authed ? (
+              <>
+                <span className="hidden text-xs text-muted-foreground sm:inline">View only</span>
+                <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut} disabled={signingOut}>
+                  <LogOut className="h-4 w-4" />
+                  {signingOut ? 'Signing out…' : 'Sign out'}
+                </Button>
+              </>
             ) : (
               <Button asChild>
                 <Link href="/login">Login</Link>
@@ -263,7 +278,7 @@ export default function PublicHomePage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground/70">
-          Unauthenticated viewer — draws are shown purely for analysis. No account information is exposed.
+          Draw history is shown for analysis only. No account information is exposed here.
         </p>
       </main>
     </div>

@@ -23,14 +23,18 @@ function LoginForm() {
     setError('');
     try {
       // With a username we authenticate a dashboard user account; without one we
-      // fall back to the legacy shared ADMIN_PASSWORD.
+      // fall back to the legacy shared ADMIN_PASSWORD. Viewers may only view the
+      // draws/home page, so they always land on `/`; admins get the dashboard.
+      const rawNext = params.get('next');
+      const nextPath =
+        rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/overview';
       if (username.trim()) {
-        await loginUser(username.trim(), password);
+        const res = await loginUser(username.trim(), password);
+        router.push(res.user.role === 'admin' ? nextPath : '/');
       } else {
         await login(password);
+        router.push(nextPath);
       }
-      const next = params.get('next') || '/overview';
-      router.push(next);
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed');

@@ -88,6 +88,21 @@ export async function checkAuth() {
   return apiFetch<{ authenticated: boolean }>('api/admin/check');
 }
 
+export interface SessionUser {
+  id: string;
+  username: string;
+  role: string;
+  displayName?: string | null;
+}
+
+// Any authenticated dashboard user (admin OR viewer) plus their role. Unlike
+// checkAuth() — which only reports whether the caller is an admin — this uses
+// the user-session endpoint so the public draws page can tell viewers apart from
+// admins and decide whether to offer the dashboard link.
+export async function checkUser(): Promise<{ authenticated: boolean; user?: SessionUser }> {
+  return apiFetch<{ authenticated: boolean; user?: SessionUser }>('api/auth/check');
+}
+
 // Username + password login for dashboard user accounts (users table). The
 // server sets a `keno_session` cookie; the dashboard proxy stores and relays it.
 export async function loginUser(username: string, password: string) {
