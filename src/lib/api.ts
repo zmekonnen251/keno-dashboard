@@ -600,6 +600,16 @@ export async function resumeRainAccountWithdrawal(id: number) {
   return apiFetch<{ ok: boolean; id: number; cash_suspended: boolean }>(`api/rain/withdrawal/accounts/${id}/resume`, { method: 'POST' });
 }
 
+// shamo session tokens expire; re-login a single rain account and persist the
+// fresh token. The server also does this on a schedule and lazily on a 403.
+export async function refreshRainAccountToken(id: number): Promise<{ ok: boolean; id: number; access_token_masked: string }> {
+  return apiFetch<{ ok: boolean; id: number; access_token_masked: string }>(`api/rain/withdrawal/accounts/${id}/refresh-token`, { method: 'POST' });
+}
+
+export async function refreshAllRainAccountTokens(): Promise<{ ok: boolean; updated: number }> {
+  return apiFetch<{ ok: boolean; updated: number }>('api/rain/withdrawal/refresh-tokens', { method: 'POST' });
+}
+
 // ---- chicken road claiming ----
 export async function getChickenRoadAccounts(): Promise<ChickenRoadAccountsResponse> {
   return apiFetch<ChickenRoadAccountsResponse>('api/chicken-road/accounts');

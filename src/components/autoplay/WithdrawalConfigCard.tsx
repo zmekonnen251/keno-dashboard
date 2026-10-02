@@ -15,6 +15,7 @@ import {
   getWithdrawalRequests,
   withdrawalStart,
   withdrawalStop,
+  refreshAllRainAccountTokens,
 } from '@/lib/api';
 import type {
   WithdrawalConfig,
@@ -125,6 +126,16 @@ export function WithdrawalConfigCard() {
     }
   }
 
+  async function refreshTokens() {
+    setMsg('');
+    try {
+      const res = await refreshAllRainAccountTokens();
+      setMsg(`Refreshed ${res.updated} shamo login token${res.updated === 1 ? '' : 's'}.`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   function updateTier(index: number, patch: Partial<{ min_win: number; pct: number }>) {
     if (!config) return;
     const tiers = config.withdraw_tiers.map((t, i) => (i === index ? { ...t, ...patch } : t));
@@ -151,6 +162,9 @@ export function WithdrawalConfigCard() {
           </span>
           <Button variant="outline" size="sm" onClick={start}>Start</Button>
           <Button variant="outline" size="sm" onClick={stop}>Stop</Button>
+          <Button variant="outline" size="sm" onClick={refreshTokens} title="Re-login every rain account and persist a fresh shamo token">
+            Refresh tokens
+          </Button>
         </div>
       }
     >
