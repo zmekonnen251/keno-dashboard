@@ -423,10 +423,57 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
               return (
                 <div
                   key={ticket.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDropTicket(idx);
+                  }}
                   className={`bg-muted/40 dark:bg-black/35 border p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all ${
+                    dragId === ticket.id ? 'ring-2 ring-indigo-500/60 ' : ''
+                  }${
                     ticket.enabled ? 'border-border dark:border-white/10 opacity-100' : 'border-border/60 dark:border-white/5 opacity-50'
                   }`}
                 >
+                  {/* Order controls: drag the grip, or nudge with the arrows.
+                      The queue order is the play/deal order. */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDragId(ticket.id);
+                      }}
+                      onDragEnd={() => setDragId(null)}
+                      title="Drag to reorder"
+                      className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <GripVertical className="w-4 h-4" />
+                    </span>
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => reorderTickets(idx, idx - 1)}
+                        disabled={idx === 0}
+                        title="Move up"
+                        className="text-slate-400 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reorderTickets(idx, idx + 1)}
+                        disabled={idx === tickets.length - 1}
+                        title="Move down"
+                        className="text-slate-400 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Status Toggle & Info */}
                   <div className="flex items-center gap-2.5 min-w-35">
                     <input
