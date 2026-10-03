@@ -316,6 +316,7 @@ function AutoplayCard() {
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: config.use_two_digit_tickets ?? false,
+        two_digit_stake: config.two_digit_stake ?? 0,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -428,6 +429,19 @@ function AutoplayCard() {
             <Label htmlFor="rain-auto-two-digit" className="cursor-pointer">
               2-digit ML dynamic tickets (2-spot pairs)
             </Label>
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-two-digit-stake">2-digit cash stake (ETB)</Label>
+            <Input
+              id="rain-auto-two-digit-stake"
+              type="number"
+              min={0}
+              max={10000}
+              value={config.two_digit_stake ?? 0}
+              onChange={(e) => setConfig({ ...config, two_digit_stake: Number(e.target.value) })}
+              disabled={!config.use_two_digit_tickets}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">0 = use the cash stake above.</p>
           </div>
           <div>
             <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>

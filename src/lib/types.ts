@@ -439,6 +439,8 @@ export interface AutoplayConfig {
 	// Bet the "2-digit ML dynamic tickets" (ranked 2-spot pairs from the last
 	// 1-3 draws + recurrence patterns) instead of the mode A/B/C number source.
 	use_two_digit_tickets: boolean;
+	// Stake for the 2-digit ML dynamic tickets (0 = use the general stake).
+	two_digit_stake: number;
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
@@ -925,6 +927,8 @@ export interface RainAutoplayConfig {
 	// Bet the "2-digit ML dynamic tickets" (ranked 2-spot pairs) on both the
 	// free-bet and cash paths instead of the spots_mode sources.
 	use_two_digit_tickets: boolean;
+	// Cash stake for the 2-digit ML dynamic tickets (0 = use cash_stake).
+	two_digit_stake: number;
 	updated_at: string;
 }
 

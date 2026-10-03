@@ -84,6 +84,7 @@ export function RainConfigCard({
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: config.use_two_digit_tickets ?? false,
+        two_digit_stake: config.two_digit_stake ?? 0,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -239,6 +240,20 @@ export function RainConfigCard({
               the same pairs the 2-digit ticket card places manually. Overrides the ticket source above; falls back to
               it when no completed draw is on record.
             </span>
+            <label htmlFor="rain-auto-two-digit-stake" className="flex items-center gap-2 text-xs text-muted-foreground">
+              2-digit cash stake (ETB)
+              <Input
+                id="rain-auto-two-digit-stake"
+                type="number"
+                min={0}
+                max={10000}
+                value={config.two_digit_stake ?? 0}
+                onChange={(e) => setConfig({ ...config, two_digit_stake: Number(e.target.value) })}
+                disabled={!config.use_two_digit_tickets}
+                className="w-28"
+              />
+              <span>0 = use cash stake</span>
+            </label>
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-muted-foreground">
