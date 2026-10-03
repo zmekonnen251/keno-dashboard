@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/app';
 import { setRainTicketConfig, getRainTicketConfig, getRainTicketPreview } from '@/lib/api';
-import { Plus, Trash2, Sparkles, Cpu } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Cpu, GripVertical, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import type { BotTicket, RainAutoplayConfig } from '@/lib/types';
 
 interface RainTicketConfigCardProps {
@@ -28,6 +28,10 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
   const [loaded, setLoaded] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [previewPicks, setPreviewPicks] = useState<Record<string, number[]>>({});
+  // Row id currently being dragged (native HTML5 drag), so the queue can be
+  // reordered by dragging the grip handle.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState('manual');
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -164,6 +168,56 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
       return t;
     });
     saveTickets(updated);
+  };
+
+  // ── Queue ordering ────────────────────────────────────────────────────────
+  // The order the tickets sit in here is the order the engine plays them (and,
+  // for cash tickets, the order they are dealt across the account pool), so
+  // reordering is persisted with the rest of the queue.
+
+  /** Move a ticket from one index to another and persist the new order. */
+  const reorderTickets = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || to >= tickets.length) return;
+    const copy = [...tickets];
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item);
+    setSortMode('manual');
+    saveTickets(copy);
+  };
+
+  /** Drop the row being dragged onto `targetIdx`. */
+  const handleDropTicket = (targetIdx: number) => {
+    if (!dragId) return;
+    const from = tickets.findIndex((t) => t.id === dragId);
+    setDragId(null);
+    if (from < 0 || from === targetIdx) return;
+    reorderTickets(from, targetIdx);
+  };
+
+  /** One-shot queue sort; the result is persisted immediately. */
+  const sortTickets = (mode: string) => {
+    if (mode === 'manual') return;
+    const numeric = (n: number | undefined, fallback = 0) => (Number.isFinite(Number(n)) ? Number(n) : fallback);
+    const sorted = [...tickets].sort((a, b) => {
+      switch (mode) {
+        case 'stake-asc':
+          return numeric(a.stake) - numeric(b.stake);
+        case 'stake-desc':
+          return numeric(b.stake) - numeric(a.stake);
+        case 'spots-asc':
+          return (a.numbers?.length ?? a.spots ?? 0) - (b.numbers?.length ?? b.spots ?? 0);
+        case 'spots-desc':
+          return (b.numbers?.length ?? b.spots ?? 0) - (a.numbers?.length ?? a.spots ?? 0);
+        case 'cash-first':
+          return Number(a.useFreeBet) - Number(b.useFreeBet);
+        case 'free-first':
+          return Number(b.useFreeBet) - Number(a.useFreeBet);
+        default:
+          return 0;
+      }
+    });
+    saveTickets(sorted);
+    onSaved?.(`Sorted ${sorted.length} ticket(s).`);
   };
 
   const handleGeneratePreview = async () => {
@@ -311,25 +365,56 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
             </div>
           </div>
 
-          {/* Generate Preview Button */}
-          <Button
-            onClick={handleGeneratePreview}
-            disabled={generating || tickets.length === 0}
-            variant="outline"
-            className="mb-4 w-full sm:w-auto"
-          >
-            {generating ? (
-              <>
-                <Cpu className="w-4 h-4 mr-2 animate-spin" />
-                Generating Previews…
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Preview for All Tickets
-              </>
-            )}
-          </Button>
+          {/* Per-ticket stake drives the cash play; cash tickets auto-spread. */}
+          <p className="mb-4 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+            💰 <b>Cash tickets</b> each play with their own stake — set a few high and the rest at the 2–3 Birr
+            minimum. Every enabled <b>CASH</b> ticket is spread across the eligible accounts each round (no two
+            accounts play the same ticket), so the whole queue gets used. The queue order below is the play order
+            (and the deal order for cash tickets).
+          </p>
+
+          {/* Preview + queue sort controls */}
+          <div className="mb-4 flex flex-wrap items-end gap-2">
+            <Button
+              onClick={handleGeneratePreview}
+              disabled={generating || tickets.length === 0}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              {generating ? (
+                <>
+                  <Cpu className="w-4 h-4 mr-2 animate-spin" />
+                  Generating Previews…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Preview for All Tickets
+                </>
+              )}
+            </Button>
+            <div className="flex items-center gap-1.5">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400">Sort queue</Label>
+              <select
+                value={sortMode}
+                onChange={(e) => {
+                  const mode = e.target.value;
+                  setSortMode(mode);
+                  sortTickets(mode);
+                }}
+                className="bg-input border border-border rounded-lg p-2 text-xs text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer dark:bg-black/40 dark:border-white/10 dark:text-white"
+              >
+                <option value="manual" className="bg-background dark:bg-slate-900">Keep my order</option>
+                <option value="stake-asc" className="bg-background dark:bg-slate-900">Stake ↑ (low first)</option>
+                <option value="stake-desc" className="bg-background dark:bg-slate-900">Stake ↓ (high first)</option>
+                <option value="spots-asc" className="bg-background dark:bg-slate-900">Spots ↑</option>
+                <option value="spots-desc" className="bg-background dark:bg-slate-900">Spots ↓</option>
+                <option value="cash-first" className="bg-background dark:bg-slate-900">Cash tickets first</option>
+                <option value="free-first" className="bg-background dark:bg-slate-900">Free-bet tickets first</option>
+              </select>
+            </div>
+          </div>
 
           {/* Queue List of Tickets */}
           <div className="space-y-2 max-h-100 overflow-y-auto pr-1">
