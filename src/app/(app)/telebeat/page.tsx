@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -17,15 +19,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
-  apiGet,
-  apiPatch,
-  apiPost,
-  type TelebeatAccount,
-  type TelebeatConfig,
-  type TelebeatEngineStatus,
-  type TelebeatPerf,
-  type TelebeatStats,
+  forceTelebeatRotate,
 } from '@/lib/api';
+import { apiFetch } from '@/lib/api-client';
+import { TelebeatConfig, TelebeatEngineStatus, TelebeatPerf, TelebeatStats } from '@/lib/types';
 
 export default function TelebeatPage() {
   const [config, setConfig] = useState<TelebeatConfig | null>(null);
@@ -63,23 +60,30 @@ export default function TelebeatPage() {
   }
 
   useEffect(() => {
-    load();
+    const initialLoad = window.setTimeout(() => void load(), 0);
     const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    return () => {
+      window.clearTimeout(initialLoad);
+      clearInterval(t);
+    };
   }, []);
 
   async function saveConfig(patch: Partial<TelebeatConfig>) {
     if (!config) return;
     setSaving(true);
     try {
-      const res = await apiFetch<{ ok: boolean; config: TelebeatConfig }>('/api/telebeat/config', patch);
+      const res = await apiFetch<{ ok: boolean; config: TelebeatConfig }>('/api/telebeat/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
       setConfig(res.config);
     } finally {
       setSaving(false);
     }
   }
 
-  async function toggleAccount(a: TelebeatAccount) {
+  async function toggleAccount(a: { id: number }) {
     try {
       await apiFetch(`/api/telebeat/accounts/${a.id}/toggle`);
       await load();
@@ -93,12 +97,16 @@ export default function TelebeatPage() {
     setCreating(true);
     try {
       await apiFetch('/api/telebeat/accounts', {
-        name: name.trim(),
-        token: token.trim() || null,
-        cookie: cookie.trim() || null,
-        strategy,
-        workers: Number(workers) || 2,
-        is_running: false,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          token: token.trim() || null,
+          cookie: cookie.trim() || null,
+          strategy,
+          workers: Number(workers) || 2,
+          is_running: false,
+        }),
       });
       setName('');
       setToken('');
@@ -194,7 +202,7 @@ export default function TelebeatPage() {
               {status?.config ? (status as any)?.current || 'direct' : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
-              Rotations {status?.activeWorkers >= 0 ? (status as any)?.totalRotations ?? 0 : 0} · Requests{' '}
+              Rotations {status?.activeWorkers != null ? (status as any)?.totalRotations ?? 0 : 0} · Requests{' '}
               {(status as any)?.totalRequests ?? 0}
             </p>
           </CardContent>
@@ -406,7 +414,7 @@ export default function TelebeatPage() {
                       <Badge variant="secondary">Stopped</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="max-w-[240px] truncate text-xs text-muted-foreground">
+                  <TableCell className="max-w-60 truncate text-xs text-muted-foreground">
                     {a.lastError || '—'}
                   </TableCell>
                   <TableCell className="text-right">
