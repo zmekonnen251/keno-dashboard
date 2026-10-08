@@ -22,7 +22,7 @@ import {
   forceTelebeatRotate,
 } from '@/lib/api';
 import { apiFetch } from '@/lib/api-client';
-import { TelebeatConfig, TelebeatEngineStatus, TelebeatPerf, TelebeatStats } from '@/lib/types';
+import { TelebeatAccount, TelebeatConfig, TelebeatEngineStatus, TelebeatPerf, TelebeatStats } from '@/lib/types';
 
 export default function TelebeatPage() {
   const [config, setConfig] = useState<TelebeatConfig | null>(null);
@@ -85,7 +85,7 @@ export default function TelebeatPage() {
 
   async function toggleAccount(a: { id: number }) {
     try {
-      await apiFetch(`/api/telebeat/accounts/${a.id}/toggle`);
+      await apiFetch(`/api/telebeat/accounts/${a.id}/toggle`, { method: 'POST' });
       await load();
     } catch (e) {
       console.error(e);
