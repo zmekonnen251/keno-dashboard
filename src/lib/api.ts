@@ -580,6 +580,8 @@ export async function setWithdrawalConfig(patch: Partial<{
   default_account_number: string | null;
   default_full_name: string | null;
   cooldown_seconds: number;
+  deposit_cooldown_seconds: number;
+  balance_trigger_enabled: boolean;
   daily_max_withdrawals: number;
   dry_run: boolean;
   concurrency: number;
@@ -903,4 +905,24 @@ export async function pushTest(): Promise<{ ok: boolean; sent: number; subscript
   } catch (e) {
     return { ok: false, sent: 0, subscriptions: 0, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+// ── TeleBeat API ────────────────────────────────────────────────────────
+export async function getTelebeatConfig(): Promise<any> {
+  return apiFetch('api/telebeat/config');
+}
+export async function updateTelebeatConfig(patch: any): Promise<any> {
+  return apiFetch('api/telebeat/config', { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export async function getTelebeatStatus(): Promise<any> {
+  return apiFetch('api/telebeat/status');
+}
+export async function getTelebeatStats(): Promise<any> {
+  return apiFetch('api/telebeat/stats');
+}
+export async function getTelebeatReport(): Promise<any> {
+  return apiFetch('api/telebeat/report');
+}
+export async function forceTelebeatRotate(): Promise<any> {
+  return apiFetch('api/telebeat/force-rotate', { method: 'POST' });
 }

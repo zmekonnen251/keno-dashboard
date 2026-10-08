@@ -22,6 +22,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Zap,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState } from 'react';
@@ -53,6 +54,7 @@ const NAV = [
   { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
+  { href: '/telebeat', label: 'TeleBeat', icon: Zap, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr'] },
   { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },

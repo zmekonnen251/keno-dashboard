@@ -985,6 +985,10 @@ export interface WithdrawalConfig {
 	default_account_number: string | null;
 	default_full_name: string | null;
 	cooldown_seconds: number;
+	/** Skip an account for this many seconds after a DEPOSIT lands. 0 = off. */
+	deposit_cooldown_seconds: number;
+	/** Let the backstop sweep on total balance (not just a win). Off by default. */
+	balance_trigger_enabled: boolean;
 	daily_max_withdrawals: number;
 	dry_run: boolean;
 	concurrency: number;
@@ -1637,4 +1641,71 @@ export interface ShamoPlaceResponse {
 	state: BetOrderStatus | 'placed' | 'rejected' | 'failed' | null;
 	ticketId: string | null;
 	message: string | null;
+}
+
+// ── TeleBeat ────────────────────────────────────────────────────────────
+
+export type TelebeatStrategy = 'random' | 'heuristic' | 'neural' | 'gemini';
+
+export interface TelebeatConfig {
+	enabled: boolean;
+	proxy_enabled: boolean;
+	require_proxy: boolean;
+	rotate_after_requests: number;
+	rotate_after_seconds: number;
+	min_request_interval_ms: number;
+	default_workers: number;
+	report_interval_minutes: number;
+}
+
+export interface TelebeatAccount {
+	id: number;
+	name: string;
+	token: string | null;
+	cookie: string | null;
+	is_running: boolean;
+	strategy: TelebeatStrategy;
+	workers: number;
+	games_played: number;
+	points_earned: number;
+	last_game_at: string | null;
+	last_error: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface TelebeatEngineStatus {
+	running: boolean;
+	activeAccounts: number;
+	activeWorkers: number;
+	config: TelebeatConfig;
+	accounts: Array<{
+		id: number;
+		name: string;
+		isRunning: boolean;
+		strategy: TelebeatStrategy;
+		workers: number;
+		activeWorkers: number;
+		gamesPlayed: number;
+		pointsEarned: number;
+		lastGameAt: string | null;
+		lastError: string | null;
+	}>;
+}
+
+export interface TelebeatStats {
+	accounts: number;
+	running: number;
+	totalGames: number;
+	totalPoints: number;
+	hitRate: number;
+	historyRows: number;
+}
+
+export interface TelebeatPerf {
+	strategy: string;
+	games: number;
+	points: number;
+	avg: number;
+	hitRate: number;
 }

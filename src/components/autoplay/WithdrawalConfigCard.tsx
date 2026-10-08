@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, Empty, Loading, Badge, TableCell, TableRow } from '@/components/app';
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 import { formatTime } from '@/lib/format';
 import {
   getWithdrawalConfig,
@@ -91,6 +93,8 @@ export function WithdrawalConfigCard() {
         default_account_number: config.default_account_number,
         default_full_name: config.default_full_name,
         cooldown_seconds: Number(config.cooldown_seconds),
+        deposit_cooldown_seconds: Number(config.deposit_cooldown_seconds),
+        balance_trigger_enabled: config.balance_trigger_enabled,
         daily_max_withdrawals: Number(config.daily_max_withdrawals),
         dry_run: config.dry_run,
         concurrency: Number(config.concurrency),
@@ -227,6 +231,29 @@ export function WithdrawalConfigCard() {
               />
             </div>
             <div>
+              <Label htmlFor="wd-deposit-cooldown" className="flex items-center gap-1">
+                Deposit cooldown (seconds)
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    After a deposit lands, leave the account alone this long. The tier percentage applies
+                    to the whole balance and shamo credits deposits into that same balance — without this
+                    the sweep pays freshly deposited money straight back out. 0 disables the guard.
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Input
+                id="wd-deposit-cooldown"
+                type="number"
+                min={0}
+                max={604800}
+                value={config.deposit_cooldown_seconds}
+                onChange={(e) => setConfig({ ...config, deposit_cooldown_seconds: Number(e.target.value) })}
+              />
+            </div>
+            <div>
               <Label htmlFor="wd-daily">Daily max withdrawals (0 = unlimited)</Label>
               <Input
                 id="wd-daily"
@@ -256,6 +283,24 @@ export function WithdrawalConfigCard() {
                   className="h-4 w-4 accent-blue-600"
                 />
                 Dry run (validate only, never submit)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <input
+                      type="checkbox"
+                      checked={config.balance_trigger_enabled}
+                      onChange={(e) => setConfig({ ...config, balance_trigger_enabled: e.target.checked })}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    Off: only a confirmed win or &quot;Withdraw now&quot; moves money out, so a top-up is
+                    never swept. On: the periodic backstop may also withdraw once the total balance clears
+                    the win trigger — which, after a deposit, is that deposit.
+                  </TooltipContent>
+                </Tooltip>
+                Allow withdrawal on total balance (no win)
               </label>
             </div>
           </div>
