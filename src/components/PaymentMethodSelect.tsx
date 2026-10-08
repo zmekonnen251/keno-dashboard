@@ -56,7 +56,9 @@ export function PaymentMethodSelect({
     let alive = true;
     getPaymentMethods()
       .then((res) => {
-        if (alive) setMethods(res.methods);
+        // Defensive: a payload without `methods` used to crash the whole page
+        // (methods became undefined and find/map threw on the next render).
+        if (alive) setMethods(res.methods ?? []);
       })
       .catch(() => {
         /* fall back to the custom input only */

@@ -76,7 +76,11 @@ export default function Header() {
           aria-label="Toggle theme"
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         >
-          {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
+          {/* Render both icons and switch with CSS: resolvedTheme is undefined
+              during SSR, so picking the icon in JS made the server and client
+              render different SVG trees (React hydration error #418). */}
+          <Sun className="hidden dark:block" />
+          <Moon className="block dark:hidden" />
         </Button>
       </div>
     </header>

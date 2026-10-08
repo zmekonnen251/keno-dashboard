@@ -160,7 +160,10 @@ export default function AppSidebar() {
                     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
                   }
                 >
-                  {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
+                  {/* CSS-switched so server and client render identical trees —
+                      see header.tsx (hydration error #418). */}
+                  <Sun className="hidden dark:block" />
+                  <Moon className="block dark:hidden" />
                   <span>Toggle theme</span>
                 </Button>
               </SidebarMenuButton>

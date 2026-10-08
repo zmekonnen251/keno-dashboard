@@ -21,7 +21,15 @@ function TooltipProvider({
 function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+  // Self-wrapping: radix throws "`Tooltip` must be used within
+  // `TooltipProvider`" if no provider is an ancestor. Wrapping here makes
+  // every call site safe — nested providers are legal and the inner one
+  // simply shadows the outer for this subtree.
+  return (
+    <TooltipProvider>
+      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+    </TooltipProvider>
+  )
 }
 
 function TooltipTrigger({
