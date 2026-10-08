@@ -61,7 +61,7 @@ export default function TelebeatPage() {
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void load(), 0);
-    const t = setInterval(load, 5000);
+    const t = setInterval(load, 10000);
     return () => {
       window.clearTimeout(initialLoad);
       clearInterval(t);
