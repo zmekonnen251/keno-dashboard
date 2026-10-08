@@ -2,8 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Activity, Globe, Pause, Play, RotateCw, Settings, Users } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
+import { Activity, Globe, Pause, Pencil, Play, RotateCw, Settings, Users, X, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,10 @@ export default function TelebeatPage() {
   const [cookie, setCookie] = useState('');
   const [strategy, setStrategy] = useState<'random' | 'heuristic' | 'neural' | 'gemini'>('random');
   const [workers, setWorkers] = useState('2');
+  // Inline edit state for an existing account.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [edit, setEdit] = useState({ name: '', token: '', cookie: '', strategy: 'random' as TelebeatAccount['strategy'], workers: '2' });
 
   async function load() {
     try {
@@ -90,6 +94,57 @@ export default function TelebeatPage() {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async function startEdit(a: { id: number; name: string; strategy: TelebeatAccount['strategy']; workers: number }) {
+    setEditingId(a.id);
+    setSavingEdit(true);
+    try {
+      // The status payload has no credentials — fetch the full row so the
+      // token/cookie fields can be prefilled.
+      const res = await apiFetch<{ ok: boolean; account: TelebeatAccount }>(`/api/telebeat/accounts/${a.id}`);
+      const acc = res.account;
+      setEdit({
+        name: acc.name,
+        token: acc.token ?? '',
+        cookie: acc.cookie ?? '',
+        strategy: acc.strategy,
+        workers: String(acc.workers),
+      });
+    } catch (e) {
+      console.error(e);
+      setEditingId(null);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (editingId === null || !edit.name.trim()) return;
+    setSavingEdit(true);
+    try {
+      await apiFetch(`/api/telebeat/accounts/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: edit.name.trim(),
+          token: edit.token.trim() || null,
+          cookie: edit.cookie.trim() || null,
+          strategy: edit.strategy,
+          workers: Number(edit.workers) || 2,
+        }),
+      });
+      setEditingId(null);
+      await load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
   }
 
   async function createAccount() {
@@ -278,6 +333,29 @@ export default function TelebeatPage() {
                   disabled={saving}
                 />
               </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>One proxy per worker</Label>
+                  <p className="text-sm text-muted-foreground">Dedicated egress IP per worker — never shared</p>
+                </div>
+                <Switch
+                  checked={!!config?.per_worker_proxy}
+                  onCheckedChange={(v) => saveConfig({ per_worker_proxy: v })}
+                  disabled={saving}
+                />
+              </div>
+              <div className="space-y-2 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>Worker IP rotate interval (minutes)</Label>
+                  <p className="text-sm text-muted-foreground">Change each worker&apos;s IP on this interval — 0 disables</p>
+                </div>
+                <Input
+                  type="number"
+                  value={config?.worker_rotate_minutes ?? 1}
+                  onChange={(e) => saveConfig({ worker_rotate_minutes: Number(e.target.value) || 0 })}
+                  disabled={saving}
+                />
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -399,7 +477,8 @@ export default function TelebeatPage() {
             </TableHeader>
             <TableBody>
               {(status?.accounts ?? []).map((a) => (
-                <TableRow key={a.id}>
+                <Fragment key={a.id}>
+                <TableRow>
                   <TableCell className="font-medium">{a.name}</TableCell>
                   <TableCell>{a.strategy}</TableCell>
                   <TableCell>
@@ -418,11 +497,76 @@ export default function TelebeatPage() {
                     {a.lastError || '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant={a.isRunning ? 'destructive' : 'default'} onClick={() => toggleAccount(a)}>
-                      {a.isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button size="sm" variant="outline" onClick={() => startEdit(a)} title="Edit account">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant={a.isRunning ? 'destructive' : 'default'} onClick={() => toggleAccount(a)}>
+                        {a.isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
+                {editingId === a.id ? (
+                  <TableRow key={`edit-${a.id}`} className="bg-muted/40">
+                    <TableCell>
+                      <Input
+                        value={edit.name}
+                        onChange={(e) => setEdit((s) => ({ ...s, name: e.target.value }))}
+                        placeholder="Name"
+                        disabled={savingEdit}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <select
+                        value={edit.strategy}
+                        onChange={(e) => setEdit((s) => ({ ...s, strategy: e.target.value as TelebeatAccount['strategy'] }))}
+                        disabled={savingEdit}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none"
+                      >
+                        <option value="random">random</option>
+                        <option value="heuristic">heuristic</option>
+                        <option value="neural">neural</option>
+                        <option value="gemini">gemini</option>
+                      </select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={edit.workers}
+                        onChange={(e) => setEdit((s) => ({ ...s, workers: e.target.value }))}
+                        disabled={savingEdit}
+                      />
+                    </TableCell>
+                    <TableCell colSpan={2}>
+                      <Input
+                        value={edit.token}
+                        onChange={(e) => setEdit((s) => ({ ...s, token: e.target.value }))}
+                        placeholder="Token (GAME.XXX)"
+                        disabled={savingEdit}
+                      />
+                    </TableCell>
+                    <TableCell colSpan={2}>
+                      <Input
+                        value={edit.cookie}
+                        onChange={(e) => setEdit((s) => ({ ...s, cookie: e.target.value }))}
+                        placeholder="Cookie (JSESSIONID=...)"
+                        disabled={savingEdit}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" onClick={saveEdit} disabled={savingEdit || !edit.name.trim()}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={cancelEdit} disabled={savingEdit}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                </Fragment>
               ))}
               {(status?.accounts ?? []).length === 0 && (
                 <TableRow>

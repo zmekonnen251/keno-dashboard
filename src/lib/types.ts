@@ -1651,6 +1651,8 @@ export interface TelebeatConfig {
 	enabled: boolean;
 	proxy_enabled: boolean;
 	require_proxy: boolean;
+	per_worker_proxy: boolean;
+	worker_rotate_minutes: number;
 	rotate_after_requests: number;
 	rotate_after_seconds: number;
 	min_request_interval_ms: number;
