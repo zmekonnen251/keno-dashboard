@@ -4,6 +4,7 @@ import { apiFetch } from './api-client';
 import type {
   ProviderSummary,
   DrawsResponse,
+  TimeMatchedDrawsResponse,
   StatsResponse,
   PatternsResponse,
   PredictionsResponse,
@@ -144,6 +145,22 @@ export async function getSites(): Promise<ProviderSummary[]> {
 
 export async function getDraws(siteId: string, limit = 100, offset = 0): Promise<DrawsResponse> {
   return apiFetch<DrawsResponse>(`api/draws/${siteId}?limit=${limit}&offset=${offset}`);
+}
+
+// Same-time-of-day history: ±windowMinutes around the anchor clock time on each
+// of the last `days` days. `anchor` is an ISO instant (defaults to now) and
+// `tzOffset` is the viewer's getTimezoneOffset() so the windows match their clock.
+export async function getTimeMatchedDraws(
+  siteId: string,
+  opts: { days?: number; windowMinutes?: number; anchor?: string; tzOffset?: number } = {}
+): Promise<TimeMatchedDrawsResponse> {
+  const params = new URLSearchParams();
+  if (opts.days != null) params.set('days', String(opts.days));
+  if (opts.windowMinutes != null) params.set('minutes', String(opts.windowMinutes));
+  if (opts.anchor) params.set('anchor', opts.anchor);
+  if (opts.tzOffset != null) params.set('tzOffset', String(opts.tzOffset));
+  const qs = params.toString();
+  return apiFetch<TimeMatchedDrawsResponse>(`api/draws/${siteId}/time-matched${qs ? `?${qs}` : ''}`);
 }
 
 export async function getStats(siteId: string): Promise<StatsResponse> {
@@ -460,7 +477,7 @@ export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigRespons
 }
 
 export async function setRainAutoplayConfig(
-  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake'>>,
+  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet'>>,
 ): Promise<RainAutoplayConfigResponse> {
   return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
     method: 'PATCH',

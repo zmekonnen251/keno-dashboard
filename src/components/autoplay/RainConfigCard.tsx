@@ -85,6 +85,9 @@ export function RainConfigCard({
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: config.use_two_digit_tickets ?? false,
         two_digit_stake: config.two_digit_stake ?? 0,
+        indicator_auto_pause: config.indicator_auto_pause ?? true,
+        indicator_guard_rounds: config.indicator_guard_rounds ?? 3,
+        indicator_auto_bet: config.indicator_auto_bet ?? true,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -254,6 +257,52 @@ export function RainConfigCard({
               />
               <span>0 = use cash stake</span>
             </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+            <input
+              id="rain-auto-indicator-pause"
+              type="checkbox"
+              checked={config.indicator_auto_pause ?? true}
+              onChange={(e) => setConfig({ ...config, indicator_auto_pause: e.target.checked })}
+              className="h-4 w-4 accent-blue-600"
+            />
+            <Label htmlFor="rain-auto-indicator-pause" className="cursor-pointer">
+              Indicator auto-pause — skip rounds when the last draws show no repetitive structure
+            </Label>
+            <label htmlFor="rain-auto-indicator-guard" className="flex items-center gap-2 text-xs text-muted-foreground">
+              Non-repetitive rounds before pausing
+              <Input
+                id="rain-auto-indicator-guard"
+                type="number"
+                min={1}
+                max={20}
+                value={config.indicator_guard_rounds ?? 3}
+                onChange={(e) => setConfig({ ...config, indicator_guard_rounds: Math.max(1, Math.min(20, Math.floor(Number(e.target.value) || 3))) })}
+                disabled={!(config.indicator_auto_pause ?? true)}
+                className="w-20"
+              />
+            </label>
+            <span className="w-full text-[11px] text-muted-foreground">
+              Repetitive strategies depend on adjacent-digit structure (chains like 53,54,56). When it disappears
+              (the "hard"/non-repetitive mode) for this many consecutive rounds, the engine stops betting for as long
+              as it lasts — then resumes automatically once repetitive draws come back.
+            </span>
+            <input
+              id="rain-auto-indicator-bet"
+              type="checkbox"
+              checked={config.indicator_auto_bet ?? true}
+              onChange={(e) => setConfig({ ...config, indicator_auto_bet: e.target.checked })}
+              className="h-4 w-4 accent-blue-600"
+            />
+            <Label htmlFor="rain-auto-indicator-bet" className="cursor-pointer">
+              Indicator tickets — pick from decade clusters, sequence triggers and vertical lanes
+            </Label>
+            <span className="w-full text-[11px] text-muted-foreground">
+              Examples: ≥3 numbers in one decade (e.g. 68,69,70 → the 60s carry) boost that decade; a run like
+              53,54,56 replicates as 4,5,6 / 14,15,16 / 44,45,46 / 64,65,66; lanes repeating a ones-place digit
+              stepped by 10 (9,19,29) prioritise the aligned tickets. High-confidence indicator tickets are paired
+              with the highest-wager available free bet.
+            </span>
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-muted-foreground">

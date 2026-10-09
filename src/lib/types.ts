@@ -26,6 +26,26 @@ export interface DrawsResponse {
 	draws: Draw[];
 }
 
+// One day of the "same clock time on each of the last N days" history view.
+export interface TimeMatchedDay {
+	daysAgo: number;
+	date: string;
+	label: string;
+	weekday: number;
+	from: string;
+	to: string;
+	draws: Draw[];
+}
+
+export interface TimeMatchedDrawsResponse {
+	siteId: string;
+	windowMinutes: number;
+	dayCount: number;
+	anchor: string;
+	anchorClock: string;
+	days: TimeMatchedDay[];
+}
+
 export interface HourlyTrend {
 	hour: number;
 	avgRepetitive: number;
@@ -929,6 +949,14 @@ export interface RainAutoplayConfig {
 	use_two_digit_tickets: boolean;
 	// Cash stake for the 2-digit ML dynamic tickets (0 = use cash_stake).
 	two_digit_stake: number;
+	// Repetition guard: pause when the last `indicator_guard_rounds` draws show
+	// no repetitive structure (engine keeps running and auto-resumes).
+	indicator_auto_pause: boolean;
+	indicator_guard_rounds: number;
+	// Seed ticket picks from the indicator signals (decade clusters / sequence
+	// triggers / vertical lanes) and use the highest-wager free bet for the
+	// high-confidence indicator tickets.
+	indicator_auto_bet: boolean;
 	updated_at: string;
 }
 
@@ -948,6 +976,12 @@ export interface RainAutoplayStatus {
 	pendingAcks: number;
 	freeBetsPlayed: number;
 	cashBetsPlayed: number;
+	// Repetition-guard state (indicatorPaused=true => engine is auto-paused but
+	// still running; it resumes when repetitive draws come back).
+	indicatorPaused: boolean;
+	indicatorReason: string | null;
+	indicatorStrong: boolean;
+	indicatorSuggestions: number[];
 }
 
 export interface RainAutoplayStatusResponse {
