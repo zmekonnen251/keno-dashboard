@@ -82,6 +82,7 @@ export function RainConfigCard({
         use_cash_after_free_bets: config.use_cash_after_free_bets,
         cash_stake: config.cash_stake,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
+        temporal_tickets_per_round: config.temporal_tickets_per_round ?? 1,
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: config.use_two_digit_tickets ?? false,
         two_digit_stake: config.two_digit_stake ?? 0,
@@ -156,13 +157,27 @@ export function RainConfigCard({
                 <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Manual spots below</SelectItem>
-                  <SelectItem value="mixed">Mixed — queue + recurrence tickets</SelectItem>
+                  <SelectItem value="temporal">Temporal pattern tickets (same clock-time window)</SelectItem>
+                  <SelectItem value="mixed">Mixed — queue + recurrence + temporal tickets</SelectItem>
                   <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
                   <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
                   <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {(config.spots_mode === 'mixed' || config.spots_mode === 'temporal') && (
+              <div>
+                <Label htmlFor="rain-auto-temporal-tickets">Temporal tickets / round{config.spots_mode === 'temporal' ? ' (whole round)' : ' (rest = queue)'}</Label>
+                <Input
+                  type="number"
+                  id="rain-auto-temporal-tickets"
+                  min={0}
+                  max={50}
+                  value={config.temporal_tickets_per_round ?? 1}
+                  onChange={(e) => setConfig({ ...config, temporal_tickets_per_round: Number(e.target.value) })}
+                />
+              </div>
+            )}
             {config.spots_mode === 'mixed' && (
               <div>
                 <Label htmlFor="rain-auto-recurrence-tickets">Recurrence tickets / round (rest = preconfigured queue)</Label>

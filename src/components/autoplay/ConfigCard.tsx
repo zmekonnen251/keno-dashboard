@@ -38,6 +38,7 @@ export function ConfigCard({
 	const [predTicketsPerRound, setPredTicketsPerRound] = useState('');
 	const [useTwoDigitTickets, setUseTwoDigitTickets] = useState(false);
 	const [twoDigitStake, setTwoDigitStake] = useState('');
+	const [predSource, setPredSource] = useState<'combined' | 'temporal'>('combined');
 	const [saving, setSaving] = useState(false);
 
 	function onLoadCurrent() {
@@ -54,6 +55,7 @@ export function ConfigCard({
 		setPredTicketsPerRound(String(cfg?.prediction_tickets_per_round ?? 0));
 		setUseTwoDigitTickets(cfg?.use_two_digit_tickets ?? false);
 		setTwoDigitStake(cfg?.two_digit_stake ? String(cfg.two_digit_stake) : '');
+		setPredSource((cfg?.prediction_source ?? 'combined') === 'temporal' ? 'temporal' : 'combined');
 		setLoaded(true);
 		onSaved('');
 	}
@@ -72,6 +74,7 @@ export function ConfigCard({
 		setPredTicketsPerRound('');
 		setUseTwoDigitTickets(false);
 		setTwoDigitStake('');
+		setPredSource('combined');
 		setLoaded(true);
 		onSaved('');
 	}
@@ -94,6 +97,7 @@ export function ConfigCard({
 				prediction_tickets_per_round: predTicketsPerRound !== '' ? parseInt(predTicketsPerRound, 10) : 0,
 				use_two_digit_tickets: useTwoDigitTickets,
 				two_digit_stake: twoDigitStake !== '' ? parseFloat(twoDigitStake) : 0,
+				prediction_source: predSource,
 			});
 			onSaved('Configuration saved.');
 			onRefresh();
@@ -287,6 +291,26 @@ export function ConfigCard({
 						</label>
 						<span className='w-full text-[11px] text-muted-foreground'>
 							0 = all tickets from the site ticket plan (editable on the Predictions page)
+						</span>
+					</div>
+
+					<div className='mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5'>
+						<Label htmlFor='predSource' className='cursor-pointer'>
+							Generated-betting ticket source
+						</Label>
+						<select
+							id='predSource'
+							value={predSource}
+							onChange={(e) => setPredSource(e.target.value === 'temporal' ? 'temporal' : 'combined')}
+							className='rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground'
+						>
+							<option value='combined'>Combined ML prediction (latest forecast)</option>
+							<option value='temporal'>Temporal pattern tickets (same clock-time window, last 7 days)</option>
+						</select>
+						<span className='ml-auto text-xs text-muted-foreground'>
+							{predSource === 'temporal'
+								? 'Every ticket comes from the rankings mined in the draws ±10 min of the target time on each of the last 7 days.'
+								: 'The engine bets the standard generated prediction tickets.'}
 						</span>
 					</div>
 

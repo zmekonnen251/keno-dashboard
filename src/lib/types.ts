@@ -514,6 +514,9 @@ export interface AutoplayConfig {
 	use_two_digit_tickets: boolean;
 	// Stake for the 2-digit ML dynamic tickets (0 = use the general stake).
 	two_digit_stake: number;
+	// Ticket source for the generated-betting tickets: 'combined' = latest
+	// ML/aggregate prediction, 'temporal' = same clock-time window tickets.
+	prediction_source: 'combined' | 'temporal';
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
@@ -989,12 +992,15 @@ export interface RainAutoplayConfig {
 	enabled: boolean;
 	provider: RainProvider;
 	tickets_per_round: number;
-	spots_mode: 'prediction' | 'prediction_tickets' | 'recurrence' | 'mixed' | 'manual';
+	spots_mode: 'prediction' | 'prediction_tickets' | 'recurrence' | 'mixed' | 'temporal' | 'manual';
 	manual_spots: number[];
 	round_interval: number;
 	use_cash_after_free_bets: boolean;
 	cash_stake: number;
 	recurrence_tickets_per_round: number;
+	// Temporal-pattern tickets (same clock-time window over the last N days). In
+	// 'mixed' mode this many picks come from it (0 disables the quota).
+	temporal_tickets_per_round: number;
 	// How many CASH tickets each eligible account places per round.
 	tickets_per_account: number;
 	// Bet the "2-digit ML dynamic tickets" (ranked 2-spot pairs) on both the

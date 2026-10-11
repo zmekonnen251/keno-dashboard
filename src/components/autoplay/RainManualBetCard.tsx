@@ -443,6 +443,34 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
   const handleClearPicks = () => { setPicks([]); setLastPrediction(null); };
 
+  // Load the top temporal-pattern ticket (same clock-time window over the last
+  // 7 days) onto the board. The engine plays these when spots_mode = 'temporal'.
+  const handleGenerateTemporalPicks = async () => {
+    if (!config) return;
+    setPredicting(true);
+    try {
+      const res = await getRainPrediction(config.provider, 3, 'temporal');
+      if (res.ok && res.prediction && res.prediction.picks.length > 0) {
+        const p = res.prediction;
+        setPicks(p.picks);
+        setLastPrediction({
+          picks: p.picks,
+          strategy: 'temporal',
+          difficulty: p.difficulty?.level ?? 'temporal',
+          repetitivePatterns: [],
+          clusters: [],
+        });
+        onMessage(`Loaded temporal pattern ticket [${p.picks.join(',')}] — draws in this ±10-min window on recent days.`);
+      } else {
+        onMessage('No temporal patterns available yet — open the Predictions page and press "Generate" on the temporal card first.');
+      }
+    } catch (e) {
+      onMessage('Error generating temporal picks: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPredicting(false);
+    }
+  };
+
   function toggleNumber(n: number) {
     setPicks((prev) => {
       if (prev.includes(n)) return prev.filter(x => x !== n);
@@ -1132,6 +1160,15 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                 className="flex-1 min-w-40"
               >
                 {predicting ? 'Generating…' : <><Sparkles className="w-4 h-4 mr-1" /> Generate AI Picks</>}
+              </Button>
+              <Button
+                onClick={handleGenerateTemporalPicks}
+                disabled={predicting || !config}
+                variant="outline"
+                className="flex-1 min-w-40"
+                title="Top ticket mined from the draws in this same ±10-min clock window over the last 7 days"
+              >
+                {predicting ? 'Loading…' : <><Zap className="w-4 h-4 mr-1" /> Temporal Picks</>}
               </Button>
               <Button
                 onClick={handlePlaceBet}

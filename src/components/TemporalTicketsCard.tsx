@@ -49,6 +49,11 @@ export function TemporalTicketsCard() {
         days, weighted toward the most recent days. Run it just before the next draw.
       </p>
       {msg && <p className="mb-2 text-xs text-muted-foreground">{msg}</p>}
+      <p className="mb-3 text-[11px] text-muted-foreground">
+        These are the tickets the engines play with the temporal source: the rain autoplay &quot;Temporal pattern
+        tickets&quot; spots mode, the general engine&apos;s &quot;temporal&quot; ticket source, and the manual bet cards&apos;
+        &quot;Temporal Picks&quot; / temporal prediction bets.
+      </p>
       {loading ? (
         <Loading rows={3} />
       ) : error ? (

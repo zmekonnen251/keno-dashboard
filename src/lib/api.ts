@@ -375,10 +375,11 @@ export async function placeManualBet(
 export async function placePredictionBet(
   stake: number,
   accountId?: number,
+  source: 'prediction' | 'temporal' = 'prediction',
 ): Promise<ManualBetResponse> {
   return apiFetch<ManualBetResponse>('api/accounts/autoplay/manual-bet-prediction', {
     method: 'POST',
-    body: JSON.stringify({ stake, accountId }),
+    body: JSON.stringify({ stake, accountId, source }),
   });
 }
 
@@ -496,7 +497,7 @@ export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigRespons
 }
 
 export async function setRainAutoplayConfig(
-  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet'>>,
+  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'temporal_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet'>>,
 ): Promise<RainAutoplayConfigResponse> {
   return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
     method: 'PATCH',
@@ -528,16 +529,20 @@ export async function playRainFreeBet(id: number, spots?: number[]): Promise<Pla
 }
 
 // Manual "Bet Prediction" for rain: plays the latest prediction's preferred
-// ticket on one eligible free bet (wager = the free bet's own amount).
-export async function rainBetPrediction(): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
+// ticket on one eligible free bet (wager = the free bet's own amount). Pass
+// strategy 'temporal' to bet the same clock-time-window ticket instead.
+export async function rainBetPrediction(strategy: 'ml' | 'temporal' = 'ml'): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
   return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/rain/bet-prediction', {
     method: 'POST',
+    body: JSON.stringify({ strategy }),
   });
 }
 
-// Get AI prediction for rain autoplay (uses DB draws + extension-like logic)
-export async function getRainPrediction(provider = 'fungames_shamo', k = 3) {
-  return apiFetch<RainPredictionResponse>(`api/rain/prediction?provider=${encodeURIComponent(provider)}&k=${k}`);
+// Get AI prediction for rain autoplay (uses DB draws + extension-like logic).
+// strategy 'temporal' returns the same-clock-time-window temporal tickets.
+export async function getRainPrediction(provider = 'fungames_shamo', k = 3, strategy?: 'temporal') {
+  const q = `provider=${encodeURIComponent(provider)}&k=${k}` + (strategy ? `&strategy=${strategy}` : '');
+  return apiFetch<RainPredictionResponse>(`api/rain/prediction?${q}`);
 }
 
 // Forced test round: the engine immediately plays as many eligible free-bets
