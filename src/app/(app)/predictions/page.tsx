@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Card, StatCard, Empty, ErrorBox, Loading, PrettyNumbers, Picks } from '@/components/app';
 import { SequenceMatchDisplay } from '@/components/app/SequenceMatchDisplay';
+import { TemporalTicketsCard } from '@/components/TemporalTicketsCard';
 import { formatTime, winRate } from '@/lib/format';
 import type { TicketPlan, PredictionTicket, AccuracyStats } from '@/lib/types';
 
@@ -424,6 +425,8 @@ export default function PredictionsPage() {
       ) : (
         <Empty label="No recent predictions" />
       )}
+
+      <TemporalTicketsCard />
 
       <div className="space-y-3">
         <h3 className="text-base font-bold text-foreground">Both sites — prediction vs actual draw</h3>

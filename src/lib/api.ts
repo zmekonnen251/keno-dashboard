@@ -71,6 +71,8 @@ import type {
   ShamoBetSessionInfo,
   ShamoBetStatus,
   ShamoPlaceResponse,
+  TemporalGenerateResponse,
+  TemporalLatestResponse,
 } from './types';
 
 // ---- auth ----
@@ -181,6 +183,23 @@ export async function getPatternsByTime(siteId: string, hour: number, day: numbe
 
 export async function getPredictions(siteId: string): Promise<PredictionsResponse> {
   return apiFetch<PredictionsResponse>(`api/predictions/${siteId}`);
+}
+
+// Temporal-pattern tickets: top 2/3/4-spot picks mined from the same clock-time
+// window over the last N days. `anchor` defaults to now; `tzOffsetMinutes` keeps
+// the server windows aligned with the viewer's clock.
+export async function generateTemporalPrediction(
+  siteId: string,
+  opts: { days?: number; windowMinutes?: number; anchor?: string; tzOffsetMinutes?: number } = {}
+): Promise<TemporalGenerateResponse> {
+  return apiFetch<TemporalGenerateResponse>(`api/predictions/${siteId}/temporal/generate`, {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export async function getTemporalPrediction(siteId: string): Promise<TemporalLatestResponse> {
+  return apiFetch<TemporalLatestResponse>(`api/predictions/${siteId}/temporal`);
 }
 
 export async function getInsights(siteId: string): Promise<InsightsResponse> {

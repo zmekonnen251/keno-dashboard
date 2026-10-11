@@ -328,6 +328,59 @@ export interface PredictionsResponse {
 	ticketPlan?: TicketPlan;
 }
 
+// Temporal-pattern multi-ticket prediction: top 2/3/4-spot tickets mined from
+// the same-time-of-day window over the last N days with temporal decay.
+// Mirrors server/src/analyzers/temporalPatternPredictor.ts.
+export interface TemporalTicket {
+	digits: number;
+	numbers: number[];
+	probability: number;
+	matchWeight: number;
+	support: number;
+	hotScore: number;
+	origins: string[];
+	reason?: string;
+}
+
+export interface TemporalTimeContext {
+	target: string;
+	targetClock: string;
+	windowMinutes: number;
+	days: number;
+	windowDrawCount: number;
+	fromClock: string | null;
+	toClock: string | null;
+	label: string;
+}
+
+export interface TemporalGenerateResponse {
+	ok: boolean;
+	siteId: string;
+	predictionType: string;
+	anchor: string;
+	windowMinutes: number;
+	days: number;
+	windowDrawCount: number;
+	timeContext: TemporalTimeContext;
+	hotPool: { number: number; score: number; count: number }[];
+	tickets: TemporalTicket[];
+	savedCount: number;
+}
+
+export interface TemporalLatestResponse {
+	siteId: string;
+	predictionType: string;
+	count: number;
+	latestAt: string | null;
+	tickets: {
+		numbers: number[];
+		digits: number;
+		confidence: number;
+		reasoning: string;
+		timeContext: string;
+	}[];
+}
+
 export interface RepetitiveAnalysis {
 	[key: string]: any;
 }
