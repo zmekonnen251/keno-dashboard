@@ -35,7 +35,7 @@ export function RainConfigCard({
   const [manualDraft, setManualDraft] = useState('');
   const seeded = useRef(false);
   const [saving, setSaving] = useState(false);
-  const [ticketConfig, setTicketConfig] = useState<any>(null);
+  const [ticketConfig, setTicketConfig] = useState<unknown>(null);
   const [ticketSeeded, setTicketSeeded] = useState(false);
 
   // Seed the editor once from the live config
@@ -56,7 +56,7 @@ export function RainConfigCard({
         }
       }).catch(() => { setTicketSeeded(true); });
     }
-  }, []);
+  }, [ticketSeeded]);
 
   function parseManualSpots(text: string): number[] {
     return text
@@ -300,7 +300,7 @@ export function RainConfigCard({
             </label>
             <span className="w-full text-[11px] text-muted-foreground">
               Repetitive strategies depend on adjacent-digit structure (chains like 53,54,56). When it disappears
-              (the "hard"/non-repetitive mode) for this many consecutive rounds, the engine stops betting for as long
+              (the &quot;hard&quot;/non-repetitive mode) for this many consecutive rounds, the engine stops betting for as long
               as it lasts — then resumes automatically once repetitive draws come back.
             </span>
             <input
@@ -337,7 +337,7 @@ export function RainConfigCard({
             config={{ 
               ...config, 
               provider: config.provider,
-              tickets: ticketConfig?.tickets || [],
+              tickets: (ticketConfig as { tickets?: NonNullable<Parameters<typeof RainTicketConfigCard>[0]['config']>['tickets'] } | null)?.tickets || [],
               tickets_per_round: config.tickets_per_round,
               round_interval: config.round_interval,
               enabled: config.enabled
