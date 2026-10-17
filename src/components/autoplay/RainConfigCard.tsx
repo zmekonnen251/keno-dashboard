@@ -157,6 +157,7 @@ export function RainConfigCard({
                 <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Manual spots below</SelectItem>
+                  <SelectItem value="frequent">Frequent numbers tickets (15 pre-generated 3-digit from draw history)</SelectItem>
                   <SelectItem value="temporal">Temporal pattern tickets (same clock-time window)</SelectItem>
                   <SelectItem value="mixed">Mixed — queue + recurrence + temporal tickets</SelectItem>
                   <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
