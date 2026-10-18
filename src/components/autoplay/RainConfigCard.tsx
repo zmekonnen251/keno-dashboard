@@ -12,9 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Empty } from '@/components/app';
-import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
+import { setRainAutoplayConfig, getRainTicketConfig, setRainTicketConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
-import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
+import type { RainAutoplayConfig, RainProvider, BotTicket } from '@/lib/types';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 
@@ -59,6 +59,7 @@ export function RainConfigCard({
   }, [ticketSeeded]);
 
   function parseManualSpots(text: string): number[] {
+    // Parse flat list for backward compatibility (comma/space separated single ticket)
     return text
       .split(/[,;\n\r]+/)
       .flatMap((part) => part.trim().split(/\s+/))
@@ -67,17 +68,65 @@ export function RainConfigCard({
       .slice(0, 20);
   }
 
+  function parseManualTickets(text: string): { numbers: number[]; spots: number }[] {
+    // Parse multiple tickets: each line = one ticket, numbers separated by comma/space
+    return text
+      .split(/\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const numbers = line
+          .split(/[,;\s]+/)
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80);
+        return { numbers, spots: numbers.length };
+      })
+      .filter((t) => t.numbers.length > 0);
+  }
+
   async function onSave() {
     if (!config) return;
     setSaving(true);
     onSaved?.('');
     try {
+      // Parse manual spots for backward compatibility (flat array)
+      const manualSpots = parseManualSpots(manualDraft);
+
+      // If manual mode, also create ticket queue entries from manual draft (one ticket per line)
+      if (config.spots_mode === 'manual' && manualDraft.trim()) {
+        const manualTickets = parseManualTickets(manualDraft);
+        if (manualTickets.length > 0) {
+          const existingTicketConfig = await getRainTicketConfig();
+          const existingTickets = existingTicketConfig.config?.tickets || [];
+          
+          // Remove existing free-bet manual tickets (keep cash tickets and other manual tickets)
+          const filteredTickets = existingTickets.filter(
+            (t) => !(t.useFreeBet === true && t.strategy === 'manual')
+          );
+          
+          // Add new manual free-bet tickets
+          const newTickets: BotTicket[] = manualTickets.map((t, i) => ({
+            id: `manual-free-${Date.now()}-${i}`,
+            spots: t.spots,
+            strategy: 'manual',
+            stake: config.cash_stake || 2,
+            enabled: true,
+            useFreeBet: true,
+            numbers: t.numbers,
+          }));
+          
+          const updatedTickets = [...filteredTickets, ...newTickets];
+          
+          await setRainTicketConfig({ tickets: updatedTickets });
+        }
+      }
+
       const res = await setRainAutoplayConfig({
         enabled: config.enabled,
         provider: config.provider,
         tickets_per_round: config.tickets_per_round,
         spots_mode: config.spots_mode,
-        manual_spots: parseManualSpots(manualDraft),
+        manual_spots: parseManualSpots(manualDraft), // backward compatibility
         round_interval: config.round_interval,
         use_cash_after_free_bets: config.use_cash_after_free_bets,
         cash_stake: config.cash_stake,
@@ -193,15 +242,22 @@ export function RainConfigCard({
               </div>
             )}
             <div>
-              <Label htmlFor="rain-auto-manual-spots">Manual spots / ticket (1–80, comma or space separated)</Label>
-              <Input
-                type="text"
+              <Label htmlFor="rain-auto-manual-spots">Manual tickets (one per line, numbers comma/space separated)</Label>
+              <textarea
                 id="rain-auto-manual-spots"
                 value={manualDraft}
                 onChange={(e) => setManualDraft(e.target.value)}
-                placeholder="e.g. 5, 12, 23, 40"
+                placeholder="5, 12, 23, 40
+7, 18, 33, 55
+11, 22, 33, 44, 55"
                 disabled={config.spots_mode !== 'manual'}
+                rows={5}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Each line = one free-bet ticket. Numbers separated by commas or spaces. 
+                Tickets are saved to the ticket queue with useFreeBet=true.
+              </p>
             </div>
             <div>
               <Label htmlFor="rain-auto-use-cash">Use cash after free bets</Label>
