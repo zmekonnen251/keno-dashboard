@@ -12,9 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Empty } from '@/components/app';
-import { setRainAutoplayConfig, getRainTicketConfig, setRainTicketConfig } from '@/lib/api';
+import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
-import type { RainAutoplayConfig, RainProvider, BotTicket } from '@/lib/types';
+import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 
@@ -32,17 +32,15 @@ export function RainConfigCard({
   defaultOpen?: boolean;
 }) {
   const [config, setConfig] = useState<RainAutoplayConfig | null>(null);
-  const [manualDraft, setManualDraft] = useState('');
   const seeded = useRef(false);
   const [saving, setSaving] = useState(false);
-  const [ticketConfig, setTicketConfig] = useState<unknown>(null);
+  const [ticketConfig, setTicketConfig] = useState<RainAutoplayConfig & { tickets?: any[] } | null>(null);
   const [ticketSeeded, setTicketSeeded] = useState(false);
 
   // Seed the editor once from the live config
   useEffect(() => {
     if (cfg && !seeded.current) {
       setConfig(cfg);
-      setManualDraft(cfg.manual_spots.join(', '));
       seeded.current = true;
     }
   }, [cfg]);
@@ -50,87 +48,33 @@ export function RainConfigCard({
   useEffect(() => {
     if (!ticketSeeded) {
       getRainTicketConfig().then(res => {
-        if (res.ok) {
-          setTicketConfig(res.config);
+        if (res.ok && config) {
+          setTicketConfig({ ...config, tickets: res.config.tickets } as any);
+          setTicketSeeded(true);
+        } else if (res.ok) {
+          setTicketConfig({ tickets: res.config.tickets } as any);
           setTicketSeeded(true);
         }
       }).catch(() => { setTicketSeeded(true); });
     }
   }, [ticketSeeded]);
 
-  function parseManualSpots(text: string): number[] {
-    // Parse flat list for backward compatibility (comma/space separated single ticket)
-    return text
-      .split(/[,;\n\r]+/)
-      .flatMap((part) => part.trim().split(/\s+/))
-      .map((s) => Number(s))
-      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80)
-      .slice(0, 20);
-  }
-
-  function parseManualTickets(text: string): { numbers: number[]; spots: number }[] {
-    // Parse multiple tickets: each line = one ticket, numbers separated by comma/space
-    return text
-      .split(/\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const numbers = line
-          .split(/[,;\s]+/)
-          .map((s) => Number(s.trim()))
-          .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80);
-        return { numbers, spots: numbers.length };
-      })
-      .filter((t) => t.numbers.length > 0);
-  }
-
   async function onSave() {
     if (!config) return;
     setSaving(true);
     onSaved?.('');
     try {
-      // Parse manual spots for backward compatibility (flat array)
-      const manualSpots = parseManualSpots(manualDraft);
-
-      // If manual mode, also create ticket queue entries from manual draft (one ticket per line)
-      if (config.spots_mode === 'manual' && manualDraft.trim()) {
-        const manualTickets = parseManualTickets(manualDraft);
-        if (manualTickets.length > 0) {
-          const existingTicketConfig = await getRainTicketConfig();
-          const existingTickets = existingTicketConfig.config?.tickets || [];
-          
-          // Remove existing free-bet manual tickets (keep cash tickets and other manual tickets)
-          const filteredTickets = existingTickets.filter(
-            (t) => !(t.useFreeBet === true && t.strategy === 'manual')
-          );
-          
-          // Add new manual free-bet tickets
-          const newTickets: BotTicket[] = manualTickets.map((t, i) => ({
-            id: `manual-free-${Date.now()}-${i}`,
-            spots: t.spots,
-            strategy: 'manual',
-            stake: config.cash_stake || 2,
-            enabled: true,
-            useFreeBet: true,
-            numbers: t.numbers,
-          }));
-          
-          const updatedTickets = [...filteredTickets, ...newTickets];
-          
-          await setRainTicketConfig({ tickets: updatedTickets });
-        }
-      }
-
+      // No manual_spots - only ticket queue
       const res = await setRainAutoplayConfig({
         enabled: config.enabled,
         provider: config.provider,
         tickets_per_round: config.tickets_per_round,
-        spots_mode: config.spots_mode,
-        manual_spots: parseManualSpots(manualDraft), // backward compatibility
+        spots_mode: 'queue',
+        manual_spots: [], // not used anymore
         round_interval: config.round_interval,
         use_cash_after_free_bets: config.use_cash_after_free_bets,
         cash_stake: config.cash_stake,
-        recurrence_tickets_per_round: config.recurrence_tickets_per_round,
+        recurrence_tickets_per_round: config.recurrence_tickets_per_round ?? 1,
         temporal_tickets_per_round: config.temporal_tickets_per_round ?? 1,
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: config.use_two_digit_tickets ?? false,
@@ -205,59 +149,23 @@ export function RainConfigCard({
               <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v as RainAutoplayConfig['spots_mode'] })}>
                 <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual spots below</SelectItem>
-                  <SelectItem value="frequent">Frequent numbers tickets (15 pre-generated 3-digit from draw history)</SelectItem>
-                  <SelectItem value="temporal">Temporal pattern tickets (same clock-time window)</SelectItem>
-                  <SelectItem value="mixed">Mixed — queue + recurrence + temporal tickets</SelectItem>
-                  <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
-                  <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
-                  <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
+                  <SelectItem value="queue">Ticket Queue Only (use pre-configured tickets)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {(config.spots_mode === 'mixed' || config.spots_mode === 'temporal') && (
-              <div>
-                <Label htmlFor="rain-auto-temporal-tickets">Temporal tickets / round{config.spots_mode === 'temporal' ? ' (whole round)' : ' (rest = queue)'}</Label>
-                <Input
-                  type="number"
-                  id="rain-auto-temporal-tickets"
-                  min={0}
-                  max={50}
-                  value={config.temporal_tickets_per_round ?? 1}
-                  onChange={(e) => setConfig({ ...config, temporal_tickets_per_round: Number(e.target.value) })}
-                />
-              </div>
-            )}
-            {config.spots_mode === 'mixed' && (
-              <div>
-                <Label htmlFor="rain-auto-recurrence-tickets">Recurrence tickets / round (rest = preconfigured queue)</Label>
-                <Input
-                  type="number"
-                  id="rain-auto-recurrence-tickets"
-                  min={0}
-                  max={50}
-                  value={config.recurrence_tickets_per_round}
-                  onChange={(e) => setConfig({ ...config, recurrence_tickets_per_round: Number(e.target.value) })}
-                />
-              </div>
-            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Configure tickets in the <strong>Ticket Queue</strong> section below. Each ticket with <code>useFreeBet=true</code> is used for free-bet rounds.
+            </p>
             <div>
-              <Label htmlFor="rain-auto-manual-spots">Manual tickets (one per line, numbers comma/space separated)</Label>
-              <textarea
-                id="rain-auto-manual-spots"
-                value={manualDraft}
-                onChange={(e) => setManualDraft(e.target.value)}
-                placeholder="5, 12, 23, 40
-7, 18, 33, 55
-11, 22, 33, 44, 55"
-                disabled={config.spots_mode !== 'manual'}
-                rows={5}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>
+              <Input
+                id="rain-auto-interval"
+                type="number"
+                min={5}
+                max={3600}
+                value={config.round_interval}
+                onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Each line = one free-bet ticket. Numbers separated by commas or spaces. 
-                Tickets are saved to the ticket queue with useFreeBet=true.
-              </p>
             </div>
             <div>
               <Label htmlFor="rain-auto-use-cash">Use cash after free bets</Label>
@@ -290,115 +198,71 @@ export function RainConfigCard({
                 max={20}
                 value={config.tickets_per_account ?? 1}
                 onChange={(e) => setConfig({ ...config, tickets_per_account: Number(e.target.value) })}
-                disabled={!config.use_cash_after_free_bets}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Each eligible account places this many cash tickets (total = accounts × this). When the next stake
-                would leave less than 2 Birr — below the minimum bet — the whole remaining balance is played as one
-                all-in ticket.
-              </p>
             </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5">
-            <input
-              id="rain-auto-two-digit"
-              type="checkbox"
-              checked={config.use_two_digit_tickets ?? false}
-              onChange={(e) => setConfig({ ...config, use_two_digit_tickets: e.target.checked })}
-              className="h-4 w-4 accent-blue-600"
-            />
-            <Label htmlFor="rain-auto-two-digit" className="cursor-pointer">
-              2-digit ML dynamic tickets — free bets and cash bets play ranked 2-spot pairs
-            </Label>
-            <span className="w-full text-[11px] text-muted-foreground">
-              Pairs predicted from the last 1–3 draws (same digits can redraw next game) plus overdue/time patterns —
-              the same pairs the 2-digit ticket card places manually. Overrides the ticket source above; falls back to
-              it when no completed draw is on record.
-            </span>
-            <label htmlFor="rain-auto-two-digit-stake" className="flex items-center gap-2 text-xs text-muted-foreground">
-              2-digit cash stake (ETB)
+            <div>
+              <Label htmlFor="rain-auto-use-2digit">2-digit ML dynamic tickets</Label>
+              <Select value={String(config.use_two_digit_tickets ?? false)} onValueChange={(v) => setConfig({ ...config, use_two_digit_tickets: v === 'true' })}>
+                <SelectTrigger id="rain-auto-use-2digit"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Enabled — ranked 2-spot pairs from recent draws</SelectItem>
+                  <SelectItem value="false">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-2digit-stake">2-digit stake (ETB, 0 = use cash stake)</Label>
               <Input
-                id="rain-auto-two-digit-stake"
+                id="rain-auto-2digit-stake"
                 type="number"
                 min={0}
                 max={10000}
                 value={config.two_digit_stake ?? 0}
                 onChange={(e) => setConfig({ ...config, two_digit_stake: Number(e.target.value) })}
                 disabled={!config.use_two_digit_tickets}
-                className="w-28"
               />
-              <span>0 = use cash stake</span>
-            </label>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5">
-            <input
-              id="rain-auto-indicator-pause"
-              type="checkbox"
-              checked={config.indicator_auto_pause ?? true}
-              onChange={(e) => setConfig({ ...config, indicator_auto_pause: e.target.checked })}
-              className="h-4 w-4 accent-blue-600"
-            />
-            <Label htmlFor="rain-auto-indicator-pause" className="cursor-pointer">
-              Indicator auto-pause — skip rounds when the last draws show no repetitive structure
-            </Label>
-            <label htmlFor="rain-auto-indicator-guard" className="flex items-center gap-2 text-xs text-muted-foreground">
-              Non-repetitive rounds before pausing
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-indicator-pause">Repetition guard (pause if no repetitive structure)</Label>
+              <Select value={String(config.indicator_auto_pause ?? true)} onValueChange={(v) => setConfig({ ...config, indicator_auto_pause: v === 'true' })}>
+                <SelectTrigger id="rain-auto-indicator-pause"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Enabled</SelectItem>
+                  <SelectItem value="false">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-indicator-rounds">Guard rounds</Label>
               <Input
-                id="rain-auto-indicator-guard"
+                id="rain-auto-indicator-rounds"
                 type="number"
                 min={1}
-                max={20}
+                max={10}
                 value={config.indicator_guard_rounds ?? 3}
-                onChange={(e) => setConfig({ ...config, indicator_guard_rounds: Math.max(1, Math.min(20, Math.floor(Number(e.target.value) || 3))) })}
-                disabled={!(config.indicator_auto_pause ?? true)}
-                className="w-20"
+                onChange={(e) => setConfig({ ...config, indicator_guard_rounds: Number(e.target.value) })}
+                disabled={!config.indicator_auto_pause}
               />
-            </label>
-            <span className="w-full text-[11px] text-muted-foreground">
-              Repetitive strategies depend on adjacent-digit structure (chains like 53,54,56). When it disappears
-              (the &quot;hard&quot;/non-repetitive mode) for this many consecutive rounds, the engine stops betting for as long
-              as it lasts — then resumes automatically once repetitive draws come back.
-            </span>
-            <input
-              id="rain-auto-indicator-bet"
-              type="checkbox"
-              checked={config.indicator_auto_bet ?? true}
-              onChange={(e) => setConfig({ ...config, indicator_auto_bet: e.target.checked })}
-              className="h-4 w-4 accent-blue-600"
-            />
-            <Label htmlFor="rain-auto-indicator-bet" className="cursor-pointer">
-              Indicator tickets — pick from decade clusters, sequence triggers and vertical lanes
-            </Label>
-            <span className="w-full text-[11px] text-muted-foreground">
-              Examples: ≥3 numbers in one decade (e.g. 68,69,70 → the 60s carry) boost that decade; a run like
-              53,54,56 replicates as 4,5,6 / 14,15,16 / 44,45,46 / 64,65,66; lanes repeating a ones-place digit
-              stepped by 10 (9,19,29) prioritise the aligned tickets. High-confidence indicator tickets are paired
-              with the highest-wager available free bet.
-            </span>
-          </div>
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              {config.tickets_per_round === 0
-                ? '0 tickets/round = all plan tickets'
-                : `${config.tickets_per_round} free bet(s)/round`}{' '}
-              · {config.tickets_per_account ?? 1} cash ticket(s) per account · Updated {formatTime(config.updated_at)}
             </div>
-            <Button onClick={onSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save configuration'}
-            </Button>
+            <div>
+              <Label htmlFor="rain-auto-indicator-bet">Indicator auto-bet</Label>
+              <Select value={String(config.indicator_auto_bet ?? true)} onValueChange={(v) => setConfig({ ...config, indicator_auto_bet: v === 'true' })}>
+                <SelectTrigger id="rain-auto-indicator-bet"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Enabled</SelectItem>
+                  <SelectItem value="false">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={onSave} disabled={saving} className="flex-1">
+                {saving ? 'Saving…' : 'Save Configuration'}
+              </Button>
+            </div>
           </div>
-
-          {/* Ticket Queue Configuration (like Extension) */}
           <RainTicketConfigCard
-            config={{ 
-              ...config, 
-              provider: config.provider,
-              tickets: (ticketConfig as { tickets?: NonNullable<Parameters<typeof RainTicketConfigCard>[0]['config']>['tickets'] } | null)?.tickets || [],
-              tickets_per_round: config.tickets_per_round,
-              round_interval: config.round_interval,
-              enabled: config.enabled
-            }}
-            onSaved={onSaved}
+            config={ticketConfig as any}
+            onSaved={(msg) => { if (msg) onSaved?.(msg); }}
             onRefresh={onRefresh}
           />
         </>
