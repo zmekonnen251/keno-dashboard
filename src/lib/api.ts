@@ -517,8 +517,8 @@ export async function getRainAutoplayStatus(): Promise<RainAutoplayStatusRespons
   return apiFetch<RainAutoplayStatusResponse>('api/rain/autoplay/status');
 }
 
-export async function getRainFreeBets(): Promise<RainFreeBetsResponse> {
-  return apiFetch<RainFreeBetsResponse>('api/rain/free-bets');
+export async function getRainFreeBets(limit = 100): Promise<RainFreeBetsResponse> {
+  return apiFetch<RainFreeBetsResponse>(`api/rain/free-bets?limit=${limit}`);
 }
 
 export async function playRainFreeBet(id: number, spots?: number[]): Promise<PlayRainFreeBetResponse> {

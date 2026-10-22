@@ -6,7 +6,7 @@ import { type RainAccount, type RainProvider } from '@/lib/types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { formatTime } from '@/lib/format';
-import { Power, PowerOff } from 'lucide-react';
+import { Power, PowerOff, Play } from 'lucide-react';
 
 // Column definitions for the rain-claiming accounts list — mirrors the keno
 // Accounts page: accessor columns are sortable, display columns (status /
@@ -51,6 +51,7 @@ export interface RainAccountsMeta {
   onToggleAutoplay: (acc: RainAccount) => void;
   onWithdrawNow: (acc: RainAccount) => void;
   onResume: (acc: RainAccount) => void;
+  onPlay: (acc: RainAccount) => void;
   busyId: number | null;
 }
 
@@ -125,6 +126,14 @@ export const rainAccountColumns = columnHelper.columns([
   }),
   columnHelper.accessor('rain_count', {
     header: 'Claims',
+  }),
+  columnHelper.accessor('free_bet_count', {
+    header: 'Free Bets',
+    cell: ({ row }) => (
+      <Badge variant={row.original.free_bet_count > 0 ? 'default' : 'secondary'}>
+        {row.original.free_bet_count}
+      </Badge>
+    ),
   }),
   columnHelper.accessor('autoplay_enabled', {
     header: 'Autoplay',
@@ -203,6 +212,17 @@ export const rainAccountColumns = columnHelper.columns([
           {row.original.cash_suspended && (
             <Button variant="secondary" size="sm" onClick={() => meta.onResume(row.original)}>
               Resume cash
+            </Button>
+          )}
+          {row.original.free_bet_count > 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              disabled={busy}
+              title={`Play a free bet on ${row.original.name} (${row.original.free_bet_count} available)`}
+              onClick={() => meta.onPlay(row.original)}
+            >
+              <Play className="size-3.5" /> Play
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => meta.onShowClaims(row.original)}>

@@ -628,6 +628,30 @@ export default function RainAccountsPage() {
     }
   }
 
+  async function onPlay(acc: RainAccount) {
+    setMsg('');
+    try {
+      // Get the first available free bet for this account
+      const freeBetsRes = await getRainFreeBets(1000);
+      const accountFreeBets = freeBetsRes.bets.filter(b => b.account_id === acc.id && (b.status === 'available' || b.status === 'bet_placed'));
+      if (accountFreeBets.length === 0) {
+        setMsg(`No available free bets for "${acc.name}".`);
+        return;
+      }
+      // Play the first available free bet using the queue ticket
+      const bet = accountFreeBets[0];
+      const playRes = await playRainFreeBet(bet.id);
+      if (!playRes.result?.ok) {
+        setMsg(playRes.result?.error || 'Failed to place bet.');
+      } else {
+        setMsg(`Bet placed on "${acc.name}" using free bet ${bet.free_bet_id}.`);
+        refresh();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function onShowFreeBets() {
     setFreeBetsLoading(true);
     setFreeBets(null);
@@ -804,6 +828,7 @@ export default function RainAccountsPage() {
               onToggleAutoplay,
               onWithdrawNow,
               onResume,
+              onPlay,
               busyId,
             }}
             renderMobileRowCard={(acc) => (
@@ -817,6 +842,7 @@ export default function RainAccountsPage() {
                   onToggleAutoplay,
                   onWithdrawNow,
                   onResume,
+                  onPlay,
                   busyId,
                 }}
               />

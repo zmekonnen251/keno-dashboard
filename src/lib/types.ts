@@ -906,6 +906,7 @@ export interface RainAccount {
 	balance: number;
 	balanceLive: boolean;
 	rain_count: number;
+	free_bet_count: number;
 	last_claimed_at: string | null;
 	created_at: string;
 	updated_at: string;
@@ -1291,6 +1292,7 @@ export interface ChickenRoadAccount {
 	balance: number;
 	balanceLive: boolean;
 	rain_count: number;
+	free_bet_count: number;
 	last_claimed_at: string | null;
 	created_at: string;
 	updated_at: string;
