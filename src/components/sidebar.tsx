@@ -23,6 +23,7 @@ import {
   Moon,
   Sun,
   Zap,
+  Server,  // Add Server icon for providers
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState } from 'react';
@@ -57,6 +58,7 @@ const NAV = [
   { href: '/telebeat', label: 'TeleBeat', icon: Zap, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr'] },
   { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
+  { href: '/providers', label: 'Providers', icon: Server, sites: ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'] },
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/logs', label: 'Logs', icon: ScrollText },

@@ -967,3 +967,83 @@ export async function getTelebeatReport(): Promise<any> {
 export async function forceTelebeatRotate(): Promise<any> {
   return apiFetch('api/telebeat/force-rotate', { method: 'POST' });
 }
+
+// ---- Provider Management ----
+export interface Provider {
+  id: number;
+  code: string;
+  name: string;
+  base_url: string;
+  api_base_url: string;
+  gateway_ws_url: string | null;
+  spin_wheel_config: {
+    enabled: boolean;
+    spin_url?: string;
+    check_url?: string;
+    cost_per_spin?: number;
+  } | null;
+  is_active: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProvidersResponse {
+  ok: boolean;
+  providers: Provider[];
+}
+
+export interface ProviderResponse {
+  ok: boolean;
+  provider?: Provider;
+  error?: string;
+}
+
+export async function getProviders(includeInactive = false): Promise<ProvidersResponse> {
+  return apiFetch<ProvidersResponse>(`api/providers?includeInactive=${includeInactive}`);
+}
+
+export async function getProvider(code: string): Promise<ProviderResponse> {
+  return apiFetch<ProviderResponse>(`api/providers/${encodeURIComponent(code)}`);
+}
+
+export async function getDefaultProvider(): Promise<ProviderResponse> {
+  return apiFetch<ProviderResponse>('api/providers/default');
+}
+
+export async function createProvider(data: {
+  code: string;
+  name: string;
+  base_url: string;
+  api_base_url: string;
+  gateway_ws_url?: string;
+  spin_wheel_config?: { enabled: boolean; spin_url?: string; check_url?: string; cost_per_spin?: number };
+  is_active?: boolean;
+  is_default?: boolean;
+}): Promise<ProviderResponse> {
+  return apiFetch<ProviderResponse>('api/providers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateProvider(code: string, patch: {
+  name?: string;
+  base_url?: string;
+  api_base_url?: string;
+  gateway_ws_url?: string | null;
+  spin_wheel_config?: { enabled: boolean; spin_url?: string; check_url?: string; cost_per_spin?: number } | null;
+  is_active?: boolean;
+  is_default?: boolean;
+}): Promise<ProviderResponse> {
+  return apiFetch<ProviderResponse>(`api/providers/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteProvider(code: string): Promise<{ ok: boolean; error?: string }> {
+  return apiFetch<{ ok: boolean; error?: string }>(`api/providers/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+  });
+}
