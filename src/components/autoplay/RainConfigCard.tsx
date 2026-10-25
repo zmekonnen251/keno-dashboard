@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Empty } from '@/components/app';
-import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
+import { setRainAutoplayConfig, getRainTicketConfig, getFrequentTicketConfig, generateFrequentTickets, updateFrequentTicketConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { formatTime } from '@/lib/format';
@@ -36,6 +36,9 @@ export function RainConfigCard({
   const [saving, setSaving] = useState(false);
   const [ticketConfig, setTicketConfig] = useState<RainAutoplayConfig & { tickets?: any[] } | null>(null);
   const [ticketSeeded, setTicketSeeded] = useState(false);
+  const [freqConfig, setFreqConfig] = useState<any>(null);
+  const [freqLoading, setFreqLoading] = useState(false);
+  const [freqGenerating, setFreqGenerating] = useState(false);
 
   // Seed the editor once from the live config
   useEffect(() => {
@@ -58,6 +61,67 @@ export function RainConfigCard({
       }).catch(() => { setTicketSeeded(true); });
     }
   }, [ticketSeeded]);
+
+  // Load frequent ticket generator config
+  useEffect(() => {
+    async function loadFreqConfig() {
+      try {
+        const res = await getFrequentTicketConfig();
+        if (res.ok && res.config) {
+          setFreqConfig(res.config);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadFreqConfig();
+  }, []);
+
+  async function loadFreqConfig() {
+    try {
+      const res = await getFrequentTicketConfig();
+      if (res.ok && res.config) {
+        setFreqConfig(res.config);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleGenerateTickets() {
+    setFreqGenerating(true);
+    try {
+      const res = await generateFrequentTickets();
+      if (res.ok && res.result) {
+        onSaved?.('Frequent tickets generated and replaced successfully');
+        await loadFreqConfig();
+      } else {
+        onSaved?.(res.result?.errors?.join(', ') || 'Failed to generate tickets');
+      }
+    } catch (e) {
+      onSaved?.(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFreqGenerating(false);
+    }
+  }
+
+  async function handleSaveFreqConfig() {
+    if (!freqConfig) return;
+    setFreqLoading(true);
+    try {
+      const res = await updateFrequentTicketConfig(freqConfig);
+      if (res.ok && res.config) {
+        setFreqConfig(res.config);
+        onSaved?.('Frequent ticket generator config saved');
+      } else {
+        onSaved?.(res.error || 'Failed to save config');
+      }
+    } catch (e) {
+      onSaved?.(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFreqLoading(false);
+    }
+  }
 
   async function onSave() {
     if (!config) return;
@@ -254,6 +318,90 @@ export function RainConfigCard({
                 </SelectContent>
               </Select>
             </div>
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-4">Frequent Ticket Generator</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Automatically generates tickets from most frequent numbers in recent draws.
+                Runs on a schedule and replaces the ticket queue with fresh tickets.
+              </p>
+
+              {freqConfig && (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="freq-enabled">Enabled</Label>
+                      <Select
+                        value={String(freqConfig.enabled)}
+                        onValueChange={(v) => setFreqConfig({ ...freqConfig, enabled: v === 'true' })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Enabled</SelectItem>
+                          <SelectItem value="false">Disabled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="freq-ticket-count">Tickets per Generation</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={freqConfig.ticketCount}
+                        onChange={(e) => setFreqConfig({ ...freqConfig, ticketCount: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="freq-spot-size">Spot Size</Label>
+                      <Input
+                        type="number"
+                        min={2}
+                        max={10}
+                        value={freqConfig.spotSize}
+                        onChange={(e) => setFreqConfig({ ...freqConfig, spotSize: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="freq-interval">Interval (hours)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={freqConfig.intervalHours}
+                        onChange={(e) => setFreqConfig({ ...freqConfig, intervalHours: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t">
+                    <Button
+                      onClick={handleGenerateTickets}
+                      disabled={freqGenerating || freqLoading}
+                      variant="default"
+                    >
+                      {freqGenerating ? 'Generating…' : 'Generate & Replace Tickets Now'}
+                    </Button>
+                    <Button
+                      onClick={handleSaveFreqConfig}
+                      disabled={freqLoading}
+                      variant="outline"
+                    >
+                      {freqLoading ? 'Saving…' : 'Save Generator Config'}
+                    </Button>
+                  </div>
+
+                  {(freqGenerating || freqLoading) && (
+                    <p className="text-xs text-muted-foreground">
+                      {freqGenerating ? 'Generating tickets…' : 'Saving config…'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-4 border-t">
               <Button onClick={onSave} disabled={saving} className="flex-1">
                 {saving ? 'Saving…' : 'Save Configuration'}
