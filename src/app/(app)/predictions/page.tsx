@@ -268,7 +268,7 @@ export default function PredictionsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Predictions</h2>
         <div className="flex gap-2">
           <Button variant="outline" onClick={refresh}>Refresh</Button>

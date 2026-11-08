@@ -90,7 +90,7 @@ function AccountForm({
   onCancel,
 }: {
   initial: RainAccount | null;
-  onSave: (input: AccountFormInput) => void;
+  onSave: (input: AccountFormInput) => Promise<void> | void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
@@ -256,27 +256,6 @@ function AutoplayCard() {
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [manualDraft, setManualDraft] = useState('');
-  const [draftSynced, setDraftSynced] = useState(false);
-
-  // Keep the manual-spots text box as the raw string the user typed, so commas
-  // and spaces aren't re-canonicalized (and dropped) on every keystroke. The
-  // draft is parsed into an array only when saving.
-  useEffect(() => {
-    if (config && !draftSynced) {
-      setManualDraft(config.manual_spots.join(', '));
-      setDraftSynced(true);
-    }
-  }, [config, draftSynced]);
-
-  function parseManualSpots(text: string): number[] {
-    return text
-      .split(/[,;\n\r]+/)
-      .flatMap((part) => part.trim().split(/\s+/))
-      .map((s) => Number(s))
-      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 80)
-      .slice(0, 20);
-  }
 
   // The status endpoint also returns the current config, so a single poll loop
   // keeps both alive without seeding state synchronously inside the effect.
@@ -310,13 +289,13 @@ function AutoplayCard() {
         enabled: config.enabled,
         provider: config.provider,
         tickets_per_round: config.tickets_per_round,
-        spots_mode: config.spots_mode,
-        manual_spots: parseManualSpots(manualDraft),
+        spots_mode: 'queue',
+        manual_spots: [],
         round_interval: config.round_interval,
         recurrence_tickets_per_round: config.recurrence_tickets_per_round,
         tickets_per_account: config.tickets_per_account ?? 1,
-        use_two_digit_tickets: config.use_two_digit_tickets ?? false,
-        two_digit_stake: config.two_digit_stake ?? 0,
+        use_two_digit_tickets: false,
+        two_digit_stake: 0,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -418,31 +397,6 @@ function AutoplayCard() {
               played all-in.
             </p>
           </div>
-          <div className="flex items-center gap-2 self-end">
-            <input
-              id="rain-auto-two-digit"
-              type="checkbox"
-              checked={config.use_two_digit_tickets ?? false}
-              onChange={(e) => setConfig({ ...config, use_two_digit_tickets: e.target.checked })}
-              className="h-4 w-4 accent-blue-600"
-            />
-            <Label htmlFor="rain-auto-two-digit" className="cursor-pointer">
-              2-digit ML dynamic tickets (2-spot pairs)
-            </Label>
-          </div>
-          <div>
-            <Label htmlFor="rain-auto-two-digit-stake">2-digit cash stake (ETB)</Label>
-            <Input
-              id="rain-auto-two-digit-stake"
-              type="number"
-              min={0}
-              max={10000}
-              value={config.two_digit_stake ?? 0}
-              onChange={(e) => setConfig({ ...config, two_digit_stake: Number(e.target.value) })}
-              disabled={!config.use_two_digit_tickets}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">0 = use the cash stake above.</p>
-          </div>
           <div>
             <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>
             <Input
@@ -454,43 +408,10 @@ function AutoplayCard() {
               onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
             />
           </div>
-          <div>
-            <Label htmlFor="rain-auto-spots-mode">Chosen spots source</Label>
-            <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v as RainAutoplayConfig['spots_mode'] })}>
-              <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">Manual spots below</SelectItem>
-                <SelectItem value="mixed">Mixed — queue + recurrence tickets</SelectItem>
-                <SelectItem value="recurrence">Recurrence tickets (repetitive + carryover)</SelectItem>
-                <SelectItem value="prediction">ML prediction (fungames_shamo)</SelectItem>
-                <SelectItem value="prediction_tickets">ML prediction tickets (per-site plan)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {config.spots_mode === 'mixed' && (
-            <div>
-              <Label htmlFor="rain-auto-recurrence-tickets">Recurrence tickets / round (rest = preconfigured queue)</Label>
-              <Input
-                type="number"
-                id="rain-auto-recurrence-tickets"
-                min={0}
-                max={50}
-                value={config.recurrence_tickets_per_round}
-                onChange={(e) => setConfig({ ...config, recurrence_tickets_per_round: Number(e.target.value) })}
-              />
-            </div>
-          )}
-          <div>
-            <Label htmlFor="rain-auto-manual-spots">Manual spots / ticket (1–80, comma or space separated)</Label>
-            <Input
-              type="text"
-              id="rain-auto-manual-spots"
-              value={manualDraft}
-              onChange={(e) => setManualDraft(e.target.value)}
-              placeholder="e.g. 5, 12, 23, 40"
-              disabled={config.spots_mode !== 'manual'}
-            />
-          </div>
+          <p className="self-end text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">
+            Every round plays the tickets configured in the <strong>Rain autoplay configuration</strong> queue
+            (free-bet tickets for free bets, cash tickets for cash bets).
+          </p>
         </div>
       )}
       {status && (
@@ -654,7 +575,8 @@ export default function RainAccountsPage() {
 
   async function onShowFreeBets() {
     setFreeBetsLoading(true);
-    setFreeBets(null);
+    // Keep the modal mounted while loading — clearing to null would unmount it.
+    setFreeBets([]);
     try {
       const res = await getRainFreeBets();
       setFreeBets(res.bets);
@@ -702,12 +624,8 @@ export default function RainAccountsPage() {
   }
 
   async function onWithdrawNow(acc: RainAccount) {
-    if (acc.cash_suspended) {
-      setMsg(`"${acc.name}" cash betting is paused after a withdrawal — resume it before withdrawing again.`);
-      return;
-    }
     if (!window.confirm(
-      `Withdraw now from "${acc.name}"?\nThis sweeps the tiered percentage of the current available balance through a shamo web session and pauses cash betting.`
+      `Withdraw now from "${acc.name}"?\nThis sweeps the tiered percentage of the current available balance through the shamo player API and pauses cash betting.`
     )) return;
     setBusyId(acc.id);
     setMsg('');
@@ -745,9 +663,9 @@ export default function RainAccountsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Rain Accounts</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => void onShowFreeBets()}>Free bets</Button>
           <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
             {bettingPrediction ? '…' : 'Bet prediction'}
@@ -855,13 +773,13 @@ export default function RainAccountsPage() {
 
       {adding && (
         <Modal title="Add rain account" onClose={() => setAdding(false)}>
-          <AccountForm initial={null} onCancel={() => setAdding(false)} onSave={(input) => void onAdd(input)} />
+          <AccountForm initial={null} onCancel={() => setAdding(false)} onSave={onAdd} />
         </Modal>
       )}
 
       {editing && (
         <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
-          <AccountForm initial={editing} onCancel={() => setEditing(null)} onSave={(input) => void onEdit(editing, input)} />
+          <AccountForm initial={editing} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
         </Modal>
       )}
 

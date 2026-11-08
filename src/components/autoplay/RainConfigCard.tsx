@@ -12,10 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Empty } from '@/components/app';
-import { setRainAutoplayConfig, getRainTicketConfig, getFrequentTicketConfig, generateFrequentTickets, updateFrequentTicketConfig } from '@/lib/api';
+import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
-import { formatTime } from '@/lib/format';
 import { CollapsibleCard } from './CollapsibleCard';
 
 const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
@@ -36,9 +35,6 @@ export function RainConfigCard({
   const [saving, setSaving] = useState(false);
   const [ticketConfig, setTicketConfig] = useState<RainAutoplayConfig & { tickets?: any[] } | null>(null);
   const [ticketSeeded, setTicketSeeded] = useState(false);
-  const [freqConfig, setFreqConfig] = useState<any>(null);
-  const [freqLoading, setFreqLoading] = useState(false);
-  const [freqGenerating, setFreqGenerating] = useState(false);
 
   // Seed the editor once from the live config
   useEffect(() => {
@@ -62,67 +58,6 @@ export function RainConfigCard({
     }
   }, [ticketSeeded]);
 
-  // Load frequent ticket generator config
-  useEffect(() => {
-    async function loadFreqConfig() {
-      try {
-        const res = await getFrequentTicketConfig();
-        if (res.ok && res.config) {
-          setFreqConfig(res.config);
-        }
-      } catch {
-        // ignore
-      }
-    }
-    loadFreqConfig();
-  }, []);
-
-  async function loadFreqConfig() {
-    try {
-      const res = await getFrequentTicketConfig();
-      if (res.ok && res.config) {
-        setFreqConfig(res.config);
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  async function handleGenerateTickets() {
-    setFreqGenerating(true);
-    try {
-      const res = await generateFrequentTickets();
-      if (res.ok && res.result) {
-        onSaved?.('Frequent tickets generated and replaced successfully');
-        await loadFreqConfig();
-      } else {
-        onSaved?.(res.result?.errors?.join(', ') || 'Failed to generate tickets');
-      }
-    } catch (e) {
-      onSaved?.(e instanceof Error ? e.message : String(e));
-    } finally {
-      setFreqGenerating(false);
-    }
-  }
-
-  async function handleSaveFreqConfig() {
-    if (!freqConfig) return;
-    setFreqLoading(true);
-    try {
-      const res = await updateFrequentTicketConfig(freqConfig);
-      if (res.ok && res.config) {
-        setFreqConfig(res.config);
-        onSaved?.('Frequent ticket generator config saved');
-      } else {
-        onSaved?.(res.error || 'Failed to save config');
-      }
-    } catch (e) {
-      onSaved?.(e instanceof Error ? e.message : String(e));
-    } finally {
-      setFreqLoading(false);
-    }
-  }
-
   async function onSave() {
     if (!config) return;
     setSaving(true);
@@ -141,8 +76,9 @@ export function RainConfigCard({
         recurrence_tickets_per_round: config.recurrence_tickets_per_round ?? 1,
         temporal_tickets_per_round: config.temporal_tickets_per_round ?? 1,
         tickets_per_account: config.tickets_per_account ?? 1,
-        use_two_digit_tickets: config.use_two_digit_tickets ?? false,
-        two_digit_stake: config.two_digit_stake ?? 0,
+        // Queue-only mode: the frequent 2-digit generator is never used.
+        use_two_digit_tickets: false,
+        two_digit_stake: 0,
         indicator_auto_pause: config.indicator_auto_pause ?? true,
         indicator_guard_rounds: config.indicator_guard_rounds ?? 3,
         indicator_auto_bet: config.indicator_auto_bet ?? true,
@@ -208,29 +144,10 @@ export function RainConfigCard({
                 onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
               />
             </div>
-            <div>
-              <Label htmlFor="rain-auto-spots-mode">Chosen spots source</Label>
-              <Select value={config.spots_mode} onValueChange={(v) => setConfig({ ...config, spots_mode: v as RainAutoplayConfig['spots_mode'] })}>
-                <SelectTrigger id="rain-auto-spots-mode"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="queue">Ticket Queue Only (use pre-configured tickets)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Configure tickets in the <strong>Ticket Queue</strong> section below. Each ticket with <code>useFreeBet=true</code> is used for free-bet rounds.
+            <p className="self-end text-xs text-muted-foreground sm:col-span-2">
+              Chosen spots come from the <strong>Ticket Queue</strong> below — each ticket with{' '}
+              <code>useFreeBet=true</code> is used for free-bet rounds.
             </p>
-            <div>
-              <Label htmlFor="rain-auto-interval">Round interval (seconds)</Label>
-              <Input
-                id="rain-auto-interval"
-                type="number"
-                min={5}
-                max={3600}
-                value={config.round_interval}
-                onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
-              />
-            </div>
             <div>
               <Label htmlFor="rain-auto-use-cash">Use cash after free bets</Label>
               <Select value={String(config.use_cash_after_free_bets)} onValueChange={(v) => setConfig({ ...config, use_cash_after_free_bets: v === 'true' })}>
@@ -265,28 +182,6 @@ export function RainConfigCard({
               />
             </div>
             <div>
-              <Label htmlFor="rain-auto-use-2digit">2-digit ML dynamic tickets</Label>
-              <Select value={String(config.use_two_digit_tickets ?? false)} onValueChange={(v) => setConfig({ ...config, use_two_digit_tickets: v === 'true' })}>
-                <SelectTrigger id="rain-auto-use-2digit"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Enabled — ranked 2-spot pairs from recent draws</SelectItem>
-                  <SelectItem value="false">Disabled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="rain-auto-2digit-stake">2-digit stake (ETB, 0 = use cash stake)</Label>
-              <Input
-                id="rain-auto-2digit-stake"
-                type="number"
-                min={0}
-                max={10000}
-                value={config.two_digit_stake ?? 0}
-                onChange={(e) => setConfig({ ...config, two_digit_stake: Number(e.target.value) })}
-                disabled={!config.use_two_digit_tickets}
-              />
-            </div>
-            <div>
               <Label htmlFor="rain-auto-indicator-pause">Repetition guard (pause if no repetitive structure)</Label>
               <Select value={String(config.indicator_auto_pause ?? true)} onValueChange={(v) => setConfig({ ...config, indicator_auto_pause: v === 'true' })}>
                 <SelectTrigger id="rain-auto-indicator-pause"><SelectValue /></SelectTrigger>
@@ -308,105 +203,11 @@ export function RainConfigCard({
                 disabled={!config.indicator_auto_pause}
               />
             </div>
-            <div>
-              <Label htmlFor="rain-auto-indicator-bet">Indicator auto-bet</Label>
-              <Select value={String(config.indicator_auto_bet ?? true)} onValueChange={(v) => setConfig({ ...config, indicator_auto_bet: v === 'true' })}>
-                <SelectTrigger id="rain-auto-indicator-bet"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Enabled</SelectItem>
-                  <SelectItem value="false">Disabled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="border-t pt-4">
-              <h3 className="text-lg font-semibold mb-4">Frequent Ticket Generator</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Automatically generates tickets from most frequent numbers in recent draws.
-                Runs on a schedule and replaces the ticket queue with fresh tickets.
-              </p>
-
-              {freqConfig && (
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="freq-enabled">Enabled</Label>
-                      <Select
-                        value={String(freqConfig.enabled)}
-                        onValueChange={(v) => setFreqConfig({ ...freqConfig, enabled: v === 'true' })}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">Enabled</SelectItem>
-                          <SelectItem value="false">Disabled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="freq-ticket-count">Tickets per Generation</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={freqConfig.ticketCount}
-                        onChange={(e) => setFreqConfig({ ...freqConfig, ticketCount: Number(e.target.value) })}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="freq-spot-size">Spot Size</Label>
-                      <Input
-                        type="number"
-                        min={2}
-                        max={10}
-                        value={freqConfig.spotSize}
-                        onChange={(e) => setFreqConfig({ ...freqConfig, spotSize: Number(e.target.value) })}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="freq-interval">Interval (hours)</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={24}
-                        value={freqConfig.intervalHours}
-                        onChange={(e) => setFreqConfig({ ...freqConfig, intervalHours: Number(e.target.value) })}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-2 border-t">
-                    <Button
-                      onClick={handleGenerateTickets}
-                      disabled={freqGenerating || freqLoading}
-                      variant="default"
-                    >
-                      {freqGenerating ? 'Generating…' : 'Generate & Replace Tickets Now'}
-                    </Button>
-                    <Button
-                      onClick={handleSaveFreqConfig}
-                      disabled={freqLoading}
-                      variant="outline"
-                    >
-                      {freqLoading ? 'Saving…' : 'Save Generator Config'}
-                    </Button>
-                  </div>
-
-                  {(freqGenerating || freqLoading) && (
-                    <p className="text-xs text-muted-foreground">
-                      {freqGenerating ? 'Generating tickets…' : 'Saving config…'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 pt-4 border-t">
-              <Button onClick={onSave} disabled={saving} className="flex-1">
-                {saving ? 'Saving…' : 'Save Configuration'}
-              </Button>
-            </div>
+          </div>
+          <div className="mt-4 flex justify-end border-t pt-4">
+            <Button onClick={onSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save Configuration'}
+            </Button>
           </div>
           <RainTicketConfigCard
             config={ticketConfig as any}

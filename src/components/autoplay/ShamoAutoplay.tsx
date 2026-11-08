@@ -582,10 +582,6 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
       </SnapSection>
 
-      <SnapSection>
-      <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} defaultOpen={false} />
-      </SnapSection>
-
       {showConfig && (
         <Modal title="Rain autoplay configuration" onClose={() => setShowConfig(false)} wide>
           <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} />

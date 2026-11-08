@@ -37,7 +37,7 @@ export default function MlAlertsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">ML Alerts</h2>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">

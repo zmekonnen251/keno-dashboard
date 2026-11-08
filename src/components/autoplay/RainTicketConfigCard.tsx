@@ -660,51 +660,6 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
               </div>
             )}
           </div>
-
-          {/* Auto-Bet Settings */}
-          <div className="mt-4 p-3 rounded-lg border border-border bg-black/5 space-y-3 dark:border-white/10 dark:bg-white/5">
-            <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-              Auto-Bet Engine Settings
-            </span>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Tickets Per Round</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={config?.tickets_per_round ?? 4}
-                  onChange={(e) => saveTickets(tickets)} // triggers save with updated config
-                  className="font-mono"
-                />
-                <p className="text-[10px] text-slate-500">How many tickets to play each round from the queue</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Round Interval (seconds)</Label>
-                <Input
-                  type="number"
-                  min={5}
-                  max={3600}
-                  value={config?.round_interval ?? 30}
-                  onChange={(e) => saveTickets(tickets)}
-                  className="font-mono"
-                />
-                <p className="text-[10px] text-slate-500">Seconds between auto-bet rounds</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="rain-auto-enabled"
-                checked={config?.enabled ?? false}
-                onChange={(e) => saveTickets(tickets)}
-                className="h-4 w-4 accent-emerald-500"
-              />
-              <Label htmlFor="rain-auto-enabled" className="cursor-pointer text-sm">
-                Enable Auto-Bet Engine
-              </Label>
-            </div>
-          </div>
         </>
       )}
     </Card>

@@ -994,7 +994,7 @@ export interface RainAutoplayConfig {
 	enabled: boolean;
 	provider: RainProvider;
 	tickets_per_round: number;
-	spots_mode: 'prediction' | 'prediction_tickets' | 'recurrence' | 'mixed' | 'temporal' | 'frequent' | 'manual' | 'queue';
+	spots_mode: 'queue' | 'prediction' | 'prediction_tickets' | 'recurrence' | 'mixed' | 'temporal' | 'manual';
 	manual_spots: number[];
 	round_interval: number;
 	use_cash_after_free_bets: boolean;

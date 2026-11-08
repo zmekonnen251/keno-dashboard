@@ -200,9 +200,9 @@ export const rainAccountColumns = columnHelper.columns([
             <Button
               variant="outline"
               size="sm"
-              disabled={busy || row.original.cash_suspended}
+              disabled={busy}
               title={row.original.cash_suspended
-                ? 'Cash is paused after a withdrawal — resume it first'
+                ? 'Cash is paused; a manual sweep still overrides the pause'
                 : 'Sweep the tiered % of the current balance now'}
               onClick={() => meta.onWithdrawNow(row.original)}
             >
@@ -331,7 +331,7 @@ export function RainAccountMobileCard({
           <Button
             variant="outline"
             size="sm"
-            disabled={busy || account.cash_suspended}
+            disabled={busy}
             onClick={() => meta.onWithdrawNow(account)}
           >
             Withdraw

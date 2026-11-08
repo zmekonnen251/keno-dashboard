@@ -28,7 +28,7 @@ export function Card({
   return (
     <ShadcnCard className={className}>
       {(title || actions) && (
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 py-3">
           <CardTitle className="text-sm font-semibold">{title}</CardTitle>
           {actions}
         </CardHeader>

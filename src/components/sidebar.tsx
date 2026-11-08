@@ -92,7 +92,7 @@ export default function AppSidebar() {
         const res = await fetch('/api/providers?includeInactive=true');
         const data = await res.json();
         if (data.ok && data.providers) {
-          setProviders(data.providers.map((p: any) => p.code));
+          setProviders(data.providers.map((p: { code: string }) => p.code));
         }
       } catch {
         // fallback to defaults
@@ -102,14 +102,14 @@ export default function AppSidebar() {
     loadProviders();
   }, []);
   
-  // Combine static and provider-specific nav, filter by available providers
-  const NAV = [
+  // Show provider nav only for providers that exist and match the active site,
+  // mirroring the mobile bottom nav's per-site rules.
+  const filteredNav = [
     ...STATIC_NAV,
-    ...PROVIDER_NAV.filter(item => !item.sites || item.sites.some((s: string) => providers.includes(s))),
+    ...PROVIDER_NAV.filter(
+      item => !item.sites || (providers.includes(siteId) && item.sites.includes(siteId)),
+    ),
   ];
-  
-  // Filter navigation items based on current site
-  const filteredNav = NAV.filter(item => !item.sites || item.sites.some((s: string) => providers.includes(s)));
   
   async function onLogout() {
     setBusy(true);

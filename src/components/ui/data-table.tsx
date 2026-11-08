@@ -96,7 +96,8 @@ export function DataTable<TData extends RowData>({
 		<div className='space-y-3'>
 			<div className='flex flex-wrap items-center gap-2'>
 				<Input
-					placeholder='Search accounts...'
+					placeholder='Search…'
+					aria-label='Search table'
 					value={search}
 					onChange={(event) => setSearch(event.target.value)}
 					className='max-w-sm'
@@ -106,7 +107,7 @@ export function DataTable<TData extends RowData>({
 					<DropdownMenuContent align='end'>
 						{table.getAllColumns().filter((column) => column.getCanHide()).map((column) => (
 							<DropdownMenuCheckboxItem key={column.id} checked={column.getIsVisible()} onCheckedChange={(value) => column.toggleVisibility(!!value)}>
-								{column.id}
+								{prettyColumnName(column.id)}
 							</DropdownMenuCheckboxItem>
 						))}
 					</DropdownMenuContent>
@@ -149,7 +150,7 @@ export function DataTable<TData extends RowData>({
           )}
         </div>
       ) :
-        <div className={'overflow-hidden rounded-md border'}>
+        <div className={'overflow-x-auto rounded-md border'}>
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

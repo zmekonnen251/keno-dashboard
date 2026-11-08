@@ -100,7 +100,7 @@ function AccountForm({
   onCancel,
 }: {
   initial: ChickenRoadAccount | null;
-  onSave: (input: { name: string; ws_token: string; provider: ChickenRoadProvider; is_enabled: boolean; access_token?: string }) => void;
+  onSave: (input: { name: string; ws_token: string; provider: ChickenRoadProvider; is_enabled: boolean; access_token?: string }) => Promise<void> | void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
@@ -669,9 +669,9 @@ export default function ChickenRoadAccountsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Chicken Road Accounts</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={onCheckAll} disabled={checkingAll}>
             {checkingAll ? 'Checking…' : 'Check all'}
           </Button>
@@ -689,9 +689,9 @@ export default function ChickenRoadAccountsPage() {
         ) : (
           <div className="space-y-3">
             {data.accounts.map((acc) => (
-              <div key={acc.id} className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
+              <div key={acc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{acc.name}</span>
                     <ProviderBadge provider={acc.provider} />
                     <StatusBadge acc={acc} />
@@ -702,7 +702,7 @@ export default function ChickenRoadAccountsPage() {
                     {acc.lastRainId && <> · Last rain: {acc.lastRainId} slot {acc.lastSlot} (+{acc.lastWager} ETB)</>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <Button variant="ghost" size="sm" onClick={() => onShowClaims(acc)}>Claims</Button>
                   <Button variant="ghost" size="sm" onClick={() => onReconnect(acc)} disabled={busyId === acc.id}>
                     {busyId === acc.id ? 'Refreshing…' : 'Refresh'}
@@ -756,6 +756,7 @@ export default function ChickenRoadAccountsPage() {
         ) : rounds.length === 0 ? (
           <Empty label="No rounds played yet" />
         ) : (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -788,6 +789,7 @@ export default function ChickenRoadAccountsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </Card>
 
