@@ -24,6 +24,7 @@ import {
   Sun,
   Zap,
   Server,
+  UsersRound,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
@@ -55,15 +56,11 @@ interface NavItem {
 const STATIC_NAV: NavItem[] = [
   { href: '/overview', label: 'Overview', icon: LayoutDashboard, end: true },
   { href: '/stats', label: 'Stats', icon: BarChart3 },
-  { href: '/patterns', label: 'Patterns', icon: Waypoints },
-  { href: '/predictions', label: 'Predictions', icon: Sparkles },
   { href: '/ml-alerts', label: 'ML Alerts', icon: BellRing },
-  { href: '/insights', label: 'Insights', icon: Lightbulb },
-  { href: '/sessions', label: 'Sessions', icon: Radio },
   { href: '/autoplay', label: 'Autoplay', icon: Repeat },
+  { href: '/accounts', label: 'Accounts', icon: UsersRound },
+  {href: '/rain-accounts', label: 'Rain Accounts', icon: CloudRain},
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
-  { href: '/clients', label: 'Clients', icon: Handshake },
-  { href: '/logs', label: 'Logs', icon: ScrollText },
   { href: '/users', label: 'Users', icon: UserCog },
 ];
 
