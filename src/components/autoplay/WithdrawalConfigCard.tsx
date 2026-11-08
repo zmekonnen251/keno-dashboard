@@ -36,6 +36,8 @@ const REQUEST_STATUS: Record<WithdrawalStatus, { label: string; cls: string }> =
   skipped: { label: 'Skipped', cls: 'bg-muted text-muted-foreground' },
 };
 
+const REQUEST_PAGE_SIZE = 10;
+
 function money(n: number | null | undefined): string {
   return n == null ? '—' : `${Number(n).toFixed(2)} ETB`;
 }
@@ -47,8 +49,11 @@ export function WithdrawalConfigCard() {
   const [config, setConfig] = useState<WithdrawalConfig | null>(null);
   const [status, setStatus] = useState<WithdrawalEngineStatus | null>(null);
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
+  const [requestTotal, setRequestTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     let alive = true;
@@ -57,12 +62,16 @@ export function WithdrawalConfigCard() {
         const [c, s, r] = await Promise.all([
           getWithdrawalConfig(),
           getWithdrawalStatus(),
-          getWithdrawalRequests(50),
+          getWithdrawalRequests(REQUEST_PAGE_SIZE, undefined, page * REQUEST_PAGE_SIZE),
         ]);
         if (!alive) return;
         setConfig((prev) => (prev ? { ...prev, ...c.config } : c.config));
         setStatus(s.status);
         setRequests(r.requests);
+        setRequestTotal(r.total ?? r.count);
+        // A page can empty out after new rows arrive / filtering changes; step
+        // back to the last page that still has rows.
+        if (r.requests.length === 0 && page > 0 && (r.total ?? 0) > 0) setPage((p) => Math.max(0, p - 1));
       } catch (e) {
         if (alive) setMsg(e instanceof Error ? e.message : String(e));
       }
@@ -73,7 +82,7 @@ export function WithdrawalConfigCard() {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [page]);
 
   async function save() {
     if (!config) return;
@@ -156,6 +165,8 @@ export function WithdrawalConfigCard() {
     setConfig({ ...config, withdraw_tiers: config.withdraw_tiers.filter((_, i) => i !== index) });
   }
 
+  const totalPages = Math.max(1, Math.ceil(requestTotal / REQUEST_PAGE_SIZE));
+
   return (
     <Card
       title="Rain withdrawal automation"
@@ -169,9 +180,12 @@ export function WithdrawalConfigCard() {
           <Button variant="outline" size="sm" onClick={refreshTokens} title="Re-login every rain account and persist a fresh shamo token">
             Refresh tokens
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'}</Button>
         </div>
       }
     >
+      {open ? (
+        <>
       {msg && <p className="mb-3 text-xs text-muted-foreground">{msg}</p>}
       {!config ? (
         <Loading rows={3} />
@@ -411,7 +425,23 @@ export function WithdrawalConfigCard() {
           </div>
 
           <div className="mt-5">
-            <p className="mb-2 text-sm font-semibold">Recent withdrawal requests</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold">
+                Recent withdrawal requests
+                <span className="ml-1 font-normal text-muted-foreground">({requestTotal})</span>
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                    Previous
+                  </Button>
+                  <span>Page {page + 1} of {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
             {requests.length === 0 ? (
               <Empty label="No withdrawal requests yet." />
             ) : (
@@ -466,6 +496,10 @@ export function WithdrawalConfigCard() {
             )}
           </div>
         </>
+      )}
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground">Collapsed — click Show to expand.</p>
       )}
     </Card>
   );

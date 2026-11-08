@@ -1119,6 +1119,10 @@ export interface WithdrawalRequest {
 export interface WithdrawalRequestsResponse {
 	ok: boolean;
 	count: number;
+	/** Total rows matching the filter (for pagination). */
+	total?: number;
+	limit?: number;
+	offset?: number;
 	requests: WithdrawalRequest[];
 }
 

@@ -637,9 +637,10 @@ export async function getWithdrawalStatus(): Promise<WithdrawalStatusResponse> {
   return apiFetch<WithdrawalStatusResponse>('api/rain/withdrawal/status');
 }
 
-export async function getWithdrawalRequests(limit = 100, accountId?: number): Promise<WithdrawalRequestsResponse> {
-  const q = accountId != null ? `?limit=${limit}&account_id=${accountId}` : `?limit=${limit}`;
-  return apiFetch<WithdrawalRequestsResponse>(`api/rain/withdrawal/requests${q}`);
+export async function getWithdrawalRequests(limit = 10, accountId?: number, offset = 0): Promise<WithdrawalRequestsResponse> {
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (accountId != null) q.set('account_id', String(accountId));
+  return apiFetch<WithdrawalRequestsResponse>(`api/rain/withdrawal/requests?${q.toString()}`);
 }
 
 export async function withdrawalStart() {

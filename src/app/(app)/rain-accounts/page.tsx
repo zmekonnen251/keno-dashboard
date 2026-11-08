@@ -47,10 +47,12 @@ import {
   TableHeader,
 } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
+import { Pagination } from '@/components/ui/pagination';
 import { formatTime } from '@/lib/format';
 import { DataTable } from '@/components/ui/data-table';
 import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-accounts-columns';
 import { WithdrawalConfigCard } from '@/components/autoplay/WithdrawalConfigCard';
+import { CollapsibleCard } from '@/components/autoplay/CollapsibleCard';
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect';
 
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
@@ -60,6 +62,8 @@ const GATEWAY_HOSTS: Record<RainProvider, string> = {
 };
 
 const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
+
+const LIST_PAGE_SIZE = 10;
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -256,6 +260,7 @@ function AutoplayCard() {
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [open, setOpen] = useState(true);
 
   // The status endpoint also returns the current config, so a single poll loop
   // keeps both alive without seeding state synchronously inside the effect.
@@ -342,9 +347,12 @@ function AutoplayCard() {
           </span>
           <Button variant="outline" size="sm" onClick={start}>Start</Button>
           <Button variant="outline" size="sm" onClick={stop}>Stop</Button>
+          <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'}</Button>
         </div>
       }
     >
+      {open ? (
+        <>
       {msg && <p className="mb-3 text-xs text-muted-foreground">{msg}</p>}
       {!config ? (
         <Loading rows={2} />
@@ -426,6 +434,10 @@ function AutoplayCard() {
       <div className="mt-4 flex justify-end">
         <Button onClick={save} disabled={busy || !config}>{busy ? 'Saving…' : 'Save config'}</Button>
       </div>
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground">Collapsed — click Show to expand.</p>
+      )}
     </Card>
   );
 }
@@ -436,9 +448,12 @@ export default function RainAccountsPage() {
   const [editing, setEditing] = useState<RainAccount | null>(null);
   const [claims, setClaims] = useState<{ account: RainAccount; rows: RainClaimRecord[] } | null>(null);
   const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimsPage, setClaimsPage] = useState(0);
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
+  const [freeBetsPage, setFreeBetsPage] = useState(0);
   const [playHistory, setPlayHistory] = useState<RainFreeBet[] | null>(null);
+  const [historyPage, setHistoryPage] = useState(0);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [bettingPrediction, setBettingPrediction] = useState(false);
@@ -459,9 +474,14 @@ export default function RainAccountsPage() {
   // and connect/disconnect state stay live without a page reload. The played-ticket
   // history is refreshed on the same cadence so win/loss verdicts appear live.
   useEffect(() => {
-    void loadPlayHistory();
+    // Kick the first poll off the effect body (the async load setStates after
+    // its fetch resolves) so the effect itself does not trigger a render.
+    const kick = setTimeout(() => { void loadPlayHistory(); }, 0);
     const timer = setInterval(() => { refresh(); void loadPlayHistory(); }, 10000);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(kick);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   async function onAdd(input: AccountFormInput) {
@@ -536,6 +556,7 @@ export default function RainAccountsPage() {
   }
 
   async function onShowClaims(acc: RainAccount) {
+    setClaimsPage(0);
     setClaimsLoading(true);
     setClaims({ account: acc, rows: [] });
     try {
@@ -574,11 +595,12 @@ export default function RainAccountsPage() {
   }
 
   async function onShowFreeBets() {
+    setFreeBetsPage(0);
     setFreeBetsLoading(true);
     // Keep the modal mounted while loading — clearing to null would unmount it.
     setFreeBets([]);
     try {
-      const res = await getRainFreeBets();
+      const res = await getRainFreeBets(1000);
       setFreeBets(res.bets);
     } catch (e) {
       setFreeBets([]);
@@ -683,7 +705,7 @@ export default function RainAccountsPage() {
 
       <WithdrawalConfigCard />
 
-      <Card title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`}>
+      <CollapsibleCard title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen>
         {playHistory === null ? (
           <Loading rows={2} />
         ) : playHistory.length === 0 ? (
@@ -702,7 +724,7 @@ export default function RainAccountsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {playHistory.map((b) => {
+                {playHistory.slice(historyPage * LIST_PAGE_SIZE, (historyPage + 1) * LIST_PAGE_SIZE).map((b) => {
                   const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
                   return (
                     <TableRow key={b.id}>
@@ -729,11 +751,18 @@ export default function RainAccountsPage() {
                 })}
               </TableBody>
             </Table>
+            <Pagination
+              page={historyPage}
+              pageSize={LIST_PAGE_SIZE}
+              total={playHistory.length}
+              onPage={setHistoryPage}
+              unit="plays"
+            />
           </div>
         )}
-      </Card>
+      </CollapsibleCard>
 
-      <Card title={`Rain-claiming accounts (${data.count})`}>
+      <CollapsibleCard title={`Rain-claiming accounts (${data.count})`} defaultOpen>
         {data.accounts.length ? (
           <DataTable
             columns={rainAccountColumns}
@@ -769,7 +798,7 @@ export default function RainAccountsPage() {
         ) : (
           <Empty label="No rain-claiming accounts. Add one to start auto-claiming free bets." />
         )}
-      </Card>
+      </CollapsibleCard>
 
       {adding && (
         <Modal title="Add rain account" onClose={() => setAdding(false)}>
@@ -799,7 +828,7 @@ export default function RainAccountsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {claims.rows.map((c) => (
+                  {claims.rows.slice(claimsPage * LIST_PAGE_SIZE, (claimsPage + 1) * LIST_PAGE_SIZE).map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-mono text-xs">{c.rain_id}</TableCell>
                       <TableCell>{c.slot_index}</TableCell>
@@ -809,6 +838,13 @@ export default function RainAccountsPage() {
                   ))}
                 </TableBody>
               </Table>
+              <Pagination
+                page={claimsPage}
+                pageSize={LIST_PAGE_SIZE}
+                total={claims.rows.length}
+                onPage={setClaimsPage}
+                unit="claims"
+              />
             </div>
           ) : (
             <Empty label="No claims recorded yet." />
@@ -835,7 +871,7 @@ export default function RainAccountsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {freeBets.map((b) => {
+                  {freeBets.slice(freeBetsPage * LIST_PAGE_SIZE, (freeBetsPage + 1) * LIST_PAGE_SIZE).map((b) => {
                     const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
                     const playable = b.status === 'available' || b.status === 'failed';
                     return (
@@ -866,6 +902,13 @@ export default function RainAccountsPage() {
                   })}
                 </TableBody>
               </Table>
+              <Pagination
+                page={freeBetsPage}
+                pageSize={LIST_PAGE_SIZE}
+                total={freeBets.length}
+                onPage={setFreeBetsPage}
+                unit="free bets"
+              />
             </div>
           ) : (
             <Empty label="No free bets in the ledger yet. They appear as rain accounts receive FREE_BET frames." />

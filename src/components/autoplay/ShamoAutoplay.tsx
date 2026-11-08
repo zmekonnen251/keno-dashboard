@@ -29,6 +29,7 @@ import { Badge, Empty, Loading, StatCard, TableCell, TableRow } from '@/componen
 import { Power, PowerOff } from 'lucide-react';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
+import { Pagination } from '@/components/ui/pagination';
 import { NumberGrid } from './NumberGrid';
 import { RainBetView } from './RainBetView';
 import { RainManualBetCard } from './RainManualBetCard';
@@ -39,6 +40,8 @@ import { MlPredictorCard } from './MlPredictorCard';
 import { RainConfigCard } from './RainConfigCard';
 import { TwoDigitTicketsCard } from './TwoDigitTicketsCard';
 import { SnapScroll, SnapSection } from '@/components/snap-scroll';
+
+const MODAL_PAGE_SIZE = 10;
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -56,6 +59,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const [accounts, setAccounts] = useState<RainAccount[]>([]);
   const [playHistory, setPlayHistory] = useState<RainFreeBet[] | null>(null);
   const [freeBets, setFreeBets] = useState<RainFreeBet[] | null>(null);
+  const [freeBetsPage, setFreeBetsPage] = useState(0);
   const [cashBets, setCashBets] = useState<RainCashBet[]>([]);
   const [showFreeBets, setShowFreeBets] = useState(false);
   const [freeBetsLoading, setFreeBetsLoading] = useState(false);
@@ -295,9 +299,10 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
   function onShowFreeBets() {
     setShowFreeBets(true);
+    setFreeBetsPage(0);
     setFreeBetsLoading(true);
     setFreeBets(null);
-    void getRainFreeBets()
+    void getRainFreeBets(1000)
       .then((res) => setFreeBets(res.bets))
       .catch((e) => setMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setFreeBetsLoading(false));
@@ -307,7 +312,9 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const liveBalance = accounts.some((a) => a.balanceLive);
   const connected = accounts.filter((a) => a.connected).length;
   const availableFb = (freeBets ?? []).filter((b) => b.status === 'available' || b.status === 'failed').length;
-  const ledgerBets = freeBets ?? [];
+  // This modal is the play surface: only playable rows belong here. The full
+  // ledger (won/lost/expired/bet_placed history) lives on the rain-accounts page.
+  const ledgerBets = (freeBets ?? []).filter((b) => b.status === 'available' || b.status === 'failed');
 
   return (
     <SnapScroll>
@@ -650,7 +657,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       )}
 
       {showFreeBets && (
-        <Modal title="Rain free bets (ledger)" onClose={() => setShowFreeBets(false)} wide>
+        <Modal title="Playable rain free bets" onClose={() => setShowFreeBets(false)} wide>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Only available / failed free bets are listed here. The full ledger (played, won, lost,
+            expired) is on the Rain accounts page.
+          </p>
           {freeBetsLoading || freeBets === null ? (
             <Loading rows={3} />
           ) : ledgerBets.length ? (
@@ -668,7 +679,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ledgerBets.map((b) => {
+                  {ledgerBets.slice(freeBetsPage * MODAL_PAGE_SIZE, (freeBetsPage + 1) * MODAL_PAGE_SIZE).map((b) => {
                     const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
                     const playable = b.status === 'available' || b.status === 'failed';
                     return (
@@ -699,9 +710,16 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                   })}
                 </TableBody>
               </Table>
+              <Pagination
+                page={freeBetsPage}
+                pageSize={MODAL_PAGE_SIZE}
+                total={ledgerBets.length}
+                onPage={setFreeBetsPage}
+                unit="free bets"
+              />
             </div>
           ) : (
-            <Empty label="No free bets in the ledger yet. They appear as rain accounts receive FREE_BET frames." />
+            <Empty label="No playable free bets right now. Played, won, lost and expired rows are on the Rain accounts page." />
           )}
         </Modal>
       )}
