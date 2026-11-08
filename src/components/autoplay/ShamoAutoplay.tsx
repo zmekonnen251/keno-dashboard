@@ -26,7 +26,20 @@ import type {
 } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge, Empty, Loading, StatCard, TableCell, TableRow } from '@/components/app';
-import { Power, PowerOff } from 'lucide-react';
+import {
+  Bell,
+  BellOff,
+  FlaskConical,
+  Play,
+  Power,
+  PowerOff,
+  Radar,
+  RefreshCw,
+  Settings,
+  Sparkles,
+  Square,
+  Ticket,
+} from 'lucide-react';
 import { Table, TableBody, TableHead, TableHeader } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
@@ -42,6 +55,10 @@ import { TwoDigitTicketsCard } from './TwoDigitTicketsCard';
 import { SnapScroll, SnapSection } from '@/components/snap-scroll';
 
 const MODAL_PAGE_SIZE = 10;
+// Compact icon-only actions on phones so the whole control bar stays on one
+// row; the labels return from `sm` up.
+const ACTION_BTN = 'h-8 w-8 px-0 sm:w-auto sm:px-2.5';
+const ACTION_LABEL = 'hidden sm:inline';
 
 const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-600 text-white' },
@@ -318,32 +335,67 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
 
   return (
     <SnapScroll>
-      {/* Sticky control bar — always reachable while the deck scrolls */}
-      <div className="sticky top-0 z-30 mb-4 rounded-xl border border-border bg-background/90 p-3 shadow-md backdrop-blur-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-foreground">Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)</h2>
-          <div className="flex flex-wrap gap-2">
+      {/* Sticky control bar — always reachable while the deck scrolls. On
+          phones it collapses to a single row of icon buttons so it does not
+          eat the viewport; labels return on larger screens. */}
+      <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:-mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md">
+        <div className="flex items-center gap-2 sm:flex-wrap sm:justify-between sm:gap-3">
+          <h2 className="hidden min-w-0 truncate text-lg font-bold text-foreground sm:block">
+            Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)
+          </h2>
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2">
             {status?.running ? (
-              <Button variant="destructive" onClick={() => void onStop()}>Stop</Button>
+              <Button variant="destructive" className={ACTION_BTN} onClick={() => void onStop()} title="Stop" aria-label="Stop">
+                <Square />
+                <span className={ACTION_LABEL}>Stop</span>
+              </Button>
             ) : (
-              <Button onClick={() => void onStart()}>Start</Button>
+              <Button className={ACTION_BTN} onClick={() => void onStart()} title="Start" aria-label="Start">
+                <Play />
+                <span className={ACTION_LABEL}>Start</span>
+              </Button>
             )}
-            <Button variant="outline" disabled={bettingPrediction} onClick={() => void onBetPrediction()}>
-              {bettingPrediction ? '…' : 'Bet prediction'}
+            <Button variant="outline" className={ACTION_BTN} disabled={bettingPrediction} onClick={() => void onBetPrediction()} title="Bet prediction" aria-label="Bet prediction">
+              <Sparkles />
+              <span className={ACTION_LABEL}>{bettingPrediction ? '…' : 'Bet prediction'}</span>
             </Button>
-            <Button variant="outline" disabled={testingRound} onClick={() => void onTestRound()}>
-              {testingRound ? '…' : 'Test round'}
+            <Button variant="outline" className={ACTION_BTN} disabled={testingRound} onClick={() => void onTestRound()} title="Test round" aria-label="Test round">
+              <FlaskConical />
+              <span className={ACTION_LABEL}>{testingRound ? '…' : 'Test round'}</span>
             </Button>
-            <Button variant="outline" disabled={checkingAll} onClick={() => void onCheckAll()}>
-              {checkingAll ? '…' : 'Check all rains'}
+            <Button variant="outline" className={ACTION_BTN} disabled={checkingAll} onClick={() => void onCheckAll()} title="Check all rains" aria-label="Check all rains">
+              <Radar />
+              <span className={ACTION_LABEL}>{checkingAll ? '…' : 'Check all rains'}</span>
             </Button>
-            <Button variant="outline" onClick={onShowFreeBets}>
-              Free bets{availableFb > 0 ? ` (${availableFb})` : ''}
+            <Button
+              variant="outline"
+              className={ACTION_BTN}
+              onClick={onShowFreeBets}
+              title={`Free bets${availableFb > 0 ? ` (${availableFb})` : ''}`}
+              aria-label={`Free bets${availableFb > 0 ? ` (${availableFb})` : ''}`}
+            >
+              <Ticket />
+              <span className={ACTION_LABEL}>Free bets{availableFb > 0 ? ` (${availableFb})` : ''}</span>
             </Button>
-            <Button variant="outline" onClick={() => void refreshAccountsAndBets()}>Refresh</Button>
-            <Button variant="outline" onClick={() => setShowConfig(true)}>Configure</Button>
-            <Button variant="outline" onClick={() => void onToggleNotifications()}>
-              {pushOn ? '✓ Push on' : notifyOn ? '✓ Notifications on' : 'Enable notifications'}
+            <Button variant="outline" className={ACTION_BTN} onClick={() => void refreshAccountsAndBets()} title="Refresh" aria-label="Refresh">
+              <RefreshCw />
+              <span className={ACTION_LABEL}>Refresh</span>
+            </Button>
+            <Button variant="outline" className={ACTION_BTN} onClick={() => setShowConfig(true)} title="Configure" aria-label="Configure">
+              <Settings />
+              <span className={ACTION_LABEL}>Configure</span>
+            </Button>
+            <Button
+              variant="outline"
+              className={ACTION_BTN}
+              onClick={() => void onToggleNotifications()}
+              title={pushOn ? 'Push on' : notifyOn ? 'Notifications on' : 'Enable notifications'}
+              aria-label={pushOn ? 'Push on' : notifyOn ? 'Notifications on' : 'Enable notifications'}
+            >
+              {pushOn || notifyOn ? <Bell /> : <BellOff />}
+              <span className={ACTION_LABEL}>
+                {pushOn ? '✓ Push on' : notifyOn ? '✓ Notifications on' : 'Enable notifications'}
+              </span>
             </Button>
           </div>
         </div>
@@ -639,7 +691,10 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
               }
               onClear={() => setPickSpots([])}
             />
-            <div className="flex items-center justify-between">
+            {/* Sticky on phones: the board can be taller than the sheet, so
+                the Play button stays pinned above the bottom edge instead of
+                scrolling out of reach. */}
+            <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-background px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:static sm:m-0 sm:border-0 sm:bg-transparent sm:p-0">
               <span className="rounded-lg border border-border px-3 py-2 font-mono text-xs">
                 Selected: {pickSpots.length > 0 ? `[${pickSpots.join(',')}]` : '—'}
               </span>
@@ -672,7 +727,6 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                     <TableHead>Account</TableHead>
                     <TableHead>Wager</TableHead>
                     <TableHead>Closed</TableHead>
-                    <TableHead>Expires</TableHead>
                     <TableHead>Spots</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -690,7 +744,6 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                         </TableCell>
                         <TableCell>+{b.wager_amount} ETB</TableCell>
                         <TableCell>{b.closed_bet_count}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{b.expires_at ? formatTime(b.expires_at) : '—'}</TableCell>
                         <TableCell className="font-mono text-xs">{b.chosen_spots?.length ? b.chosen_spots.join(', ') : '—'}</TableCell>
                         <TableCell>
                           <Badge className={s.cls} title={b.error ?? undefined}>{s.label}</Badge>

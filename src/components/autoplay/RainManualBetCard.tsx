@@ -47,6 +47,14 @@ const DEFAULT_PRESETS: { label: string; numbers: number[] }[] = [
 ];
 const PRESETS_KEY = 'rainManualOneClickPresets';
 const presetKey = (p: { numbers: number[] }) => p.numbers.join(',');
+
+// Unique ticket ids are generated outside the component so handlers never read
+// a time-based value during render.
+let ticketIdCounter = 0;
+function newTicketId(): string {
+  return `t${Date.now()}-${++ticketIdCounter}`;
+}
+
 function loadPresets(): { label: string; numbers: number[] }[] {
   try {
     const raw = localStorage.getItem(PRESETS_KEY);
@@ -192,11 +200,14 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   });
 
   // Load the browser's custom pre-configured list once on mount (defaults on
-  // first run), then persist every change back to localStorage.
+  // first run), then persist every change back to localStorage. Deferred so
+  // the effect does not set state during the same render pass.
   useEffect(() => {
-    setPresets(loadPresets());
-    setPresetsLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const timer = setTimeout(() => {
+      setPresets(loadPresets());
+      setPresetsLoaded(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
   useEffect(() => {
     if (!presetsLoaded) return;
@@ -397,7 +408,10 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   const handlePlaceBet = async () => {
     if (picks.length === 0) return;
     if (betMode === 'free') {
-      await handlePlayFreeBet(picks, stake, 'manual free bet');
+      const res = await handlePlayFreeBet(picks, stake, 'manual free bet');
+      // Same post-bet reset as the cash path below: the board's numbers were
+      // consumed by this wager, so clear them on success.
+      if (res?.ok && res.result?.ok) setPicks([]);
       return;
     }
     setBetting(true);
@@ -479,11 +493,12 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     });
   }
 
-  /** Build a ticket from the "Add custom ticket" inputs. Empty numbers ⇒ AI ticket. */
-  const buildTicket = (): BotTicket => {
+  /** Build a ticket from the "Add custom ticket" inputs. Empty numbers ⇒ AI ticket.
+   *  The id is supplied by the click handler so no time-based value is read during render. */
+  const buildTicket = (id: string): BotTicket => {
     const numbers = parseNumbers(newNumbers);
     return {
-      id: `t${Date.now()}`,
+      id,
       spots: numbers.length || 3,
       strategy: numbers.length ? 'manual' : 'cluster',
       stake: clampStake(Number(newStake) || DEFAULT_STAKE),
@@ -507,7 +522,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
   /** Persist a new custom ticket to the queue so it appears in the one-click list. */
   const handleAddTicket = async () => {
-    const t = buildTicket();
+    const t = buildTicket(newTicketId());
     await persistQueue([...queue, t]);
     onMessage(
       `Ticket added (#${t.id})${t.numbers ? ` [${t.numbers.join(',')}]` : ' (AI — generates picks on click)'} · ${t.stake} ETB · ${t.useFreeBet ? 'Free bet' : 'Cash'}.`,
@@ -518,7 +533,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
   /** Persist a new custom ticket AND play it immediately. */
   const handleAddAndPlay = async () => {
-    const t = buildTicket();
+    const t = buildTicket(newTicketId());
     const ok = await persistQueue([...queue, t]);
     setNewNumbers('');
     setNewStake(String(DEFAULT_STAKE));

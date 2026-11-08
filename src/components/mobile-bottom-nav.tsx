@@ -52,7 +52,7 @@ export function MobileBottomNav() {
   );
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background sm:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
       {/* Scrolls horizontally when the active site exposes more items than fit. */}
       <div className="flex items-stretch gap-1 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filteredNav.map((item) => {

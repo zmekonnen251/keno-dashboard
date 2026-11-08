@@ -14,14 +14,14 @@ export default function Header() {
   const [showMobileSiteSelector, setShowMobileSiteSelector] = useState(false);
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-border bg-sidebar px-3 py-3 sm:px-5">
+    <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-sidebar px-3 py-2 sm:gap-3 sm:px-5 sm:py-3">
       <div className="flex min-w-0 items-center gap-2">
         <div className="hidden sm:block">
           <SidebarTrigger />
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold">{siteName}</h1>
-          <p className="text-xs text-muted-foreground">Live site: {siteId}</p>
+          <h1 className="truncate text-sm font-semibold sm:text-base">{siteName}</h1>
+          <p className="hidden truncate text-xs text-muted-foreground sm:block">Live site: {siteId}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">

@@ -29,14 +29,17 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div className='fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-6' onClick={onClose}>
+    // z-[60] keeps the sheet above the mobile bottom nav, so a dialog's last
+    // action row is never covered by it. On phones the panel is also capped a
+    // little lower than the viewport and pads past the home-indicator inset.
+    <div className='fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-6' onClick={onClose}>
       <div
         ref={panelRef}
         role='dialog'
         aria-modal='true'
         aria-label={title}
         tabIndex={-1}
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl outline-none sm:rounded-2xl sm:p-6 ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'}`}
+        className={`max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl outline-none sm:max-h-[90vh] sm:rounded-2xl sm:p-6 ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className='mb-3 flex items-center justify-between'>

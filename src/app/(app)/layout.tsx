@@ -15,7 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex h-dvh min-w-0 flex-1 flex-col">
             <Header />
-            <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 pb-20 sm:pb-5">{children}</main>
+            <main className="min-h-0 flex-1 overflow-y-auto p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-5 sm:pb-5">{children}</main>
           </div>
           <MobileBottomNav />
         </SidebarProvider>
