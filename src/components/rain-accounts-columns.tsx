@@ -124,6 +124,14 @@ export const rainAccountColumns = columnHelper.columns([
         <span className="text-xs text-muted-foreground">—</span>
       ),
   }),
+  columnHelper.accessor('assigned_username', {
+    header: 'Assigned user',
+    cell: ({ row }) => (
+      <span className="text-xs">
+        {row.original.assigned_username ?? <span className="text-muted-foreground">Admin only</span>}
+      </span>
+    ),
+  }),
   columnHelper.accessor('rain_count', {
     header: 'Claims',
   }),
@@ -307,6 +315,10 @@ export function RainAccountMobileCard({
               <span className="text-rose-600 dark:text-rose-400">no payment</span>
             )}
           </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Assigned user</dt>
+          <dd>{account.assigned_username ?? 'admin only'}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Shamo pw</dt>

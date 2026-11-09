@@ -32,7 +32,7 @@ export function Modal({
     // z-[60] keeps the sheet above the mobile bottom nav, so a dialog's last
     // action row is never covered by it. On phones the panel is also capped a
     // little lower than the viewport and pads past the home-indicator inset.
-    <div className='fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-6' onClick={onClose}>
+    <div className='fixed inset-0 z-60 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-6' onClick={onClose}>
       <div
         ref={panelRef}
         role='dialog'

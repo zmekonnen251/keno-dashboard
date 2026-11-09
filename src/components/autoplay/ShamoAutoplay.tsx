@@ -53,6 +53,7 @@ import { MlPredictorCard } from './MlPredictorCard';
 import { RainConfigCard } from './RainConfigCard';
 import { TwoDigitTicketsCard } from './TwoDigitTicketsCard';
 import { SnapScroll, SnapSection } from '@/components/snap-scroll';
+import { useSession } from '@/components/session-provider';
 
 const MODAL_PAGE_SIZE = 10;
 // Compact icon-only actions on phones so the whole control bar stays on one
@@ -71,6 +72,10 @@ const SPOT_STATUS_LABEL: Record<RainFreeBet['status'], { label: string; cls: str
 };
 
 export function ShamoAutoplay({ siteName }: { siteName?: string }) {
+  // Viewers see only their assigned accounts (server-scoped) and may toggle
+  // autoplay / play their own free bets. Engine start/stop, config, prediction,
+  // test rounds and manual cash bets stay admin-only.
+  const { isAdmin } = useSession();
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
   const [cfg, setCfg] = useState<RainAutoplayConfig | null>(null);
   const [accounts, setAccounts] = useState<RainAccount[]>([]);
@@ -344,7 +349,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)
           </h2>
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2">
-            {status?.running ? (
+            {isAdmin && (status?.running ? (
               <Button variant="destructive" className={ACTION_BTN} onClick={() => void onStop()} title="Stop" aria-label="Stop">
                 <Square />
                 <span className={ACTION_LABEL}>Stop</span>
@@ -354,19 +359,25 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                 <Play />
                 <span className={ACTION_LABEL}>Start</span>
               </Button>
+            ))}
+            {isAdmin && (
+              <Button variant="outline" className={ACTION_BTN} disabled={bettingPrediction} onClick={() => void onBetPrediction()} title="Bet prediction" aria-label="Bet prediction">
+                <Sparkles />
+                <span className={ACTION_LABEL}>{bettingPrediction ? '…' : 'Bet prediction'}</span>
+              </Button>
             )}
-            <Button variant="outline" className={ACTION_BTN} disabled={bettingPrediction} onClick={() => void onBetPrediction()} title="Bet prediction" aria-label="Bet prediction">
-              <Sparkles />
-              <span className={ACTION_LABEL}>{bettingPrediction ? '…' : 'Bet prediction'}</span>
-            </Button>
-            <Button variant="outline" className={ACTION_BTN} disabled={testingRound} onClick={() => void onTestRound()} title="Test round" aria-label="Test round">
-              <FlaskConical />
-              <span className={ACTION_LABEL}>{testingRound ? '…' : 'Test round'}</span>
-            </Button>
-            <Button variant="outline" className={ACTION_BTN} disabled={checkingAll} onClick={() => void onCheckAll()} title="Check all rains" aria-label="Check all rains">
-              <Radar />
-              <span className={ACTION_LABEL}>{checkingAll ? '…' : 'Check all rains'}</span>
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" className={ACTION_BTN} disabled={testingRound} onClick={() => void onTestRound()} title="Test round" aria-label="Test round">
+                <FlaskConical />
+                <span className={ACTION_LABEL}>{testingRound ? '…' : 'Test round'}</span>
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="outline" className={ACTION_BTN} disabled={checkingAll} onClick={() => void onCheckAll()} title="Check all rains" aria-label="Check all rains">
+                <Radar />
+                <span className={ACTION_LABEL}>{checkingAll ? '…' : 'Check all rains'}</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               className={ACTION_BTN}
@@ -381,10 +392,12 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
               <RefreshCw />
               <span className={ACTION_LABEL}>Refresh</span>
             </Button>
-            <Button variant="outline" className={ACTION_BTN} onClick={() => setShowConfig(true)} title="Configure" aria-label="Configure">
-              <Settings />
-              <span className={ACTION_LABEL}>Configure</span>
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" className={ACTION_BTN} onClick={() => setShowConfig(true)} title="Configure" aria-label="Configure">
+                <Settings />
+                <span className={ACTION_LABEL}>Configure</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               className={ACTION_BTN}
@@ -442,7 +455,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             label="Engine"
             value={status?.running ? 'RUNNING' : 'IDLE'}
             tone={status?.running ? 'positive' : 'default'}
-            sub={cfg?.enabled ? 'Config enabled — rounds on' : 'Config disabled'}
+            sub={isAdmin ? (cfg?.enabled ? 'Config enabled — rounds on' : 'Config disabled') : status?.running ? 'Rounds are running' : 'Rounds are paused'}
           />
           <StatCard label="Rounds played (total)" value={status?.totalPlayed ?? '—'} />
           <StatCard
@@ -484,28 +497,33 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
       </SnapSection>
 
-      <SnapSection fill>
-      <MlPredictorCard siteId="fungames_shamo" />
-      </SnapSection>
+      {isAdmin && (
+        <SnapSection fill>
+          <MlPredictorCard siteId="fungames_shamo" />
+        </SnapSection>
+      )}
 
-      <SnapSection fill>
-      <TwoDigitTicketsCard
-        siteId="fungames_shamo"
-        onMessage={setMsg}
-        onRefresh={() => void refreshAccountsAndBets()}
-      />
-      </SnapSection>
+      {isAdmin && (
+        <SnapSection fill>
+          <TwoDigitTicketsCard
+            siteId="fungames_shamo"
+            onMessage={setMsg}
+            onRefresh={() => void refreshAccountsAndBets()}
+          />
+        </SnapSection>
+      )}
 
-      <SnapSection fill>
-      <RainManualBetCard
-        running={status?.running ?? false}
-        config={cfg}
-        accounts={accounts}
-        onMessage={setMsg}
-        onRefresh={() => void refreshAccountsAndBets()}
-      />
-
-      </SnapSection>
+      {isAdmin && (
+        <SnapSection fill>
+          <RainManualBetCard
+            running={status?.running ?? false}
+            config={cfg}
+            accounts={accounts}
+            onMessage={setMsg}
+            onRefresh={() => void refreshAccountsAndBets()}
+          />
+        </SnapSection>
+      )}
 
       <SnapSection fill>
       <CollapsibleCard title="Live view — current draw & recent bets" defaultOpen={true}>
@@ -568,7 +586,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       <SnapSection>
       <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={false}>
         {accounts.length === 0 ? (
-          <Empty label="No rain accounts yet — add them on the Rain Accounts page." />
+          <Empty label={isAdmin ? 'No rain accounts yet — add them on the Rain Accounts page.' : 'No rain account is assigned to you yet. Ask an admin to assign one.'} />
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -641,7 +659,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
       </SnapSection>
 
-      {showConfig && (
+      {isAdmin && showConfig && (
         <Modal title="Rain autoplay configuration" onClose={() => setShowConfig(false)} wide>
           <RainConfigCard cfg={cfg} onSaved={setMsg} onRefresh={() => void refreshStatus()} />
         </Modal>

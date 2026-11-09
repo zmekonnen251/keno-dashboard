@@ -3,6 +3,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { getSites } from '@/lib/api';
 import type { ProviderSummary } from '@/lib/types';
+import { useSession } from './session-provider';
+
+// Viewers are restricted to the shamo rain-autoplay experience, so they never
+// load or switch the provider list (which is an admin-only endpoint).
+const VIEWER_SITE_ID = 'fungames_shamo';
+const VIEWER_SITE_NAME = 'Fungames Shamo';
 
 interface SiteCtx {
   sites: ProviderSummary[];
@@ -17,11 +23,20 @@ const Ctx = createContext<SiteCtx | null>(null);
 const STORAGE_KEY = 'keno-dashboard-site';
 
 export function SiteProvider({ children }: { children: ReactNode }) {
+  const { isAdmin, loading: sessionLoading } = useSession();
   const [sites, setSites] = useState<ProviderSummary[]>([]);
-  const [siteId, setSiteIdState] = useState('fungames_shamo');
+  const [siteId, setSiteIdState] = useState(VIEWER_SITE_ID);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (sessionLoading) return;
+    if (!isAdmin) {
+      // The viewer experience is pinned to the shamo rain autoplay page.
+      setSiteIdState(VIEWER_SITE_ID);
+      setSites([]);
+      setLoading(false);
+      return;
+    }
     getSites()
       .then((s) => {
         setSites(s);
@@ -31,12 +46,13 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAdmin, sessionLoading]);
 
   function setSiteId(id: string) {
-    setSiteIdState(id);
+    const next = isAdmin ? id : VIEWER_SITE_ID;
+    setSiteIdState(next);
     try {
-      window.localStorage.setItem(STORAGE_KEY, id);
+      window.localStorage.setItem(STORAGE_KEY, next);
     } catch {}
   }
 
@@ -45,11 +61,11 @@ export function SiteProvider({ children }: { children: ReactNode }) {
     return {
       sites,
       siteId,
-      siteName: site?.name || siteId,
+      siteName: site?.name || (isAdmin ? siteId : VIEWER_SITE_NAME),
       setSiteId,
       loading,
     };
-  }, [sites, siteId, loading]);
+  }, [sites, siteId, loading, isAdmin]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

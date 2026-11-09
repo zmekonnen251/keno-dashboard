@@ -19,6 +19,10 @@ import {
   rainBetPrediction,
   withdrawRainAccountNow,
   resumeRainAccountWithdrawal,
+  getUsers,
+  getRainPaymentChanges,
+  approveRainPaymentChange,
+  rejectRainPaymentChange,
 } from '@/lib/api';
 import type {
   RainAccount,
@@ -27,6 +31,8 @@ import type {
   RainAutoplayConfig,
   RainFreeBet,
   RainAutoplayStatus,
+  RainPaymentChangeRequest,
+  User,
 } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
@@ -86,14 +92,17 @@ interface AccountFormInput {
   payment_method: string | null;
   payment_account_number: string | null;
   payment_full_name: string | null;
+  assigned_user_id: number | null;
 }
 
 function AccountForm({
   initial,
+  users,
   onSave,
   onCancel,
 }: {
   initial: RainAccount | null;
+  users: User[];
   onSave: (input: AccountFormInput) => Promise<void> | void;
   onCancel: () => void;
 }) {
@@ -107,6 +116,7 @@ function AccountForm({
   const [paymentMethod, setPaymentMethod] = useState(initial?.payment_method ?? '');
   const [paymentNumber, setPaymentNumber] = useState(initial?.payment_account_number ?? '');
   const [paymentName, setPaymentName] = useState(initial?.payment_full_name ?? '');
+  const [assignedUserId, setAssignedUserId] = useState(String(initial?.assigned_user_id ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -131,6 +141,7 @@ function AccountForm({
         payment_method: paymentMethod.trim() || null,
         payment_account_number: paymentNumber.trim() || null,
         payment_full_name: paymentName.trim() || null,
+        assigned_user_id: Number(assignedUserId) || null,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -240,6 +251,28 @@ function AccountForm({
         <p className="text-[11px] text-muted-foreground">
           Blank fields fall back to the global payment defaults on the withdrawal card. shamo.bet&apos;s minimum
           withdrawal is 200 ETB.
+        </p>
+      </div>
+      <div>
+        <Label htmlFor="rain-assigned-user">Assigned user</Label>
+        <Select value={assignedUserId} onValueChange={setAssignedUserId}>
+          <SelectTrigger id="rain-assigned-user">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">Admin only (no viewer access)</SelectItem>
+            {users
+              .filter((u) => u.role === 'viewer' || String(u.id) === assignedUserId)
+              .map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.username}{u.displayName ? ` — ${u.displayName}` : ''}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <p className="mt-1 text-xs text-muted-foreground">
+          An assigned viewer can open this account&apos;s rain autoplay and withdrawal-account pages. The admin
+          keeps full control.
         </p>
       </div>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -490,6 +523,64 @@ export default function RainAccountsPage() {
   const [bettingPrediction, setBettingPrediction] = useState(false);
   const [checkingAll, setCheckingAll] = useState(false);
   const [msg, setMsg] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [paymentChanges, setPaymentChanges] = useState<RainPaymentChangeRequest[]>([]);
+  const [changeBusyId, setChangeBusyId] = useState<number | null>(null);
+
+  // Viewer assignment picker options (admin-only endpoint).
+  useEffect(() => {
+    getUsers()
+      .then((res) => setUsers(res.users))
+      .catch(() => {});
+  }, []);
+
+  async function loadPaymentChanges() {
+    try {
+      const res = await getRainPaymentChanges('pending');
+      setPaymentChanges(res.requests);
+    } catch {
+      /* keep the last list */
+    }
+  }
+
+  useEffect(() => {
+    const t = setTimeout(() => { void loadPaymentChanges(); }, 0);
+    const timer = setInterval(() => { void loadPaymentChanges(); }, 15000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(timer);
+    };
+  }, []);
+
+  async function onApproveChange(req: RainPaymentChangeRequest) {
+    if (!window.confirm(
+      `Approve payee change for "${req.account_name ?? `#${req.account_id}`}"?\nWithdrawals will use ${req.payment_method} · ${req.payment_account_number} from now on.`,
+    )) return;
+    setChangeBusyId(req.id);
+    try {
+      await approveRainPaymentChange(req.id);
+      setMsg(`Payee change approved for "${req.account_name ?? `#${req.account_id}`}".`);
+      await loadPaymentChanges();
+      refresh();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChangeBusyId(null);
+    }
+  }
+
+  async function onRejectChange(req: RainPaymentChangeRequest) {
+    setChangeBusyId(req.id);
+    try {
+      await rejectRainPaymentChange(req.id);
+      setMsg(`Payee change rejected for "${req.account_name ?? `#${req.account_id}`}".`);
+      await loadPaymentChanges();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setChangeBusyId(null);
+    }
+  }
 
   // Played-ticket history (chosen_spots present) used by the card + the poll.
   async function loadPlayHistory() {
@@ -533,6 +624,7 @@ export default function RainAccountsPage() {
       payment_method: input.payment_method,
       payment_account_number: input.payment_account_number,
       payment_full_name: input.payment_full_name,
+      assigned_user_id: input.assigned_user_id,
     });
     setEditing(null);
     refresh();
@@ -736,6 +828,63 @@ export default function RainAccountsPage() {
 
       <WithdrawalConfigCard />
 
+      <CollapsibleCard
+        title={`Payee change requests${paymentChanges.length ? ` (${paymentChanges.length} pending)` : ''}`}
+        defaultOpen={paymentChanges.length > 0}
+      >
+        {paymentChanges.length === 0 ? (
+          <Empty label="No pending payee changes. Viewer submissions appear here for approval." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Requested by</TableHead>
+                  <TableHead>Proposed payee</TableHead>
+                  <TableHead>When</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paymentChanges.map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell className="font-medium">{req.account_name ?? `#${req.account_id}`}</TableCell>
+                    <TableCell className="text-xs">{req.requested_by_username ?? '—'}</TableCell>
+                    <TableCell className="text-xs">
+                      <span className="font-medium">{req.payment_method}</span>
+                      {' · '}
+                      <span className="font-mono">{req.payment_account_number}</span>
+                      {req.payment_full_name ? ` · ${req.payment_full_name}` : ''}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatTime(req.requested_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          disabled={changeBusyId === req.id}
+                          onClick={() => void onApproveChange(req)}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={changeBusyId === req.id}
+                          onClick={() => void onRejectChange(req)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CollapsibleCard>
+
       <CollapsibleCard title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen>
         {playHistory === null ? (
           <Loading rows={2} />
@@ -833,13 +982,13 @@ export default function RainAccountsPage() {
 
       {adding && (
         <Modal title="Add rain account" onClose={() => setAdding(false)}>
-          <AccountForm initial={null} onCancel={() => setAdding(false)} onSave={onAdd} />
+          <AccountForm initial={null} users={users} onCancel={() => setAdding(false)} onSave={onAdd} />
         </Modal>
       )}
 
       {editing && (
         <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
-          <AccountForm initial={editing} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
+          <AccountForm initial={editing} users={users} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
         </Modal>
       )}
 

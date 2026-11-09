@@ -5,15 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   BarChart3,
-  Waypoints,
   Sparkles,
-  Lightbulb,
-  Radio,
   Users,
   Repeat,
   ShieldCheck,
-  Handshake,
-  ScrollText,
   BellRing,
   CloudRain,
   PawPrint,
@@ -25,11 +20,13 @@ import {
   Zap,
   Server,
   UsersRound,
+  Wallet,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 import { logout } from '@/lib/api';
 import { useSite } from '@/components/site-provider';
+import { useSession } from '@/components/session-provider';
 import {
   Sidebar,
   SidebarContent,
@@ -64,6 +61,13 @@ const STATIC_NAV: NavItem[] = [
   { href: '/users', label: 'Users', icon: UserCog },
 ];
 
+// Viewers get the assigned-account surfaces only: the shamo rain autoplay page
+// and the withdrawal-account page.
+const VIEWER_NAV: NavItem[] = [
+  { href: '/autoplay', label: 'Rain Autoplay', icon: Repeat },
+  { href: '/withdrawal-account', label: 'Withdrawal Account', icon: Wallet },
+];
+
 const PROVIDER_NAV: NavItem[] = [
   { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'phoenixbet'] },
   { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
@@ -78,12 +82,14 @@ export default function AppSidebar() {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const { siteId } = useSite();
+  const { isAdmin, loading: sessionLoading } = useSession();
   const [busy, setBusy] = useState(false);
   const {state} = useSidebar();
   const [providers, setProviders] = useState<string[]>([]);
   
-  // Fetch providers dynamically
+  // Fetch providers dynamically (admin-only endpoint; viewers never need it).
   useEffect(() => {
+    if (!isAdmin) return;
     async function loadProviders() {
       try {
         const res = await fetch('/api/providers?includeInactive=true');
@@ -97,16 +103,19 @@ export default function AppSidebar() {
       }
     }
     loadProviders();
-  }, []);
+  }, [isAdmin]);
   
   // Show provider nav only for providers that exist and match the active site,
   // mirroring the mobile bottom nav's per-site rules.
-  const filteredNav = [
-    ...STATIC_NAV,
-    ...PROVIDER_NAV.filter(
-      item => !item.sites || (providers.includes(siteId) && item.sites.includes(siteId)),
-    ),
-  ];
+  const filteredNav = !isAdmin
+    ? VIEWER_NAV
+    : [
+        ...STATIC_NAV,
+        ...PROVIDER_NAV.filter(
+          item => !item.sites || (providers.includes(siteId) && item.sites.includes(siteId)),
+        ),
+      ];
+  const navItems = sessionLoading ? [] : filteredNav;
   
   async function onLogout() {
     setBusy(true);
@@ -145,7 +154,7 @@ export default function AppSidebar() {
 					<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{filteredNav.map((item) => {
+							{navItems.map((item) => {
 								const active = item.end
 									? pathname === item.href
 									: pathname === item.href ||

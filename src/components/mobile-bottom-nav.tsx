@@ -14,8 +14,10 @@ import {
   Zap,
   // PawPrint,
   TrendingDown,
+  Wallet,
 } from 'lucide-react';
 import { useSite } from './site-provider';
+import { useSession } from './session-provider';
 
 interface NavItem {
   href: string;
@@ -40,16 +42,25 @@ const MOBILE_NAV: NavItem[] = [
   { href: '/odds', label: 'Odd Drops', icon: TrendingDown },
 ];
 
+const VIEWER_NAV: NavItem[] = [
+  { href: '/autoplay', label: 'Rain Autoplay', icon: Repeat },
+  { href: '/withdrawal-account', label: 'Withdrawal', icon: Wallet },
+];
+
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { siteId } = useSite();
+  const { isAdmin, loading } = useSession();
 
   // Filter navigation items based on current site (exclude rules win).
-  const filteredNav = MOBILE_NAV.filter(
-    item =>
-      (!item.excludeSites || !item.excludeSites.includes(siteId)) &&
-      (!item.sites || item.sites.includes(siteId)),
-  );
+  const filteredNav = !isAdmin
+    ? VIEWER_NAV
+    : MOBILE_NAV.filter(
+        item =>
+          (!item.excludeSites || !item.excludeSites.includes(siteId)) &&
+          (!item.sites || item.sites.includes(siteId)),
+      );
+  if (loading) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">

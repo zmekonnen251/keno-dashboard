@@ -46,6 +46,9 @@ import type {
   WithdrawalStatusResponse,
   WithdrawalRequestsResponse,
   PaymentMethodsResponse,
+  RainPaymentChangesResponse,
+  RainPaymentChangeResponse,
+  RainPaymentChangeStatus,
   UsersResponse,
   UserResponse,
   TicketPlan,
@@ -446,6 +449,7 @@ export async function createRainAccount(input: {
   payment_method?: string | null;
   payment_account_number?: string | null;
   payment_full_name?: string | null;
+  assigned_user_id?: number | null;
 }) {
   return apiFetch('api/rain/accounts', {
     method: 'POST',
@@ -467,6 +471,7 @@ export async function updateRainAccount(
     payment_method: string | null;
     payment_account_number: string | null;
     payment_full_name: string | null;
+    assigned_user_id: number | null;
   }>,
 ) {
   return apiFetch(`api/rain/accounts/${id}`, {
@@ -667,6 +672,41 @@ export async function refreshRainAccountToken(id: number): Promise<{ ok: boolean
 
 export async function refreshAllRainAccountTokens(): Promise<{ ok: boolean; updated: number }> {
   return apiFetch<{ ok: boolean; updated: number }>('api/rain/withdrawal/refresh-tokens', { method: 'POST' });
+}
+
+// ---- viewer withdrawal account (assignment-scoped) ----
+export async function setRainAccountWithdrawEnabled(id: number, enabled: boolean) {
+  return apiFetch<{ ok: boolean; id: number; withdraw_enabled: boolean }>(
+    `api/rain/withdrawal/accounts/${id}/withdraw-enabled`,
+    { method: 'POST', body: JSON.stringify({ enabled }) },
+  );
+}
+
+// Propose new payee details; an admin must approve before the engine uses them.
+export async function requestRainPaymentChange(
+  accountId: number,
+  input: { payment_method: string; payment_account_number: string; payment_full_name?: string | null },
+): Promise<RainPaymentChangeResponse> {
+  return apiFetch<RainPaymentChangeResponse>(`api/rain/withdrawal/accounts/${accountId}/payment-changes`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getRainPaymentChanges(status?: RainPaymentChangeStatus): Promise<RainPaymentChangesResponse> {
+  const q = status ? `?status=${status}` : '';
+  return apiFetch<RainPaymentChangesResponse>(`api/rain/withdrawal/payment-changes${q}`);
+}
+
+export async function approveRainPaymentChange(id: number): Promise<RainPaymentChangeResponse> {
+  return apiFetch<RainPaymentChangeResponse>(`api/rain/withdrawal/payment-changes/${id}/approve`, { method: 'POST' });
+}
+
+export async function rejectRainPaymentChange(id: number, note?: string): Promise<RainPaymentChangeResponse> {
+  return apiFetch<RainPaymentChangeResponse>(`api/rain/withdrawal/payment-changes/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ note: note ?? null }),
+  });
 }
 
 // ---- chicken road claiming ----

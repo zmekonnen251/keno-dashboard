@@ -520,7 +520,6 @@ export interface AutoplayConfig {
 	updated_at: string;
 	game_state: 'betting_open' | 'drawing' | 'settled' | 'unknown';
 	signals: 'repetitive' | 'recurring' | 'hot' | 'none';
-	manual_account_selection: boolean;
 }
 
 // Live recurrence / pattern-trend signal used to auto-bet recent repetitive
@@ -908,6 +907,10 @@ export interface RainAccount {
 	balanceLive: boolean;
 	rain_count: number;
 	free_bet_count: number;
+	// Optional viewer assignment (admin always keeps full control). NULL means
+	// the account is admin-only.
+	assigned_user_id: number | null;
+	assigned_username: string | null;
 	last_claimed_at: string | null;
 	created_at: string;
 	updated_at: string;
@@ -1166,6 +1169,38 @@ export interface PaymentMethod {
 export interface PaymentMethodsResponse {
 	ok: boolean;
 	methods: PaymentMethod[];
+}
+
+// A viewer-proposed change to an account's withdrawal payee. It only touches
+// the live rain_accounts.payment_* fields after an admin approves it.
+export type RainPaymentChangeStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RainPaymentChangeRequest {
+	id: number;
+	account_id: number;
+	account_name: string | null;
+	payment_method: string | null;
+	payment_account_number: string | null;
+	payment_full_name: string | null;
+	status: RainPaymentChangeStatus;
+	requested_by: number | null;
+	requested_by_username: string | null;
+	requested_at: string;
+	reviewed_by: number | null;
+	reviewed_by_username: string | null;
+	reviewed_at: string | null;
+	review_note: string | null;
+}
+
+export interface RainPaymentChangesResponse {
+	ok: boolean;
+	count: number;
+	requests: RainPaymentChangeRequest[];
+}
+
+export interface RainPaymentChangeResponse {
+	ok: boolean;
+	request: RainPaymentChangeRequest;
 }
 
 // Dashboard login users (roles admin / viewer), managed via /api/users.

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Play, Save, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Trash2, Save, RefreshCw } from 'lucide-react';
 import { getAutoplayConfig, setAutoplayConfig } from '@/lib/api';
 
 interface TicketConfig {
   id: string;
   spots: number;
-  stake: number;
   enabled: boolean;
   picks?: number[];
 }
@@ -31,7 +31,6 @@ export function TicketConfig({ siteId }: { siteId: string }) {
         const loadedTickets: TicketConfig[] = config.base_tickets.map((ticket, idx) => ({
           id: String(idx),
           spots: ticket.length,
-          stake: config.stake || 2,
           enabled: true,
           picks: ticket,
         }));
@@ -48,10 +47,10 @@ export function TicketConfig({ siteId }: { siteId: string }) {
 
   function getDefaultTickets(): TicketConfig[] {
     return [
-      { id: '1', spots: 2, stake: 2, enabled: true, picks: [11, 12] },
-      { id: '2', spots: 2, stake: 2, enabled: true, picks: [15, 25] },
-      { id: '3', spots: 3, stake: 2, enabled: true, picks: [11, 12, 13] },
-      { id: '4', spots: 3, stake: 2, enabled: true, picks: [15, 25, 35] },
+      { id: '1', spots: 2, enabled: true, picks: [11, 12] },
+      { id: '2', spots: 2, enabled: true, picks: [15, 25] },
+      { id: '3', spots: 3, enabled: true, picks: [11, 12, 13] },
+      { id: '4', spots: 3, enabled: true, picks: [15, 25, 35] },
     ];
   }
 
@@ -87,7 +86,6 @@ export function TicketConfig({ siteId }: { siteId: string }) {
     setTickets([...tickets, {
       id: newId,
       spots: 2,
-      stake: 2,
       enabled: true,
       picks: generateRandomPicks(2),
     }]);
@@ -103,14 +101,12 @@ export function TicketConfig({ siteId }: { siteId: string }) {
     ));
   }
 
-  function updateTicket(id: string, field: keyof TicketConfig, value: any) {
+  function updateTicket(id: string, field: 'spots' | 'enabled', value: number | boolean) {
     setTickets(tickets.map(t => {
       if (t.id === id) {
-        const updated = { ...t, [field]: value };
-        if (field === 'spots') {
-          updated.picks = generateRandomPicks(value);
-        }
-        return updated;
+        return field === 'spots'
+          ? { ...t, spots: Number(value), picks: generateRandomPicks(Number(value)) }
+          : { ...t, enabled: Boolean(value) };
       }
       return t;
     }));
@@ -147,50 +143,52 @@ export function TicketConfig({ siteId }: { siteId: string }) {
         </p>
       )}
 
+      <p className="text-xs text-muted-foreground">
+        These are the base tickets for modes A/B — the stake is set in{' '}
+        <span className="font-medium text-foreground">Configuration → Stake per ticket</span>. Disabled
+        tickets are dropped on save.
+      </p>
+
       <div className="space-y-2">
+        {tickets.length === 0 && (
+          <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            No tickets configured — add one below.
+          </p>
+        )}
         {tickets.map((ticket, idx) => (
           <div
             key={ticket.id}
-            className={`flex items-center gap-3 p-3 rounded-lg border ${
+            className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 ${
               ticket.enabled
                 ? 'border-emerald-500/30 bg-emerald-500/10'
-                : 'border-border bg-black/5 opacity-50 dark:border-white/10 dark:bg-white/5'
+                : 'border-border bg-black/5 opacity-60 dark:border-white/10 dark:bg-white/5'
             }`}
           >
-            <input
-              type="checkbox"
+            <Switch
               checked={ticket.enabled}
-              onChange={() => toggleTicket(ticket.id)}
-              className="w-4 h-4 rounded"
+              onCheckedChange={() => toggleTicket(ticket.id)}
+              aria-label={`Enable ticket ${idx + 1}`}
             />
-            
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold">Ticket #{idx + 1}</span>
                 <select
                   value={ticket.spots}
                   onChange={(e) => updateTicket(ticket.id, 'spots', Number(e.target.value))}
-                  className="text-xs bg-background border rounded px-2 py-1"
+                  className="rounded border bg-background px-2 py-1 text-xs"
                 >
                   {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
                     <option key={s} value={s}>{s} spots</option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  value={ticket.stake}
-                  onChange={(e) => updateTicket(ticket.id, 'stake', Number(e.target.value))}
-                  className="w-16 text-xs bg-background border rounded px-2 py-1"
-                  min="1"
-                />
-                <span className="text-xs text-muted-foreground">ETB</span>
               </div>
-              
+
               <div className="flex flex-wrap gap-1">
                 {(ticket.picks || []).map((num) => (
                   <span
                     key={num}
-                    className="w-6 h-6 flex items-center justify-center rounded bg-primary/20 text-primary text-xs font-bold"
+                    className="flex h-6 w-6 items-center justify-center rounded bg-primary/20 text-xs font-bold text-primary"
                   >
                     {num}
                   </span>
@@ -204,6 +202,7 @@ export function TicketConfig({ siteId }: { siteId: string }) {
                 variant="ghost"
                 onClick={() => regeneratePicks(ticket.id)}
                 title="Regenerate picks"
+                aria-label={`Regenerate picks for ticket ${idx + 1}`}
               >
                 <RefreshCw className="w-3 h-3" />
               </Button>
@@ -212,6 +211,7 @@ export function TicketConfig({ siteId }: { siteId: string }) {
                 variant="ghost"
                 onClick={() => deleteTicket(ticket.id)}
                 title="Delete ticket"
+                aria-label={`Delete ticket ${idx + 1}`}
               >
                 <Trash2 className="w-3 h-3" />
               </Button>

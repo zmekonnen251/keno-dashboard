@@ -1,6 +1,7 @@
 'use client';
 
 import { useSite } from './site-provider';
+import { useSession } from './session-provider';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Moon, Sun, ChevronDown } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -10,6 +11,7 @@ import { useState } from 'react';
 
 export default function Header() {
   const { sites, siteId, setSiteId, siteName } = useSite();
+  const { isAdmin } = useSession();
   const { resolvedTheme, setTheme } = useTheme();
   const [showMobileSiteSelector, setShowMobileSiteSelector] = useState(false);
 
@@ -25,8 +27,8 @@ export default function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {/* Mobile site selector */}
-        <div className="sm:hidden relative">
+        {/* Site switching is admin-only; viewers are pinned to shamo. */}
+        {isAdmin && <div className="sm:hidden relative">
           <Button
             variant="outline"
             size="sm"
@@ -54,10 +56,10 @@ export default function Header() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Desktop site selector */}
-        <label className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+        {isAdmin && <label className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
           <span className="text-xs uppercase tracking-wide">Site</span>
           <select
             value={siteId}
@@ -68,7 +70,7 @@ export default function Header() {
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
-        </label>
+        </label>}
         <NotificationsBell />
         <Button
           variant="ghost"

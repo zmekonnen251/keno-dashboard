@@ -30,7 +30,7 @@ function LoginForm() {
         rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/overview';
       if (username.trim()) {
         const res = await loginUser(username.trim(), password);
-        router.push(res.user.role === 'admin' ? nextPath : '/');
+        router.push(res.user.role === 'admin' ? nextPath : '/autoplay');
       } else {
         await login(password);
         router.push(nextPath);

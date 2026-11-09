@@ -2,9 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_COOKIE, apiBase } from '@/lib/config';
 
 // Server-side guard (Next 16 renamed middleware -> proxy). The home /
-// draw-history page and /login are open to everyone; every other (dashboard)
-// route requires an authenticated *admin*. Viewers get a valid session but may
-// only see the draws page, so anything else bounces them back to `/`.
+// draw-history page and /login are open to everyone. Viewers may additionally
+// open the rain autoplay page (shamo only) and their withdrawal-account page;
+// everything else requires an admin session.
 
 // Ask the keno-server who owns the stored session cookie. Returns the role
 // (`admin`/`viewer`) for a valid session, or null when the cookie is
@@ -35,13 +35,16 @@ export async function proxy(req: NextRequest) {
   // session. Checking the session (instead of just cookie presence) prevents a
   // stale cookie from trapping the user in a /login <-> / redirect loop.
   if (pathname === '/login') {
-    if (stored && (await sessionRole(stored)) !== null) {
-      return NextResponse.redirect(new URL('/', req.url));
+    if (stored) {
+      const role = await sessionRole(stored);
+      if (role !== null) {
+        return NextResponse.redirect(new URL(role === 'admin' ? '/overview' : '/autoplay', req.url));
+      }
     }
     return NextResponse.next();
   }
 
-  // The draw-history page is public, and is the only page viewers may see.
+  // The draw-history page is public.
   if (pathname === '/') return NextResponse.next();
 
   const url = new URL('/login', req.url);
@@ -51,7 +54,12 @@ export async function proxy(req: NextRequest) {
 
   const role = await sessionRole(stored);
   if (role === null) return NextResponse.redirect(url); // expired/forged cookie
-  if (role !== 'admin') return NextResponse.redirect(new URL('/', req.url)); // viewer
+  if (role !== 'admin') {
+    // Viewers: only the shamo rain autoplay page and their withdrawal-account
+    // page. Everything else goes back to autoplay.
+    const viewerAllowed = pathname === '/autoplay' || pathname === '/withdrawal-account';
+    return viewerAllowed ? NextResponse.next() : NextResponse.redirect(new URL('/autoplay', req.url));
+  }
 
   return NextResponse.next();
 }
