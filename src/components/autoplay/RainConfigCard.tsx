@@ -12,12 +12,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Empty } from '@/components/app';
-import { setRainAutoplayConfig, getRainTicketConfig } from '@/lib/api';
+import { Switch } from '@/components/ui/switch';
+import { setRainAutoplayConfig } from '@/lib/api';
 import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { CollapsibleCard } from './CollapsibleCard';
 
 const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
+
+// Boolean settings are switches that persist immediately: leaving them as
+// <Select>s meant a toggle only took effect after "Save Configuration", which
+// made the cash switch look broken. A partial PATCH is supported by the API.
+type BoolField = 'enabled' | 'use_cash_after_free_bets' | 'indicator_auto_pause';
+
+const BOOL_LABELS: Record<BoolField, string> = {
+  enabled: 'Rain autoplay',
+  use_cash_after_free_bets: 'Cash autoplay',
+  indicator_auto_pause: 'Repetition guard',
+};
 
 export function RainConfigCard({
   cfg,
@@ -33,8 +45,7 @@ export function RainConfigCard({
   const [config, setConfig] = useState<RainAutoplayConfig | null>(null);
   const seeded = useRef(false);
   const [saving, setSaving] = useState(false);
-  const [ticketConfig, setTicketConfig] = useState<RainAutoplayConfig & { tickets?: any[] } | null>(null);
-  const [ticketSeeded, setTicketSeeded] = useState(false);
+  const [savingBool, setSavingBool] = useState<BoolField | null>(null);
 
   // Seed the editor once from the live config
   useEffect(() => {
@@ -44,19 +55,27 @@ export function RainConfigCard({
     }
   }, [cfg]);
 
-  useEffect(() => {
-    if (!ticketSeeded) {
-      getRainTicketConfig().then(res => {
-        if (res.ok && config) {
-          setTicketConfig({ ...config, tickets: res.config.tickets } as any);
-          setTicketSeeded(true);
-        } else if (res.ok) {
-          setTicketConfig({ tickets: res.config.tickets } as any);
-          setTicketSeeded(true);
-        }
-      }).catch(() => { setTicketSeeded(true); });
+  async function saveBool(field: BoolField, value: boolean) {
+    if (!config) return;
+    setConfig({ ...config, [field]: value });
+    setSavingBool(field);
+    onSaved?.('');
+    try {
+      const patch = { [field]: value } as Pick<RainAutoplayConfig, BoolField>;
+      const res = await setRainAutoplayConfig(patch);
+      setConfig(res.config);
+      seeded.current = true;
+      onSaved?.(`${BOOL_LABELS[field]} ${value ? 'enabled' : 'disabled'}.`);
+      onRefresh?.();
+    } catch (e) {
+      // Put the switch back where the server left it so the UI never claims a
+      // setting that was not persisted.
+      setConfig((prev) => (prev ? { ...prev, [field]: !value } : prev));
+      onSaved?.(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingBool(null);
     }
-  }, [ticketSeeded]);
+  }
 
   async function onSave() {
     if (!config) return;
@@ -101,15 +120,21 @@ export function RainConfigCard({
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <Label htmlFor="rain-auto-enabled">Enabled</Label>
-              <Select value={String(config.enabled)} onValueChange={(v) => setConfig({ ...config, enabled: v === 'true' })}>
-                <SelectTrigger id="rain-auto-enabled"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Enabled — run rounds when started</SelectItem>
-                  <SelectItem value="false">Disabled</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-lg border p-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label htmlFor="rain-auto-enabled">Enabled</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {config.enabled ? 'Runs rounds when the engine is started.' : 'Stopped — no rounds are played.'}
+                  </p>
+                </div>
+                <Switch
+                  id="rain-auto-enabled"
+                  checked={config.enabled}
+                  disabled={savingBool === 'enabled'}
+                  onCheckedChange={(v) => void saveBool('enabled', v)}
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="rain-auto-provider">Provider</Label>
@@ -148,15 +173,23 @@ export function RainConfigCard({
               Chosen spots come from the <strong>Ticket Queue</strong> below — each ticket with{' '}
               <code>useFreeBet=true</code> is used for free-bet rounds.
             </p>
-            <div>
-              <Label htmlFor="rain-auto-use-cash">Use cash after free bets</Label>
-              <Select value={String(config.use_cash_after_free_bets)} onValueChange={(v) => setConfig({ ...config, use_cash_after_free_bets: v === 'true' })}>
-                <SelectTrigger id="rain-auto-use-cash"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Enabled — use account cash when no free bets</SelectItem>
-                  <SelectItem value="false">Disabled — free bets only</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-lg border p-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label htmlFor="rain-auto-use-cash">Cash autoplay</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {config.use_cash_after_free_bets
+                      ? 'Enabled — plays account cash when no free bets are left.'
+                      : 'Disabled — free bets only; cash is never staked.'}
+                  </p>
+                </div>
+                <Switch
+                  id="rain-auto-use-cash"
+                  checked={config.use_cash_after_free_bets}
+                  disabled={savingBool === 'use_cash_after_free_bets'}
+                  onCheckedChange={(v) => void saveBool('use_cash_after_free_bets', v)}
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="rain-auto-cash-stake">Cash stake (ETB)</Label>
@@ -181,15 +214,23 @@ export function RainConfigCard({
                 onChange={(e) => setConfig({ ...config, tickets_per_account: Number(e.target.value) })}
               />
             </div>
-            <div>
-              <Label htmlFor="rain-auto-indicator-pause">Repetition guard (pause if no repetitive structure)</Label>
-              <Select value={String(config.indicator_auto_pause ?? true)} onValueChange={(v) => setConfig({ ...config, indicator_auto_pause: v === 'true' })}>
-                <SelectTrigger id="rain-auto-indicator-pause"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Enabled</SelectItem>
-                  <SelectItem value="false">Disabled</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-lg border p-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label htmlFor="rain-auto-indicator-pause">Repetition guard</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {config.indicator_auto_pause
+                      ? 'Pauses when draws stop showing repetitive structure.'
+                      : 'Never pauses for non-repetitive draws.'}
+                  </p>
+                </div>
+                <Switch
+                  id="rain-auto-indicator-pause"
+                  checked={config.indicator_auto_pause ?? true}
+                  disabled={savingBool === 'indicator_auto_pause'}
+                  onCheckedChange={(v) => void saveBool('indicator_auto_pause', v)}
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="rain-auto-indicator-rounds">Guard rounds</Label>
@@ -210,7 +251,7 @@ export function RainConfigCard({
             </Button>
           </div>
           <RainTicketConfigCard
-            config={ticketConfig as any}
+            config={config}
             onSaved={(msg) => { if (msg) onSaved?.(msg); }}
             onRefresh={onRefresh}
           />

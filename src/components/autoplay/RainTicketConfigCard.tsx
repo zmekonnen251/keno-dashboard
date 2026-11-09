@@ -8,8 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/app';
 import { setRainTicketConfig, getRainTicketConfig, getRainTicketPreview } from '@/lib/api';
-import { Plus, Trash2, Sparkles, Cpu, GripVertical, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Cpu, GripVertical, ArrowUp, ArrowDown, ArrowUpDown, LayoutGrid } from 'lucide-react';
 import type { BotTicket, RainAutoplayConfig } from '@/lib/types';
+import { TicketCatalogModal } from './TicketCatalogModal';
+import { ticketKey } from '@/lib/ticketCatalog';
+
+let catalogTicketSeq = 0;
+function catalogTicketId(): string {
+  return `cat-${Date.now()}-${++catalogTicketSeq}`;
+}
 
 interface RainTicketConfigCardProps {
   config?: (RainAutoplayConfig & { tickets?: BotTicket[] }) | null;
@@ -32,6 +39,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
   // reordered by dragging the grip handle.
   const [dragId, setDragId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState('manual');
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -87,7 +95,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
   };
 
   const handleAddTicket = () => {
-    const newId = String(Date.now());
+    const newId = catalogTicketId();
     const numbers = parseNumbers(newNumbers);
     const updated = [
       ...tickets,
@@ -112,7 +120,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
   ];
 
   const handleAddPreset = (numbers: number[]) => {
-    const newId = String(Date.now());
+    const newId = catalogTicketId();
     const updated = [
       ...tickets,
       {
@@ -126,6 +134,39 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
       },
     ];
     saveTickets(updated);
+  };
+
+  // Batch-add from the catalog modal. Skip sets already in the queue so a
+  // ticket can never be duplicated by re-checking it later.
+  const handleCatalogAdd = (
+    numbersList: number[][],
+    opts: { stake: number; useFreeBet: boolean },
+  ) => {
+    const seen = new Set(
+      tickets
+        .filter((t) => t.numbers && t.numbers.length > 0)
+        .map((t) => ticketKey(t.numbers as number[])),
+    );
+    const additions: BotTicket[] = [];
+    for (const numbers of numbersList) {
+      const key = ticketKey(numbers);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      additions.push({
+        id: catalogTicketId(),
+        spots: numbers.length,
+        strategy: 'manual',
+        stake: opts.stake,
+        enabled: true,
+        useFreeBet: opts.useFreeBet,
+        numbers,
+      });
+    }
+    if (additions.length === 0) {
+      onSaved?.('Those tickets are already in the queue.');
+      return;
+    }
+    saveTickets([...tickets, ...additions]);
   };
 
   const handleDeleteTicket = (id: string) => {
@@ -270,9 +311,20 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
 
           {/* Form to Add New Ticket */}
           <div className="bg-black/5 border border-border p-3 rounded-xl mb-4 dark:bg-white/5 dark:border-white/10">
-            <span className="block text-[10px] text-slate-600 dark:text-slate-300 font-black uppercase tracking-wider mb-3">
-              Create & Append Ticket
-            </span>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="block text-[10px] text-slate-600 dark:text-slate-300 font-black uppercase tracking-wider">
+                Create & Append Ticket
+              </span>
+              <Button
+                onClick={() => setCatalogOpen(true)}
+                variant="outline"
+                size="sm"
+                className="h-8 text-[10px] font-bold uppercase tracking-wider"
+              >
+                <LayoutGrid className="mr-1.5 w-3.5 h-3.5" />
+                Browse Catalog
+              </Button>
+            </div>
 
             {/* Quick presets: one-click add of usual picks */}
             <div className="flex flex-wrap gap-2 mb-3">
@@ -660,6 +712,17 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
               </div>
             )}
           </div>
+
+          {catalogOpen && (
+            <TicketCatalogModal
+              onClose={() => setCatalogOpen(false)}
+              provider={config?.provider ?? 'fungames_shamo'}
+              existingTickets={tickets}
+              defaultStake={newStake}
+              defaultUseFreeBet={newFreeBet}
+              onAdd={handleCatalogAdd}
+            />
+          )}
         </>
       )}
     </Card>
