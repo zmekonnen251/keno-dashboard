@@ -31,6 +31,9 @@ export default function AccountsPage() {
   const [checking, setChecking] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleanMsg, setCleanMsg] = useState('');
+  // Accounts below the 2 ETB playable floor are hidden by default — they are
+  // kept (never auto-deleted) but cannot place a bet until they earn funds.
+  const [showLowBalance, setShowLowBalance] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -243,12 +246,23 @@ export default function AccountsPage() {
   if (!data) return <Empty label="No accounts" />;
 
   const spentIdleCount = data.accounts.filter((a) => (a.balance ?? 0) < 2 && a.last_bet_at != null).length;
+  const lowBalanceCount = data.accounts.filter((a) => (a.balance ?? 0) < 2).length;
+  const visibleAccounts = showLowBalance
+    ? data.accounts
+    : data.accounts.filter((a) => (a.balance ?? 0) >= 2);
 
   return (
 		<div className='space-y-5'>
 			<div className='flex flex-wrap items-center justify-between gap-3'>
 				<h2 className='text-lg font-bold text-foreground'>Accounts</h2>
 				<div className='flex flex-wrap gap-2'>
+					<Button
+						variant='outline'
+						onClick={() => setShowLowBalance((v) => !v)}
+						title={showLowBalance ? 'Hide accounts below 2 ETB' : 'Also show accounts below 2 ETB'}
+					>
+						{showLowBalance ? `Hide < 2 ETB (${lowBalanceCount})` : `Show < 2 ETB (${lowBalanceCount})`}
+					</Button>
 					<Button variant='outline' onClick={onCleanupSpent} disabled={cleaning || spentIdleCount === 0}>
 						{cleaning ? 'Deleting…' : `Delete spent idle (${spentIdleCount})`}
 					</Button>
@@ -264,9 +278,10 @@ export default function AccountsPage() {
 				</div>
 			</div>
 			<p className='text-xs text-muted-foreground'>
-				Balance is the live ToloBirr wallet, written to the database every
-				couple of minutes (and when you click Sync wallets). New accounts start
-				at 2 ETB until the first sync. “Spent idle” means: placed at least one
+				Balance is the live ToloBirr wallet, synced from the gateway stream after
+				each round (and when you click Sync wallets). New accounts start at 2 ETB
+				until the first sync. Accounts below 2 ETB are hidden by default but kept
+				— use the toggle to show them. “Spent idle” means: placed at least one
 				bet, below 2 ETB, and no unsettled bet — safe to delete in one click.
 			</p>
 			{syncMsg && <p className='text-xs text-muted-foreground'>{syncMsg}</p>}
@@ -319,7 +334,7 @@ export default function AccountsPage() {
 										: `Done: ${job.made}/${job.target} accounts`}
 								{` • ${job.wsTokens ?? 0} ws_token${(job.wsTokens ?? 0) === 1 ? '' : 's'} • ${job.attempts} attempts`}
 								{job.startedAt
-									? ` • ${job.running ? 'elapsed' : 'took'} ${fmtDur(job.durationMs ?? (job.finishedAt ? job.finishedAt - job.startedAt : Date.now() - job.startedAt))}`
+									? ` • ${job.running ? 'elapsed' : 'took'} ${fmtDur(job.durationMs ?? (job.finishedAt ? job.finishedAt - job.startedAt : 0))}`
 									: ''}
 							</p>
 							{job.errors.length > 0 && (
@@ -380,10 +395,10 @@ export default function AccountsPage() {
 				</Card>
 			</div>
 
-			<Card title={`Accounts (${data.accounts.length})`}>
+			<Card title={`Accounts (${visibleAccounts.length}${!showLowBalance && lowBalanceCount > 0 ? ` of ${data.accounts.length}` : ''})`}>
 				<DataTable
 					columns={columns}
-					data={data.accounts}
+					data={visibleAccounts}
 					meta={{ onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance }}
 					groupOptions={[
 						{
