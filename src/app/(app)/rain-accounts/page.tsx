@@ -55,6 +55,7 @@ import {
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
 import { formatTime } from '@/lib/format';
+import { isPlayableFreeBet } from '@/lib/freeBet';
 import { DataTable } from '@/components/ui/data-table';
 import { rainAccountColumns, RainAccountMobileCard } from '@/components/rain-accounts-columns';
 import { WithdrawalConfigCard } from '@/components/autoplay/WithdrawalConfigCard';
@@ -725,7 +726,11 @@ export default function RainAccountsPage() {
     try {
       // Get the first available free bet for this account
       const freeBetsRes = await getRainFreeBets(1000);
-      const accountFreeBets = freeBetsRes.bets.filter(b => b.account_id === acc.id && (b.status === 'available' || b.status === 'bet_placed'));
+      // Only unplayed, unexpired rows — already-settled/bet_placed history must
+      // never be picked for the Play action (the gateway rejects those rains).
+      const accountFreeBets = freeBetsRes.bets.filter(
+        (b) => b.account_id === acc.id && isPlayableFreeBet(b),
+      );
       if (accountFreeBets.length === 0) {
         setMsg(`No available free bets for "${acc.name}".`);
         return;
@@ -1080,7 +1085,7 @@ export default function RainAccountsPage() {
                 <TableBody>
                   {freeBets.slice(freeBetsPage * LIST_PAGE_SIZE, (freeBetsPage + 1) * LIST_PAGE_SIZE).map((b) => {
                     const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
-                    const playable = b.status === 'available' || b.status === 'failed';
+                    const playable = isPlayableFreeBet(b);
                     return (
                       <TableRow key={b.id}>
                         <TableCell className="whitespace-nowrap">

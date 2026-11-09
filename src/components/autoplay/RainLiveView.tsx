@@ -13,6 +13,9 @@ import { BOARD_CSS } from './boardStyles';
 
 const BETTING_WINDOW_MS = 70000; // 70 seconds for betting
 const DRAWING_DURATION_MS = 10000; // 10 seconds for drawing
+// The ledger is historical; only announce wins placed in this window. Without
+// it, every page load/sign-in re-announced all old settled wins as new.
+const NOTIFY_FRESH_MS = 15 * 60 * 1000;
 
 // Rain CASH wagers: settlement is authoritative on the server (rainClaimer),
 // so we only render the settle verdict — no local matching of pending tickets.
@@ -186,6 +189,7 @@ export function RainLiveView({ bets, picks, autoRefresh = true }: { bets?: RainC
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
       saveCelebrated();
+      if (Date.now() - b.placedAt > NOTIFY_FRESH_MS) continue;
       const spots = b.spots || [];
       const matched =
         b.matched ??

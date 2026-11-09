@@ -47,6 +47,7 @@ import { NumberGrid } from './NumberGrid';
 import { RainBetView } from './RainBetView';
 import { RainManualBetCard } from './RainManualBetCard';
 import { formatTime } from '@/lib/format';
+import { isPlayableFreeBet } from '@/lib/freeBet';
 import { CollapsibleCard } from './CollapsibleCard';
 import { LastDrawsBoards } from './LastDrawsBoards';
 import { MlPredictorCard } from './MlPredictorCard';
@@ -333,10 +334,11 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
   const liveBalance = accounts.some((a) => a.balanceLive);
   const connected = accounts.filter((a) => a.connected).length;
-  const availableFb = (freeBets ?? []).filter((b) => b.status === 'available' || b.status === 'failed').length;
+  const playableFb = (freeBets ?? []).filter((b) => isPlayableFreeBet(b));
+  const availableFb = playableFb.length;
   // This modal is the play surface: only playable rows belong here. The full
   // ledger (won/lost/expired/bet_placed history) lives on the rain-accounts page.
-  const ledgerBets = (freeBets ?? []).filter((b) => b.status === 'available' || b.status === 'failed');
+  const ledgerBets = playableFb;
 
   return (
     <SnapScroll>
@@ -513,17 +515,15 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         </SnapSection>
       )}
 
-      {isAdmin && (
-        <SnapSection fill>
-          <RainManualBetCard
-            running={status?.running ?? false}
-            config={cfg}
-            accounts={accounts}
-            onMessage={setMsg}
-            onRefresh={() => void refreshAccountsAndBets()}
-          />
-        </SnapSection>
-      )}
+      <SnapSection fill>
+        <RainManualBetCard
+          running={status?.running ?? false}
+          config={cfg}
+          accounts={accounts}
+          onMessage={setMsg}
+          onRefresh={() => void refreshAccountsAndBets()}
+        />
+      </SnapSection>
 
       <SnapSection fill>
       <CollapsibleCard title="Live view — current draw & recent bets" defaultOpen={true}>
@@ -584,7 +584,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </SnapSection>
 
       <SnapSection>
-      <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={false}>
+      <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={!isAdmin}>
         {accounts.length === 0 ? (
           <Empty label={isAdmin ? 'No rain accounts yet — add them on the Rain Accounts page.' : 'No rain account is assigned to you yet. Ask an admin to assign one.'} />
         ) : (
@@ -753,7 +753,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
                 <TableBody>
                   {ledgerBets.slice(freeBetsPage * MODAL_PAGE_SIZE, (freeBetsPage + 1) * MODAL_PAGE_SIZE).map((b) => {
                     const s = SPOT_STATUS_LABEL[b.status] ?? { label: b.status, cls: 'bg-muted text-muted-foreground' };
-                    const playable = b.status === 'available' || b.status === 'failed';
+                    const playable = isPlayableFreeBet(b);
                     return (
                       <TableRow key={b.id}>
                         <TableCell className="whitespace-nowrap">

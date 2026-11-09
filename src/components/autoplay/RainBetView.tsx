@@ -14,6 +14,18 @@ import { BOARD_CSS } from './boardStyles';
 
 const BETTING_WINDOW_MS = 70000;
 const DRAWING_DURATION_MS = 10000;
+// Wins older than this were already settled before the page opened. They are
+// still marked celebrated (so they never fire later) but are not re-announced:
+// the ledger feed is historical, and treating its rows as "new" made every
+// sign-in replay days of old wins into the notification bell.
+const NOTIFY_FRESH_MS = 15 * 60 * 1000;
+
+function placedMs(at: string | number | null): number {
+  if (typeof at === 'number') return at;
+  if (!at) return Date.now();
+  const t = new Date(at).getTime();
+  return Number.isFinite(t) ? t : Date.now();
+}
 
 // Ticket states that are still in play for the current round. Settled tickets
 // (won / lost / failed) are not part of the live list — they leave the board as
@@ -245,6 +257,7 @@ export function RainBetView({
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
       saveCelebrated();
+      if (Date.now() - placedMs(b.betPlacedAt) > NOTIFY_FRESH_MS) continue;
       const spots = b.spots || [];
       const matched =
         b.matched ??
@@ -276,6 +289,7 @@ export function RainBetView({
       if (celebratedRef.current.has(key)) continue;
       celebratedRef.current.add(key);
       saveCelebrated();
+      if (Date.now() - placedMs(b.betPlacedAt) > NOTIFY_FRESH_MS) continue;
       const spots = b.spots || [];
       const matched =
         b.matched ??

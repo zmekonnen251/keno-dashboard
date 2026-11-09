@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RainFreeBet } from '@/lib/types';
 import { getRainFreeBets } from '@/lib/api';
+import { isPlayableFreeBet } from '@/lib/freeBet';
 import { BOARD_CSS } from './boardStyles';
 import { formatTime } from '@/lib/format';
 
@@ -133,6 +134,13 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
     return freeBets.filter(b => b.status === 'bet_placed' || b.status === 'claiming');
   }, [freeBets]);
 
+  // Only unplayed, unexpired rows: the ledger also carries settled history
+  // (won/lost/bet_placed) that must never be offered as "available".
+  const playableBets = useMemo(
+    () => (freeBets ?? []).filter((b) => isPlayableFreeBet(b)),
+    [freeBets],
+  );
+
   return (
     <div className='overflow-hidden rounded-xl border border-border bg-card text-card-foreground dark:border-white/10 dark:bg-[#0b0f19] dark:text-slate-100'>
       <style>{BOARD_CSS}</style>
@@ -169,7 +177,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
             •
           </span>
           <span className='text-slate-500 dark:text-slate-400'>
-            {freeBets?.filter(b => b.status === 'available' || b.status === 'failed').length || 0} available
+            {playableBets.length} available
           </span>
         </div>
       </div>
@@ -250,7 +258,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
       {/* Available free bets */}
       <div className='p-3'>
         <div className='mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400'>
-          Available free bets ({freeBets?.filter(b => b.status === 'available' || b.status === 'failed').length || 0})
+          Available free bets ({playableBets.length})
         </div>
         {loading && !freeBets ? (
           <p className='py-4 text-center text-xs italic text-slate-500'>Loading free bets…</p>
@@ -258,8 +266,7 @@ export function RainFreeBetView({ autoRefresh = true }: { autoRefresh?: boolean 
           <p className='py-4 text-center text-xs italic text-slate-500'>No free bets available.</p>
         ) : (
           <div className='space-y-2 max-h-60 overflow-y-auto'>
-            {freeBets
-              .filter(b => b.status === 'available' || b.status === 'failed')
+            {playableBets
               .slice(0, 20)
               .map((b) => {
                 const s = freeBetStatusLabel(b);

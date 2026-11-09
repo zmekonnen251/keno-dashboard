@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 export interface AppNotification {
   id: string;
@@ -21,7 +21,12 @@ interface NotificationCenter {
 
 const Ctx = createContext<NotificationCenter | null>(null);
 const STORAGE_KEY = 'keno_notifications';
+const SEEN_KEY = 'keno_notifications_seen';
 const MAX_STORED = 50;
+// Kept much larger than MAX_STORED: ids evicted from the visible list must stay
+// deduped, otherwise live feeds (wins, ML alerts) re-announce them on the next
+// sign-in as if they were new.
+const MAX_SEEN = 1000;
 
 function loadStored(): AppNotification[] {
   try {
@@ -45,12 +50,45 @@ function loadLastReadAt(): number {
   }
 }
 
+function loadSeenIds(): string[] {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = window.localStorage.getItem(SEEN_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown[];
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSeen(seen: Set<string>): void {
+  try {
+    const ids = [...seen].slice(-MAX_SEEN);
+    window.localStorage.setItem(SEEN_KEY, JSON.stringify(ids));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>(loadStored);
   const [lastReadAt, setLastReadAt] = useState<number>(loadLastReadAt);
+  // Every id ever delivered (or dismissed) in this browser. Hydrated from the
+  // persisted list too, so older sessions' visible items are never re-added.
+  const seenRef = useRef<Set<string> | null>(null);
+  if (seenRef.current === null) {
+    const seen = new Set<string>(loadSeenIds());
+    for (const n of notifications) seen.add(n.id);
+    seenRef.current = seen;
+  }
 
   const notify = useCallback((n: Omit<AppNotification, 'at'> & { at?: number }) => {
     const item: AppNotification = { ...n, at: n.at ?? Date.now() };
+    const seen = seenRef.current!;
+    if (seen.has(item.id)) return;
+    seen.add(item.id);
+    persistSeen(seen);
     setNotifications((prev) => {
       if (prev.some((x) => x.id === item.id)) return prev;
       const next = [item, ...prev].slice(0, MAX_STORED);
@@ -64,7 +102,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clear = useCallback(() => {
-    setNotifications([]);
+    setNotifications((prev) => {
+      for (const n of prev) seenRef.current!.add(n.id);
+      persistSeen(seenRef.current!);
+      return [];
+    });
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -80,6 +122,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore storage errors.
     }
+    // Opening the bell dismisses what is listed; remember those ids so a feed
+    // replay cannot resurrect them as unread after a clear/eviction.
+    setNotifications((prev) => {
+      for (const n of prev) seenRef.current!.add(n.id);
+      persistSeen(seenRef.current!);
+      return prev;
+    });
   }, []);
 
   const unread = useMemo(

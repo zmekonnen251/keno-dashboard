@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getRainFreeBets, getTwoDigitTickets, placeManualBet, playRainFreeBet, rainManualCashBet } from '@/lib/api';
 import type { RainFreeBet, TwoDigitTicketsResponse } from '@/lib/types';
+import { isPlayableFreeBet } from '@/lib/freeBet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,16 +75,7 @@ export function TwoDigitTicketsCard({
     if (isShamo) void loadFreeBets();
   }, [isShamo, loadFreeBets]);
 
-  /** A free-bet row is playable while it's available (or failed = retryable),
-   *  not settled, and not expired — mirrors the server's listEligibleFreeBets. */
-  const isPlayableFreeBet = (b: RainFreeBet): boolean => {
-    if (b.status !== 'available' && b.status !== 'failed') return false;
-    if ((b.closed_bet_count ?? 0) >= 1) return false;
-    if (b.expires_at && new Date(b.expires_at).getTime() <= Date.now()) return false;
-    return true;
-  };
-
-  const playableFreeBets = freeBets.filter(isPlayableFreeBet);
+  const playableFreeBets = freeBets.filter((b) => isPlayableFreeBet(b));
   const bestFreeBet = playableFreeBets.length
     ? [...playableFreeBets].sort(
         (a, b) => b.wager_amount - a.wager_amount || (a.granted_at ?? '').localeCompare(b.granted_at ?? ''),

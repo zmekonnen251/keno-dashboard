@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Card, Empty, ErrorBox, Loading, PrettyNumbers } from '@/components/app';
 import { formatTime } from '@/lib/format';
 
+// The alerts endpoint returns history too; only push genuinely recent alerts
+// into the bell so signing in does not replay the whole backlog as new.
+const NOTIFY_FRESH_MS = 15 * 60 * 1000;
+
 export default function MlAlertsPage() {
   const alerts = useApi(() => getMlAlerts(100), []);
   const { notify } = useNotifications();
@@ -26,11 +30,13 @@ export default function MlAlertsPage() {
     for (const a of list) {
       if (seen.current.has(a.id)) continue;
       seen.current.add(a.id);
+      const at = new Date(a.receivedAt).getTime();
+      if (!Number.isFinite(at) || Date.now() - at > NOTIFY_FRESH_MS) continue;
       notify({
         id: `ml-${a.id}`,
         kind: 'info',
         text: `ML alert: repetitive triplet in [${(a.summary?.draw || a.draw).join(', ')}]`,
-        at: new Date(a.receivedAt).getTime(),
+        at,
       });
     }
   }, [alerts.data, notify]);

@@ -10,7 +10,6 @@ import { CollapsibleCard } from './CollapsibleCard';
 import {
   rainManualCashBet,
   getRainAutoplayStatus,
-  rainBetPrediction,
   getRainPrediction,
   getRainTicketConfig,
   setRainTicketConfig,
@@ -35,6 +34,7 @@ import {
 } from 'lucide-react';
 import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus, BotTicket, RainFreeBet } from '@/lib/types';
 import { useSocket } from '@/lib/service-gateway';
+import { isPlayableFreeBet } from '@/lib/freeBet';
 import { NumberGrid } from './NumberGrid';
 
 // Pre-configured one-click tickets. Seeded with the classic defaults and then
@@ -77,15 +77,6 @@ const CASH_PRESETS = [2, 5, 8, 10, 20];
 // Free-bet one-click presets (Birr) — highest-value first.
 const FREE_PRESETS = [50, 30, 10, 5, 2];
 const DEFAULT_STAKE = 5;
-
-/** A free-bet row is playable while it's available (or failed = retryable),
- *  not settled, and not expired — mirrors the server's listEligibleFreeBets. */
-function isPlayableFreeBet(b: RainFreeBet): boolean {
-  if (b.status !== 'available' && b.status !== 'failed') return false;
-  if ((b.closed_bet_count ?? 0) >= 1) return false;
-  if (b.expires_at && new Date(b.expires_at).getTime() <= Date.now()) return false;
-  return true;
-}
 
 /** Build the two ML ticket groups from the last rain prediction:
  *  "Most Repetitive 2–5 Digit" chips are the top repeated 2-5 digit patterns;
@@ -141,6 +132,9 @@ interface RainManualBetCardProps {
 }
 
 export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: RainManualBetCardProps) {
+  // Viewers get no autoplay config (admin-only), but they still play on
+  // fungames_shamo rain accounts, so picks fall back to that provider.
+  const provider = config?.provider ?? 'fungames_shamo';
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null); // null = auto (server picks by balance)
   const [picks, setPicks] = useState<number[]>([]);
   const [stake, setStake] = useState<number>(DEFAULT_STAKE);
@@ -307,7 +301,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     if (!numbers) {
       onMessage(`Ticket #${ticket.id} has no fixed numbers — generating picks, then betting…`);
       try {
-        const res = await getRainPrediction(config?.provider ?? 'fungames_shamo', ticket.spots || 3);
+        const res = await getRainPrediction(provider, ticket.spots || 3);
         if (res.ok && res.prediction?.picks?.length) numbers = res.prediction.picks;
       } catch {}
       if (!numbers || numbers.length === 0) numbers = picks.length > 0 ? picks : null;
@@ -387,24 +381,6 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
     }
   };
 
-  const handleInjectPicks = async () => {
-    if (!config) return;
-    setPredicting(true);
-    try {
-      const res = await rainBetPrediction();
-      if (res.ok && res.result?.ok) {
-        onMessage('Prediction bet placed!');
-        onRefresh();
-      } else {
-        onMessage(res.result?.error || 'Failed to place prediction bet');
-      }
-    } catch (e) {
-      onMessage('Error: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setPredicting(false);
-    }
-  };
-
   const handlePlaceBet = async () => {
     if (picks.length === 0) return;
     if (betMode === 'free') {
@@ -432,10 +408,9 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   };
 
   const handleGeneratePicks = async () => {
-    if (!config) return;
     setPredicting(true);
     try {
-      const res = await getRainPrediction(config.provider, 3);
+      const res = await getRainPrediction(provider, 3);
       if (res.ok && res.prediction) {
         const p = res.prediction;
         setPicks(p.picks);
@@ -460,10 +435,9 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   // Load the top temporal-pattern ticket (same clock-time window over the last
   // 7 days) onto the board. The engine plays these when spots_mode = 'temporal'.
   const handleGenerateTemporalPicks = async () => {
-    if (!config) return;
     setPredicting(true);
     try {
-      const res = await getRainPrediction(config.provider, 3, 'temporal');
+      const res = await getRainPrediction(provider, 3, 'temporal');
       if (res.ok && res.prediction && res.prediction.picks.length > 0) {
         const p = res.prediction;
         setPicks(p.picks);
