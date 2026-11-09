@@ -98,11 +98,15 @@ interface AccountFormInput {
 function AccountForm({
   initial,
   users,
+  usersLoading,
+  usersError,
   onSave,
   onCancel,
 }: {
   initial: RainAccount | null;
   users: User[];
+  usersLoading?: boolean;
+  usersError?: string;
   onSave: (input: AccountFormInput) => Promise<void> | void;
   onCancel: () => void;
 }) {
@@ -270,10 +274,20 @@ function AccountForm({
               ))}
           </SelectContent>
         </Select>
-        <p className="mt-1 text-xs text-muted-foreground">
-          An assigned viewer can open this account&apos;s rain autoplay and withdrawal-account pages. The admin
-          keeps full control.
-        </p>
+        {usersError ? (
+          <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+            Could not load dashboard users: {usersError}
+          </p>
+        ) : !usersLoading && users.every((u) => u.role !== 'viewer') ? (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            No viewer accounts yet — create one on the Users page to assign this rain account to someone.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-muted-foreground">
+            An assigned viewer can open this account&apos;s rain autoplay and withdrawal-account pages. The admin
+            keeps full control.
+          </p>
+        )}
       </div>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex justify-end gap-2">
@@ -524,14 +538,27 @@ export default function RainAccountsPage() {
   const [checkingAll, setCheckingAll] = useState(false);
   const [msg, setMsg] = useState('');
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
   const [paymentChanges, setPaymentChanges] = useState<RainPaymentChangeRequest[]>([]);
   const [changeBusyId, setChangeBusyId] = useState<number | null>(null);
 
   // Viewer assignment picker options (admin-only endpoint).
   useEffect(() => {
+    let alive = true;
     getUsers()
-      .then((res) => setUsers(res.users))
-      .catch(() => {});
+      .then((res) => {
+        if (alive) setUsers(res.users);
+      })
+      .catch((e) => {
+        if (alive) setUsersError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (alive) setUsersLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function loadPaymentChanges() {
@@ -982,13 +1009,13 @@ export default function RainAccountsPage() {
 
       {adding && (
         <Modal title="Add rain account" onClose={() => setAdding(false)}>
-          <AccountForm initial={null} users={users} onCancel={() => setAdding(false)} onSave={onAdd} />
+          <AccountForm initial={null} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setAdding(false)} onSave={onAdd} />
         </Modal>
       )}
 
       {editing && (
         <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
-          <AccountForm initial={editing} users={users} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
+          <AccountForm initial={editing} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
         </Modal>
       )}
 
