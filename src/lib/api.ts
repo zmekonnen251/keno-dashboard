@@ -497,7 +497,7 @@ export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigRespons
 }
 
 export async function setRainAutoplayConfig(
-  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'temporal_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet'>>,
+  patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'temporal_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet' | 'free_bet_stake_threshold' | 'free_bet_high_spots' | 'free_bet_low_spots' | 'max_cash_stake_per_round'>>,
 ): Promise<RainAutoplayConfigResponse> {
   return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
     method: 'PATCH',

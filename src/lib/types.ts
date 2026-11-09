@@ -1018,6 +1018,14 @@ export interface RainAutoplayConfig {
 	// triggers / vertical lanes) and use the highest-wager free bet for the
 	// high-confidence indicator tickets.
 	indicator_auto_bet: boolean;
+	// Wager-based free-bet routing: free bets with wager_amount >= threshold play
+	// tickets of `free_bet_high_spots` spots, the rest play `free_bet_low_spots`.
+	// 0 disables routing (every free bet uses the round's queue picks).
+	free_bet_stake_threshold: number;
+	free_bet_high_spots: number;
+	free_bet_low_spots: number;
+	// Hard cap on total cash staked in one round across all accounts (0 = no cap).
+	max_cash_stake_per_round: number;
 	updated_at: string;
 }
 

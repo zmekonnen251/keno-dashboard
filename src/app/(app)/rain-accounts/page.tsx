@@ -301,6 +301,8 @@ function AutoplayCard() {
         tickets_per_account: config.tickets_per_account ?? 1,
         use_two_digit_tickets: false,
         two_digit_stake: 0,
+        free_bet_stake_threshold: config.free_bet_stake_threshold ?? 50,
+        max_cash_stake_per_round: config.max_cash_stake_per_round ?? 0,
       });
       setConfig(res.config);
       setMsg('Autoplay config saved.');
@@ -415,6 +417,35 @@ function AutoplayCard() {
               value={config.round_interval}
               onChange={(e) => setConfig({ ...config, round_interval: Number(e.target.value) })}
             />
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-fb-threshold">Free-bet wager threshold (ETB)</Label>
+            <Input
+              id="rain-auto-fb-threshold"
+              type="number"
+              min={0}
+              max={10000}
+              value={config.free_bet_stake_threshold ?? 50}
+              onChange={(e) => setConfig({ ...config, free_bet_stake_threshold: Number(e.target.value) })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Free bets at or above this wager play the high-spot (2-digit) queue tickets, the rest the low-spot
+              (3-digit) ones. 0 disables routing.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="rain-auto-max-cash">Max cash stake per round (ETB)</Label>
+            <Input
+              id="rain-auto-max-cash"
+              type="number"
+              min={0}
+              max={100000}
+              value={config.max_cash_stake_per_round ?? 0}
+              onChange={(e) => setConfig({ ...config, max_cash_stake_per_round: Number(e.target.value) })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Total cash staked across accounts per round; tickets that would exceed it are skipped. 0 = unlimited.
+            </p>
           </div>
           <p className="self-end text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">
             Every round plays the tickets configured in the <strong>Rain autoplay configuration</strong> queue

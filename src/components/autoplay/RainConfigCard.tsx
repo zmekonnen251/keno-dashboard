@@ -20,6 +20,21 @@ import { CollapsibleCard } from './CollapsibleCard';
 
 const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
 
+// Full-hit probabilities from the keno paytable (2-spot 190/3160, 3-spot
+// 1140/82160). Used by the N-per-round hint; the expected stake per full hit is
+// stake/p, which does not depend on N.
+const P_FULL_2 = 190 / 3160;
+const P_FULL_3 = 1140 / 82160;
+
+function pct(x: number, digits = 2): string {
+  return `${(x * 100).toFixed(digits)}%`;
+}
+
+function anyHit(p: number, n: number): number {
+  return n > 0 ? 1 - Math.pow(1 - p, n) : 0;
+}
+
+
 // Boolean settings are switches that persist immediately: leaving them as
 // <Select>s meant a toggle only took effect after "Save Configuration", which
 // made the cash switch look broken. A partial PATCH is supported by the API.
@@ -101,6 +116,10 @@ export function RainConfigCard({
         indicator_auto_pause: config.indicator_auto_pause ?? true,
         indicator_guard_rounds: config.indicator_guard_rounds ?? 3,
         indicator_auto_bet: config.indicator_auto_bet ?? true,
+        free_bet_stake_threshold: config.free_bet_stake_threshold ?? 50,
+        free_bet_high_spots: config.free_bet_high_spots ?? 2,
+        free_bet_low_spots: config.free_bet_low_spots ?? 3,
+        max_cash_stake_per_round: config.max_cash_stake_per_round ?? 0,
       });
       setConfig(res.config);
       seeded.current = true;
@@ -243,6 +262,78 @@ export function RainConfigCard({
                 onChange={(e) => setConfig({ ...config, indicator_guard_rounds: Number(e.target.value) })}
                 disabled={!config.indicator_auto_pause}
               />
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-fb-threshold">Free-bet wager threshold (ETB)</Label>
+              <Input
+                id="rain-auto-fb-threshold"
+                type="number"
+                min={0}
+                max={10000}
+                value={config.free_bet_stake_threshold ?? 50}
+                onChange={(e) => setConfig({ ...config, free_bet_stake_threshold: Number(e.target.value) })}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Free bets at or above this wager play the higher-spot (2-digit) queue tickets; lower ones play the
+                lower-spot (3-digit) tickets. <b>0</b> disables routing.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-fb-high">High-wager spots</Label>
+              <Input
+                id="rain-auto-fb-high"
+                type="number"
+                min={1}
+                max={10}
+                value={config.free_bet_high_spots ?? 2}
+                onChange={(e) => setConfig({ ...config, free_bet_high_spots: Number(e.target.value) })}
+                disabled={!(config.free_bet_stake_threshold ?? 50)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-fb-low">Low-wager spots</Label>
+              <Input
+                id="rain-auto-fb-low"
+                type="number"
+                min={1}
+                max={10}
+                value={config.free_bet_low_spots ?? 3}
+                onChange={(e) => setConfig({ ...config, free_bet_low_spots: Number(e.target.value) })}
+                disabled={!(config.free_bet_stake_threshold ?? 50)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="rain-auto-max-cash">Max cash stake per round (ETB)</Label>
+              <Input
+                id="rain-auto-max-cash"
+                type="number"
+                min={0}
+                max={100000}
+                value={config.max_cash_stake_per_round ?? 0}
+                onChange={(e) => setConfig({ ...config, max_cash_stake_per_round: Number(e.target.value) })}
+                disabled={!config.use_cash_after_free_bets}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Caps total cash staked across all accounts in one round. Tickets that would exceed it are skipped.{' '}
+                <b>0</b> = unlimited.
+              </p>
+            </div>
+            <div className="rounded-lg border p-2.5 sm:col-span-2 lg:col-span-3">
+              <Label>N-per-round economics</Label>
+              {(() => {
+                const n = Math.max(1, Math.floor(Number(config.tickets_per_round ?? 1) || 1));
+                const stake = Math.max(1, Number(config.cash_stake ?? 2) || 2);
+                return (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    With <b>{n}</b> independent ticket(s)/round at <b>{stake} ETB</b>: a 2-digit full hit is{' '}
+                    <b>{pct(anyHit(P_FULL_2, n))}</b> per round ({pct(P_FULL_2)}/ticket, ~
+                    {(stake / P_FULL_2).toFixed(0)} ETB expected stake per full hit); a 3-digit full hit is{' '}
+                    <b>{pct(anyHit(P_FULL_3, n))}</b> ({pct(P_FULL_3)}/ticket, ~
+                    {(stake / P_FULL_3).toFixed(0)} ETB). Expected return is fixed by the paytable at any N — N only
+                    changes variance and how often a win shows up.
+                  </p>
+                );
+              })()}
             </div>
           </div>
           <div className="mt-4 flex justify-end border-t pt-4">
