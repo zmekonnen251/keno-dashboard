@@ -10,6 +10,11 @@ import { useSession } from './session-provider';
 const VIEWER_SITE_ID = 'fungames_shamo';
 const VIEWER_SITE_NAME = 'Fungames Shamo';
 
+// The selector only offers the sites this dashboard actually operates. Other
+// provider rows stay in the server registry for historical draws and legacy
+// tooling, but they are not switch targets here.
+const SELECTABLE_SITE_IDS = new Set(['fungames_tolobirr', 'casagames', 'fungames_shamo']);
+
 interface SiteCtx {
   sites: ProviderSummary[];
   siteId: string;
@@ -38,7 +43,8 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       return;
     }
     getSites()
-      .then((s) => {
+      .then((all) => {
+        const s = all.filter((x) => SELECTABLE_SITE_IDS.has(x.id));
         setSites(s);
         const saved = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
         if (saved && s.some((x) => x.id === saved)) setSiteIdState(saved);
