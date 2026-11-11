@@ -11,6 +11,7 @@ import { toLocalPhone } from '@/lib/phone';
 import { GATEWAY_URL } from '@/hooks/useGatewayWorker';
 import {
 	Check,
+	CloudRain,
 	Copy,
 	LoaderCircle,
 	MoreVertical,
@@ -37,6 +38,10 @@ import {
 } from './ui/tooltip';
 
 type ConnectionStatus = 'idle' | 'checking' | 'valid' | 'invalid';
+
+// Accounts on these providers can join the FunGames rain-claiming list
+// (shared by tolobirr + casagames, separate from the shamo rain pool).
+const FUNGAMES_RAIN_PROVIDERS = new Set(['fungames_tolobirr', 'casagames']);
 
 export function TestGatewayConnection({ token }: { token?: string | null }) {
 	const [status, setStatus] = useState<ConnectionStatus>('idle');
@@ -156,7 +161,7 @@ export function CopyPhoneButton({ phone }: { phone: string }) {
 	);
 }
 
-export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void; onCheckBalance: (id: number, phone: string) => void }) {
+export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance, onAddToRain }: { account: Account; onDelete: (id: number) => void; onRefreshWsToken: (id: number) => void; onToggleEnabled: (id: number, enabled: boolean) => void; onCheckBalance: (id: number, phone: string) => void; onAddToRain: (id: number) => void }) {
 	return (
 		<TooltipProvider>
 			<article className='rounded-lg border bg-card p-4 text-sm shadow-sm'>
@@ -189,6 +194,20 @@ export function AccountMobileCard({ account, onDelete, onRefreshWsToken, onToggl
 							<DropdownMenuItem onClick={() => onCheckBalance(account.id, account.phone)}>
 								<Wallet /> Check balance
 							</DropdownMenuItem>
+							{FUNGAMES_RAIN_PROVIDERS.has(account.provider) && (
+								account.rain_account_id ? (
+									<DropdownMenuItem disabled>
+										<CloudRain /> In rain claiming
+									</DropdownMenuItem>
+								) : (
+									<DropdownMenuItem
+										onClick={() => onAddToRain(account.id)}
+										disabled={!account.ws_token}
+									>
+										<CloudRain /> Add to rain claiming
+									</DropdownMenuItem>
+								)
+							)}
 							<DropdownMenuSeparator />
 							<DropdownMenuItem variant='destructive' onClick={() => onDelete(account.id)}>
 								<Trash2 /> Delete account
@@ -328,6 +347,25 @@ export const columns = columnHelper.columns([
         >
           <Wallet className='size-3.5' /> Check
         </Button>
+        {FUNGAMES_RAIN_PROVIDERS.has(row.original.provider) && (
+          row.original.rain_account_id ? (
+            <Badge variant='outline' className='self-center'>
+              <CloudRain /> In rain
+            </Badge>
+          ) : (
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={!row.original.ws_token}
+              title={row.original.ws_token ? 'Add to the FunGames rain-claiming list' : 'Refresh the WS token first'}
+              onClick={() =>
+                (table.options.meta as { onAddToRain: (id: number) => void }).onAddToRain(row.original.id)
+              }
+            >
+              <CloudRain className='size-3.5' /> Add to rain
+            </Button>
+          )
+        )}
       </div>
 		),
 	}),

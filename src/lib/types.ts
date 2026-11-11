@@ -442,6 +442,9 @@ export interface Account {
 	last_bet_at?: string | null;
 	is_deleted: boolean;
 	is_enabled?: boolean;
+	// FunGames accounts only: the linked rain-claiming row id, when the account
+	// has been promoted into the tolobirr/casagames rain list.
+	rain_account_id?: number | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -660,6 +663,7 @@ export interface CreationJobStatus {
 	durationMs?: number;
 	stopped: boolean;
 	wsTokens?: number;
+	provider?: string;
 }
 
 export interface CreateAccountsResponse {
@@ -866,6 +870,11 @@ export interface LiveBalancesResponse {
 // (draws/autoplay/tolobirr) id never appears here.
 // Dynamic provider codes from the providers API. Use string to allow custom providers.
 export type RainProvider = string;
+
+// Rain claiming runs as two independent groups: shamo/phoenix and
+// tolobirr/casagames. Each has its own accounts filter, claimer, autoplay
+// config and ticket queue on the server.
+export type RainGroup = 'shamo' | 'fungames';
 
 export interface RainAccount {
 	id: number;

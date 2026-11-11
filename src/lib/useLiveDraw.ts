@@ -81,10 +81,11 @@ function parseGameFrame(data: unknown): LiveGameFrame | null {
 
 // Live draw state. Primary source is OUR server's live re-stream: the server
 // already listens on the provider gateway sockets (collector + claimer workers)
-// and re-broadcasts the normalized live frame on its own /ws endpoint, so the
-// dashboard gets real-time round id / phase / drawn spots without its own
-// gateway token and without timers. Falls back to a direct provider observer
-// socket when the server stream is unavailable.
+// and re-broadcasts the normalized live frame as Server-Sent Events through the
+// dashboard's /api proxy, so every logged-in user gets real-time round id /
+// phase / drawn spots without a provider token. Falls back to a direct provider
+// observer socket when the server stream is unavailable (admins only — viewers
+// have no token).
 export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 	const [status, setStatus] = useState<LiveDrawStatus>('connecting');
 	const [observer, setObserver] = useState('');
@@ -100,7 +101,7 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 	useEffect(() => {
 		let cancelled = false;
 		let ws: WebSocket | null = null; // provider gateway socket (fallback)
-		let serverWs: WebSocket | null = null; // our server re-stream (primary)
+		let serverEs: EventSource | null = null; // our server re-stream (primary)
 		let retry: ReturnType<typeof setTimeout> | null = null;
 		let serverRetry: ReturnType<typeof setTimeout> | null = null;
 		let tokens: { phone: string; ws_token: string }[] = [];
@@ -136,18 +137,22 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 
 		function connectServer() {
 			if (cancelled) return;
-			const url = `wss://${window.location.host}/ws?site=${encodeURIComponent(SITE_BY_SOURCE[tokenSource])}`;
+			// The server re-stream is exposed as SSE through the dashboard's own
+			// API proxy: the dashboard origin cannot open the keno-server's /ws
+			// socket, and the proxy path carries the session cookie for every
+			// logged-in user (viewers included), not just admins.
+			const url = `/api/live?site=${encodeURIComponent(SITE_BY_SOURCE[tokenSource])}`;
 			setObserver('keno server');
 			try {
-				serverWs = new WebSocket(url);
+				serverEs = new EventSource(url);
 			} catch {
-				serverWs = null;
+				serverEs = null;
 				return;
 			}
-			serverWs.onopen = () => {
+			serverEs.onopen = () => {
 				if (!cancelled) setStatus('live');
 			};
-			serverWs.onmessage = (event) => {
+			serverEs.onmessage = (event) => {
 				if (cancelled) return;
 				try {
 					const msg = JSON.parse(event.data);
@@ -181,21 +186,20 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 					// Ignore non-JSON server frames.
 				}
 			};
-			const rotateServer = () => {
-				try {
-					serverWs?.close();
-				} catch {
-					// Ignore close errors during rotation.
-				}
-				serverWs = null;
+			// EventSource retries on its own while CONNECTING. Only rebuild the
+			// connection when the browser gave up (CLOSED), e.g. a 401 or an
+			// upstream that stopped streaming.
+			serverEs.onerror = () => {
 				if (cancelled) return;
 				if (serverFrames === 0) return; // gateway observer carries the board
 				setStreaming(null);
 				setStatus('waiting');
-				serverRetry = setTimeout(connectServer, 5000);
+				if (serverEs && serverEs.readyState === EventSource.CLOSED) {
+					serverEs.close();
+					serverEs = null;
+					serverRetry = setTimeout(connectServer, 5000);
+				}
 			};
-			serverWs.onclose = rotateServer;
-			serverWs.onerror = rotateServer;
 		}
 
 		function connect() {
@@ -273,7 +277,7 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 				// Ignore close errors on unmount.
 			}
 			try {
-				serverWs?.close();
+				serverEs?.close();
 			} catch {
 				// Ignore close errors on unmount.
 			}

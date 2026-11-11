@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAccounts, deleteAccount, createAccounts, creationStatus, stopCreation, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances } from '@/lib/api';
+import { getAccounts, addAccountToRain, deleteAccount, createAccounts, creationStatus, stopCreation, uploadAccounts, syncBalances, refreshWsToken, setAccountEnabled, cleanupSpentAccounts, getLiveBalances, checkBalances } from '@/lib/api';
 import { ApiError } from '@/lib/api-client';
 import type { CreationJobStatus } from '@/lib/types';
 import { useApi } from '@/lib/hooks';
@@ -11,7 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Card, Empty, ErrorBox, Loading } from '@/components/app';
 import { parseAccountFile } from '@/lib/phone';
 import { DataTable } from '@/components/ui/data-table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountMobileCard, columns } from '@/components/accounts-columns';
+
+// Account providers served by the shared FunGames site. Both register on the
+// same fungames gateway (site identity lives in the ws_token), so switching a
+// tab only changes which wallet API creates/reads the accounts.
+const ACCOUNT_PROVIDERS = [
+	{ id: 'fungames_tolobirr', label: 'ToloBirr' },
+	{ id: 'casagames', label: 'CasaGames' },
+] as const;
 
 function fmtDur(ms: number): string {
 	const s = Math.max(0, Math.round(ms / 1000));
@@ -20,7 +29,9 @@ function fmtDur(ms: number): string {
 }
 
 export default function AccountsPage() {
-  const { data, error, loading, refresh } = useApi(() => getAccounts('fungames_tolobirr'), []);
+  const [provider, setProvider] = useState<string>('fungames_tolobirr');
+  const providerLabel = ACCOUNT_PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
+  const { data, error, loading, refresh } = useApi(() => getAccounts(provider), [provider]);
   const [createCount, setCreateCount] = useState('5');
   const [job, setJob] = useState<CreationJobStatus | null>(null);
   const [jobMsg, setJobMsg] = useState('');
@@ -95,12 +106,12 @@ export default function AccountsPage() {
   async function onCreate() {
     setJobMsg('');
     try {
-      const res = await createAccounts(parseInt(createCount || '0', 10) || 1);
+      const res = await createAccounts(parseInt(createCount || '0', 10) || 1, provider);
       lastMadeRef.current = res.job?.made ?? 0;
       setJob(res.job);
       setJobMsg(
         res.job
-          ? `Job started: 0/${res.job.target} accounts. Each account registers, spins/claims, then fetches its gateway ws_token in the same pass — takes as long as needed.`
+          ? `Job started on ${providerLabel}: 0/${res.job.target} accounts. Each account registers, spins/claims, then fetches its gateway ws_token in the same pass — takes as long as needed.`
           : 'Job started.'
       );
       refresh();
@@ -131,7 +142,7 @@ export default function AccountsPage() {
     setUploading(true);
     setUploadMsg('Uploading…');
     try {
-      const res = await uploadAccounts(file);
+      const res = await uploadAccounts(file, provider);
       setUploadMsg(
         res.rejected
           ? `Imported ${res.inserted ?? 0} of ${res.provided} rows (${res.rejected} rejected — invalid/blank Ethiopian phone or missing password).`
@@ -156,6 +167,17 @@ export default function AccountsPage() {
   async function onToggleEnabled(id: number, enabled: boolean) {
     await setAccountEnabled(id, enabled);
     refresh();
+  }
+
+  async function onAddToRain(id: number) {
+    setSyncMsg('Adding account to FunGames rain claiming…');
+    try {
+      await addAccountToRain(id);
+      setSyncMsg('Added to FunGames rain claiming.');
+      refresh();
+    } catch (e) {
+      setSyncMsg('Error: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   async function onRefreshWsToken(id: number) {
@@ -253,6 +275,15 @@ export default function AccountsPage() {
 
   return (
 		<div className='space-y-5'>
+			<Tabs value={provider} onValueChange={setProvider}>
+				<TabsList>
+					{ACCOUNT_PROVIDERS.map((p) => (
+						<TabsTrigger key={p.id} value={p.id}>
+							{p.label}
+						</TabsTrigger>
+					))}
+				</TabsList>
+			</Tabs>
 			<div className='flex flex-wrap items-center justify-between gap-3'>
 				<h2 className='text-lg font-bold text-foreground'>Accounts</h2>
 				<div className='flex flex-wrap gap-2'>
@@ -278,7 +309,7 @@ export default function AccountsPage() {
 				</div>
 			</div>
 			<p className='text-xs text-muted-foreground'>
-				Balance is the live ToloBirr wallet, synced from the gateway stream after
+				Balance is the live {providerLabel} wallet, synced from the gateway stream after
 				each round (and when you click Sync wallets). New accounts start at 2 ETB
 				until the first sync. Accounts below 2 ETB are hidden by default but kept
 				— use the toggle to show them. “Spent idle” means: placed at least one
@@ -290,7 +321,7 @@ export default function AccountsPage() {
 			<div className='grid grid-cols-1 gap-5 lg:grid-cols-2'>
 				<Card title='Create accounts'>
 					<p className='mb-3 text-xs text-muted-foreground'>
-						Register new ToloBirr accounts in the background: each account
+						Register new {providerLabel} accounts in the background: each account
 						registers, spins/claims, then fetches its gateway ws_token in the
 						same pass. The worker runs until it hits the exact requested
 						count — however long that takes. Missing tokens are backfilled
@@ -399,7 +430,7 @@ export default function AccountsPage() {
 				<DataTable
 					columns={columns}
 					data={visibleAccounts}
-					meta={{ onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance }}
+					meta={{ onDelete, onRefreshWsToken, onToggleEnabled, onCheckBalance, onAddToRain }}
 					groupOptions={[
 						{
 							value: 'provider',
@@ -413,6 +444,7 @@ export default function AccountsPage() {
 							onRefreshWsToken={onRefreshWsToken}
 							onToggleEnabled={onToggleEnabled}
 							onCheckBalance={onCheckBalance}
+							onAddToRain={onAddToRain}
 						/>
 					)}
 				/>

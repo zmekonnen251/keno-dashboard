@@ -33,6 +33,7 @@ import type {
   RainAccountsResponse,
   RainClaimsResponse,
   RainProvider,
+  RainGroup,
   RainAutoplayConfig,
   RainAutoplayConfigResponse,
   RainAutoplayStatusResponse,
@@ -280,21 +281,30 @@ export async function setAccountEnabled(id: number, enabled: boolean) {
   });
 }
 
+// Promote a ToloBirr / CasaGames account into the FunGames rain-claiming list.
+// Idempotent: re-adding refreshes the linked rain row instead of duplicating it.
+export async function addAccountToRain(id: number) {
+  return apiFetch<{ ok: boolean; id: number; rain_account_id: number; in_rain: boolean }>(
+    `api/accounts/${id}/add-to-rain`,
+    { method: 'POST' },
+  );
+}
+
 // Enable/disable autoplay participation for one rain account. Disabled
 // accounts keep claiming rain but their free bets + wallet are excluded from
 // the rain autoplay engine (free-bet plays AND cash-mode betting). Mirrors the
 // tolobirr accounts setAccountEnabled toggle.
-export async function setRainAccountAutoplayEnabled(id: number, enabled: boolean) {
-  return apiFetch<{ ok: boolean; id: number; autoplay_enabled: boolean }>(`api/rain/accounts/${id}/autoplay-enabled`, {
+export async function setRainAccountAutoplayEnabled(id: number, enabled: boolean, group: RainGroup = 'shamo') {
+  return apiFetch<{ ok: boolean; id: number; autoplay_enabled: boolean }>(`${rainBase(group)}/accounts/${id}/autoplay-enabled`, {
     method: 'POST',
     body: JSON.stringify({ enabled }),
   });
 }
 
-export async function createAccounts(count: number): Promise<CreateAccountsResponse> {
+export async function createAccounts(count: number, provider = 'fungames_tolobirr'): Promise<CreateAccountsResponse> {
   return apiFetch<CreateAccountsResponse>('api/accounts/create', {
     method: 'POST',
-    body: JSON.stringify({ count }),
+    body: JSON.stringify({ count, provider }),
   });
 }
 
@@ -308,9 +318,10 @@ export async function stopCreation(): Promise<{ ok: boolean; stopped: boolean; j
   });
 }
 
-export async function uploadAccounts(file: File): Promise<UploadResponse> {
+export async function uploadAccounts(file: File, provider = 'fungames_tolobirr'): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
+  form.append('provider', provider);
   return apiFetch<UploadResponse>('api/accounts/upload', {
     method: 'POST',
     body: form,
@@ -435,8 +446,13 @@ export async function getLiveBalances(): Promise<LiveBalancesResponse> {
 }
 
 // ---- rain claiming ----
-export async function getRainAccounts(): Promise<RainAccountsResponse> {
-  return apiFetch<RainAccountsResponse>('api/rain/accounts');
+// The two rain groups are served by separate API prefixes; everything else in
+// this section is identical, so every call takes an optional group (default
+// shamo) and resolves the prefix through the same helper.
+const rainBase = (group: RainGroup = 'shamo') => (group === 'fungames' ? 'api/fungames-rain' : 'api/rain');
+
+export async function getRainAccounts(group: RainGroup = 'shamo'): Promise<RainAccountsResponse> {
+  return apiFetch<RainAccountsResponse>(`${rainBase(group)}/accounts`);
 }
 
 export async function createRainAccount(input: {
@@ -450,8 +466,8 @@ export async function createRainAccount(input: {
   payment_account_number?: string | null;
   payment_full_name?: string | null;
   assigned_user_id?: number | null;
-}) {
-  return apiFetch('api/rain/accounts', {
+}, group: RainGroup = 'shamo') {
+  return apiFetch(`${rainBase(group)}/accounts`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -473,61 +489,63 @@ export async function updateRainAccount(
     payment_full_name: string | null;
     assigned_user_id: number | null;
   }>,
+  group: RainGroup = 'shamo',
 ) {
-  return apiFetch(`api/rain/accounts/${id}`, {
+  return apiFetch(`${rainBase(group)}/accounts/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
-export async function deleteRainAccount(id: number) {
-  return apiFetch(`api/rain/accounts/${id}`, { method: 'DELETE' });
+export async function deleteRainAccount(id: number, group: RainGroup = 'shamo') {
+  return apiFetch(`${rainBase(group)}/accounts/${id}`, { method: 'DELETE' });
 }
 
-export async function refreshRainAccount(id: number) {
-  return apiFetch(`api/rain/accounts/${id}/refresh`, { method: 'POST' });
+export async function refreshRainAccount(id: number, group: RainGroup = 'shamo') {
+  return apiFetch(`${rainBase(group)}/accounts/${id}/refresh`, { method: 'POST' });
 }
 
-export async function checkAllRainStatus(): Promise<{ ok: boolean; reconnected: number }> {
-  return apiFetch<{ ok: boolean; reconnected: number }>('api/rain/accounts/check-status', { method: 'POST' });
+export async function checkAllRainStatus(group: RainGroup = 'shamo'): Promise<{ ok: boolean; reconnected: number }> {
+  return apiFetch<{ ok: boolean; reconnected: number }>(`${rainBase(group)}/accounts/check-status`, { method: 'POST' });
 }
 
-export async function getRainClaims(id: number): Promise<RainClaimsResponse> {
-  return apiFetch<RainClaimsResponse>(`api/rain/accounts/${id}/claims`);
+export async function getRainClaims(id: number, group: RainGroup = 'shamo'): Promise<RainClaimsResponse> {
+  return apiFetch<RainClaimsResponse>(`${rainBase(group)}/accounts/${id}/claims`);
 }
 
 // ---- rain autoplay (clock-driven free-bet rounds) ----
-export async function getRainAutoplayConfig(): Promise<RainAutoplayConfigResponse> {
-  return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config');
+export async function getRainAutoplayConfig(group: RainGroup = 'shamo'): Promise<RainAutoplayConfigResponse> {
+  return apiFetch<RainAutoplayConfigResponse>(`${rainBase(group)}/autoplay/config`);
 }
 
 export async function setRainAutoplayConfig(
   patch: Partial<Pick<RainAutoplayConfig, 'enabled' | 'provider' | 'tickets_per_round' | 'spots_mode' | 'manual_spots' | 'round_interval' | 'use_cash_after_free_bets' | 'cash_stake' | 'recurrence_tickets_per_round' | 'temporal_tickets_per_round' | 'tickets_per_account' | 'use_two_digit_tickets' | 'two_digit_stake' | 'indicator_auto_pause' | 'indicator_guard_rounds' | 'indicator_auto_bet' | 'free_bet_stake_threshold' | 'free_bet_high_spots' | 'free_bet_low_spots' | 'max_cash_stake_per_round'>>,
+  group: RainGroup = 'shamo',
 ): Promise<RainAutoplayConfigResponse> {
-  return apiFetch<RainAutoplayConfigResponse>('api/rain/autoplay/config', {
+  return apiFetch<RainAutoplayConfigResponse>(`${rainBase(group)}/autoplay/config`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
-export async function rainAutoplayStart() {
-  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/autoplay/start', { method: 'POST' });
+export async function rainAutoplayStart(group: RainGroup = 'shamo') {
+  return apiFetch<{ ok: boolean; running: boolean }>(`${rainBase(group)}/autoplay/start`, { method: 'POST' });
 }
 
-export async function rainAutoplayStop() {
-  return apiFetch<{ ok: boolean; running: boolean }>('api/rain/autoplay/stop', { method: 'POST' });
+export async function rainAutoplayStop(group: RainGroup = 'shamo') {
+  return apiFetch<{ ok: boolean; running: boolean }>(`${rainBase(group)}/autoplay/stop`, { method: 'POST' });
 }
 
-export async function getRainAutoplayStatus(): Promise<RainAutoplayStatusResponse> {
-  return apiFetch<RainAutoplayStatusResponse>('api/rain/autoplay/status');
+export async function getRainAutoplayStatus(group: RainGroup = 'shamo'): Promise<RainAutoplayStatusResponse> {
+  return apiFetch<RainAutoplayStatusResponse>(`${rainBase(group)}/autoplay/status`);
 }
 
-export async function getRainFreeBets(limit = 100): Promise<RainFreeBetsResponse> {
-  return apiFetch<RainFreeBetsResponse>(`api/rain/free-bets?limit=${limit}`);
+export async function getRainFreeBets(limit = 100, group: RainGroup = 'shamo'): Promise<RainFreeBetsResponse> {
+  return apiFetch<RainFreeBetsResponse>(`${rainBase(group)}/free-bets?limit=${limit}`);
 }
 
-export async function playRainFreeBet(id: number, spots?: number[]): Promise<PlayRainFreeBetResponse> {
-  return apiFetch<PlayRainFreeBetResponse>(`api/rain/free-bets/${id}/play`, {
+export async function playRainFreeBet(id: number, spots?: number[], group: RainGroup = 'shamo'): Promise<PlayRainFreeBetResponse> {
+  return apiFetch<PlayRainFreeBetResponse>(`${rainBase(group)}/free-bets/${id}/play`, {
     method: 'POST',
     body: spots && spots.length ? JSON.stringify({ spots }) : undefined,
   });
@@ -536,8 +554,8 @@ export async function playRainFreeBet(id: number, spots?: number[]): Promise<Pla
 // Manual "Bet Prediction" for rain: plays the latest prediction's preferred
 // ticket on one eligible free bet (wager = the free bet's own amount). Pass
 // strategy 'temporal' to bet the same clock-time-window ticket instead.
-export async function rainBetPrediction(strategy: 'ml' | 'temporal' = 'ml'): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
-  return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>('api/rain/bet-prediction', {
+export async function rainBetPrediction(strategy: 'ml' | 'temporal' = 'ml', group: RainGroup = 'shamo'): Promise<{ ok: boolean; result: { ok: boolean; error?: string } }> {
+  return apiFetch<{ ok: boolean; result: { ok: boolean; error?: string } }>(`${rainBase(group)}/bet-prediction`, {
     method: 'POST',
     body: JSON.stringify({ strategy }),
   });
@@ -545,15 +563,15 @@ export async function rainBetPrediction(strategy: 'ml' | 'temporal' = 'ml'): Pro
 
 // Get AI prediction for rain autoplay (uses DB draws + extension-like logic).
 // strategy 'temporal' returns the same-clock-time-window temporal tickets.
-export async function getRainPrediction(provider = 'fungames_shamo', k = 3, strategy?: 'temporal') {
+export async function getRainPrediction(provider = 'fungames_shamo', k = 3, strategy?: 'temporal', group: RainGroup = 'shamo') {
   const q = `provider=${encodeURIComponent(provider)}&k=${k}` + (strategy ? `&strategy=${strategy}` : '');
-  return apiFetch<RainPredictionResponse>(`api/rain/prediction?${q}`);
+  return apiFetch<RainPredictionResponse>(`${rainBase(group)}/prediction?${q}`);
 }
 
 // Forced test round: the engine immediately plays as many eligible free-bets
 // as the current config allows, whether or not it is running.
-export async function rainTestRound(): Promise<RainTestRoundResponse> {
-  return apiFetch<RainTestRoundResponse>('api/rain/autoplay/test-round', { method: 'POST' });
+export async function rainTestRound(group: RainGroup = 'shamo'): Promise<RainTestRoundResponse> {
+  return apiFetch<RainTestRoundResponse>(`${rainBase(group)}/autoplay/test-round`, { method: 'POST' });
 }
 
 // Manual CASH wager through a rain account. Spots are the keno numbers
@@ -563,8 +581,9 @@ export async function rainManualCashBet(
   accountId: number | null,
   spots: number[],
   stake: number,
+  group: RainGroup = 'shamo',
 ): Promise<RainManualBetResponse> {
-  return apiFetch<RainManualBetResponse>('api/rain/autoplay/manual-bet', {
+  return apiFetch<RainManualBetResponse>(`${rainBase(group)}/autoplay/manual-bet`, {
     method: 'POST',
     body: JSON.stringify({
       account_id: accountId ?? 'auto',
@@ -575,30 +594,30 @@ export async function rainManualCashBet(
 }
 
 // Recent manual CASH wagers across all rain accounts (newest first).
-export async function getRainCashBets(limit = 100): Promise<RainCashBetsResponse> {
-  return apiFetch<RainCashBetsResponse>(`api/rain/cash-bets?limit=${limit}`);
+export async function getRainCashBets(limit = 100, group: RainGroup = 'shamo'): Promise<RainCashBetsResponse> {
+  return apiFetch<RainCashBetsResponse>(`${rainBase(group)}/cash-bets?limit=${limit}`);
 }
 
 // Raw ws_tokens for the live-drawing observer (admin-only). Never rendered.
-export async function getRainWsTokens(): Promise<RainWsTokensResponse> {
-  return apiFetch<RainWsTokensResponse>('api/rain/accounts/ws-tokens');
+export async function getRainWsTokens(group: RainGroup = 'shamo'): Promise<RainWsTokensResponse> {
+  return apiFetch<RainWsTokensResponse>(`${rainBase(group)}/accounts/ws-tokens`);
 }
 
 // Rain ticket config (multi-ticket queue like extension)
-export async function getRainTicketConfig(): Promise<{ ok: boolean; config: RainTicketConfig }> {
-  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/rain/autoplay/ticket-config');
+export async function getRainTicketConfig(group: RainGroup = 'shamo'): Promise<{ ok: boolean; config: RainTicketConfig }> {
+  return apiFetch<{ ok: boolean; config: RainTicketConfig }>(`${rainBase(group)}/autoplay/ticket-config`);
 }
 
-export async function setRainTicketConfig(patch: { tickets: BotTicket[] }): Promise<{ ok: boolean; config: RainTicketConfig }> {
-  return apiFetch<{ ok: boolean; config: RainTicketConfig }>('api/rain/autoplay/ticket-config', {
+export async function setRainTicketConfig(patch: { tickets: BotTicket[] }, group: RainGroup = 'shamo'): Promise<{ ok: boolean; config: RainTicketConfig }> {
+  return apiFetch<{ ok: boolean; config: RainTicketConfig }>(`${rainBase(group)}/autoplay/ticket-config`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
 // Generate preview picks for all tickets
-export async function getRainTicketPreview(tickets: BotTicket[], provider: string, ticketsPerRound: number): Promise<{ ok: boolean; previews: Record<string, number[]> }> {
-  return apiFetch<{ ok: boolean; previews: Record<string, number[]> }>('api/rain/autoplay/ticket-preview', {
+export async function getRainTicketPreview(tickets: BotTicket[], provider: string, ticketsPerRound: number, group: RainGroup = 'shamo'): Promise<{ ok: boolean; previews: Record<string, number[]> }> {
+  return apiFetch<{ ok: boolean; previews: Record<string, number[]> }>(`${rainBase(group)}/autoplay/ticket-preview`, {
     method: 'POST',
     body: JSON.stringify({ tickets, provider, tickets_per_round: ticketsPerRound }),
   });

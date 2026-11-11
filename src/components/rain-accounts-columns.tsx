@@ -2,7 +2,7 @@
 
 import { createColumnHelper } from '@tanstack/react-table';
 import { type DataTableFeatures } from './ui/data-table-features';
-import { type RainAccount, type RainProvider } from '@/lib/types';
+import { type RainAccount, type RainProvider, type RainGroup } from '@/lib/types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { formatTime } from '@/lib/format';
@@ -22,7 +22,9 @@ function ProviderBadge({ provider }: { provider: RainProvider }) {
           ? 'bg-fuchsia-600 text-white'
           : provider === 'fungames_tolobirr'
             ? 'bg-sky-600 text-white'
-            : ''
+            : provider === 'casagames'
+              ? 'bg-amber-600 text-white'
+              : ''
       }
       variant={provider === 'fungames_shamo' ? 'default' : 'secondary'}
     >
@@ -53,6 +55,9 @@ export interface RainAccountsMeta {
   onResume: (acc: RainAccount) => void;
   onPlay: (acc: RainAccount) => void;
   busyId: number | null;
+  // Rain group being shown. Withdrawal automation is shamo-only, so the
+  // FunGames tab hides its column and actions.
+  group?: RainGroup;
 }
 
 export const rainAccountColumns = columnHelper.columns([
@@ -153,7 +158,10 @@ export const rainAccountColumns = columnHelper.columns([
   }),
   columnHelper.accessor('withdraw_enabled', {
     header: 'Withdrawal',
-    cell: ({ row }) => {
+    cell: ({ table, row }) => {
+      if ((table.options.meta as RainAccountsMeta | undefined)?.group === 'fungames') {
+        return <span className="text-xs text-muted-foreground">—</span>;
+      }
       const acc = row.original;
       if (!acc.withdraw_enabled) return <Badge variant="secondary">Off</Badge>;
       if (acc.cash_suspended) return <Badge className="bg-amber-500 text-black">Cash paused</Badge>;
@@ -192,6 +200,7 @@ export const rainAccountColumns = columnHelper.columns([
     cell: ({ table, row }) => {
       const meta = table.options.meta as RainAccountsMeta;
       const busy = meta.busyId === row.original.id;
+      const funGames = meta.group === 'fungames';
       return (
         <div className="flex justify-end gap-2">
           <Button
@@ -204,7 +213,7 @@ export const rainAccountColumns = columnHelper.columns([
           >
             {row.original.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable</> : <><Power className="size-3.5" /> Enable</>}
           </Button>
-          {row.original.withdraw_enabled && (
+          {!funGames && row.original.withdraw_enabled && (
             <Button
               variant="outline"
               size="sm"
@@ -217,7 +226,7 @@ export const rainAccountColumns = columnHelper.columns([
               Withdraw
             </Button>
           )}
-          {row.original.cash_suspended && (
+          {!funGames && row.original.cash_suspended && (
             <Button variant="secondary" size="sm" onClick={() => meta.onResume(row.original)}>
               Resume cash
             </Button>
@@ -259,6 +268,7 @@ export function RainAccountMobileCard({
   meta: RainAccountsMeta;
 }) {
   const busy = meta.busyId === account.id;
+  const funGames = meta.group === 'fungames';
   return (
     <article className="rounded-lg border bg-card p-4 text-sm shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -302,20 +312,22 @@ export function RainAccountMobileCard({
             )}
           </dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">Withdrawal</dt>
-          <dd>
-            {!account.withdraw_enabled ? (
-              <span className="text-muted-foreground">off</span>
-            ) : account.cash_suspended ? (
-              <span className="text-amber-600 dark:text-amber-400">cash paused</span>
-            ) : account.has_payment_details ? (
-              <span className="text-emerald-600 dark:text-emerald-400">ready</span>
-            ) : (
-              <span className="text-rose-600 dark:text-rose-400">no payment</span>
-            )}
-          </dd>
-        </div>
+        {!funGames && (
+          <div>
+            <dt className="text-muted-foreground">Withdrawal</dt>
+            <dd>
+              {!account.withdraw_enabled ? (
+                <span className="text-muted-foreground">off</span>
+              ) : account.cash_suspended ? (
+                <span className="text-amber-600 dark:text-amber-400">cash paused</span>
+              ) : account.has_payment_details ? (
+                <span className="text-emerald-600 dark:text-emerald-400">ready</span>
+              ) : (
+                <span className="text-rose-600 dark:text-rose-400">no payment</span>
+              )}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="text-muted-foreground">Assigned user</dt>
           <dd>{account.assigned_username ?? 'admin only'}</dd>
@@ -339,7 +351,7 @@ export function RainAccountMobileCard({
         >
           {account.autoplay_enabled ? <><PowerOff className="size-3.5" /> Disable autoplay</> : <><Power className="size-3.5" /> Enable autoplay</>}
         </Button>
-        {account.withdraw_enabled && (
+        {!funGames && account.withdraw_enabled && (
           <Button
             variant="outline"
             size="sm"
@@ -349,7 +361,7 @@ export function RainAccountMobileCard({
             Withdraw
           </Button>
         )}
-        {account.cash_suspended && (
+        {!funGames && account.cash_suspended && (
           <Button variant="secondary" size="sm" onClick={() => meta.onResume(account)}>
             Resume cash
           </Button>

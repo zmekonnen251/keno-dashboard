@@ -27,6 +27,7 @@ import {
 import type {
   RainAccount,
   RainProvider,
+  RainGroup,
   RainClaimRecord,
   RainAutoplayConfig,
   RainFreeBet,
@@ -54,6 +55,7 @@ import {
 } from '@/components/ui/table';
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatTime } from '@/lib/format';
 import { isPlayableFreeBet } from '@/lib/freeBet';
 import { DataTable } from '@/components/ui/data-table';
@@ -65,10 +67,25 @@ import { PaymentMethodSelect } from '@/components/PaymentMethodSelect';
 const GATEWAY_HOSTS: Record<RainProvider, string> = {
   fungames_shamo: 'gateway.fungames.live',
   fungames_tolobirr: 'gateway.fungames.live',
+  casagames: 'gateway.fungames.live',
   phoenixbet: 'gateway.phoenixbet.io',
 };
 
-const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
+// Two independent rain groups. Shamo owns the withdrawal automation stack;
+// tolobirr + casagames share the FunGames claimer/config/queue but never touch
+// shamo's withdrawal API.
+const GROUP_PROVIDERS: Record<RainGroup, RainProvider[]> = {
+  shamo: ['fungames_shamo', 'phoenixbet'],
+  fungames: ['fungames_tolobirr', 'casagames'],
+};
+const GROUP_DEFAULT_PROVIDER: Record<RainGroup, RainProvider> = {
+  shamo: 'fungames_shamo',
+  fungames: 'fungames_tolobirr',
+};
+const GROUP_LABEL: Record<RainGroup, string> = {
+  shamo: 'Shamo / Phoenix',
+  fungames: 'FunGames (ToloBirr · CasaGames)',
+};
 
 const LIST_PAGE_SIZE = 10;
 
@@ -98,6 +115,7 @@ interface AccountFormInput {
 
 function AccountForm({
   initial,
+  group,
   users,
   usersLoading,
   usersError,
@@ -105,6 +123,7 @@ function AccountForm({
   onCancel,
 }: {
   initial: RainAccount | null;
+  group: RainGroup;
   users: User[];
   usersLoading?: boolean;
   usersError?: string;
@@ -112,7 +131,7 @@ function AccountForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
-  const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? 'fungames_shamo');
+  const [provider, setProvider] = useState<RainProvider>(initial?.provider ?? GROUP_DEFAULT_PROVIDER[group]);
   const [wsToken, setWsToken] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [password, setPassword] = useState('');
@@ -167,7 +186,7 @@ function AccountForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PROVIDERS.map((p) => (
+            {GROUP_PROVIDERS[group].map((p) => (
               <SelectItem key={p} value={p}>
                 {p} — wss://{GATEWAY_HOSTS[p]}/v2/ws
               </SelectItem>
@@ -195,17 +214,19 @@ function AccountForm({
         )}
         <Input id="rain-access-token" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder={initial ? '••••••••' : 'optional account access token'} />
       </div>
-      <div>
-        <Label htmlFor="rain-password">
-          Shamo login password (optional) {initial && <span className="font-normal text-muted-foreground">(blank keeps the current password)</span>}
-        </Label>
-        {initial && (
-          <p className="mb-1 text-xs text-muted-foreground">
-            Current: {initial.has_password ? 'stored' : 'not set'} — used by the mobile “login to shamo website” flow.
-          </p>
-        )}
-        <Input id="rain-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={initial ? '••••••••' : 'optional shamo.bet login password'} />
-      </div>
+      {group === 'shamo' && (
+        <div>
+          <Label htmlFor="rain-password">
+            Shamo login password (optional) {initial && <span className="font-normal text-muted-foreground">(blank keeps the current password)</span>}
+          </Label>
+          {initial && (
+            <p className="mb-1 text-xs text-muted-foreground">
+              Current: {initial.has_password ? 'stored' : 'not set'} — used by the mobile “login to shamo website” flow.
+            </p>
+          )}
+          <Input id="rain-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={initial ? '••••••••' : 'optional shamo.bet login password'} />
+        </div>
+      )}
       <div>
         <Label htmlFor="rain-enabled">Enabled</Label>
         <Select value={String(enabled)} onValueChange={(v) => setEnabled(v === 'true')}>
@@ -218,46 +239,48 @@ function AccountForm({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-3 rounded-lg border border-border p-3">
-        <p className="text-sm font-semibold">Withdrawal &amp; payment</p>
-        <div>
-          <Label htmlFor="rain-withdraw-enabled">Withdrawal automation</Label>
-          <Select value={String(withdrawEnabled)} onValueChange={(v) => setWithdrawEnabled(v === 'true')}>
-            <SelectTrigger id="rain-withdraw-enabled">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="true">Enabled — sweep tiered winnings and pause cash</SelectItem>
-              <SelectItem value="false">Disabled — never withdraw for this account</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+      {group === 'shamo' && (
+        <div className="space-y-3 rounded-lg border border-border p-3">
+          <p className="text-sm font-semibold">Withdrawal &amp; payment</p>
           <div>
-            <Label htmlFor="rain-pay-method">Payment method</Label>
-            <div className="mt-1">
-              <PaymentMethodSelect
-                id="rain-pay-method"
-                value={paymentMethod}
-                onChange={setPaymentMethod}
-                emptyLabel="Use global default"
-              />
+            <Label htmlFor="rain-withdraw-enabled">Withdrawal automation</Label>
+            <Select value={String(withdrawEnabled)} onValueChange={(v) => setWithdrawEnabled(v === 'true')}>
+              <SelectTrigger id="rain-withdraw-enabled">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Enabled — sweep tiered winnings and pause cash</SelectItem>
+                <SelectItem value="false">Disabled — never withdraw for this account</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="rain-pay-method">Payment method</Label>
+              <div className="mt-1">
+                <PaymentMethodSelect
+                  id="rain-pay-method"
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  emptyLabel="Use global default"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="rain-pay-number">Account number</Label>
+              <Input id="rain-pay-number" value={paymentNumber} onChange={(e) => setPaymentNumber(e.target.value)} placeholder="e.g. 0911223344" />
+            </div>
+            <div>
+              <Label htmlFor="rain-pay-name">Full name</Label>
+              <Input id="rain-pay-name" value={paymentName} onChange={(e) => setPaymentName(e.target.value)} placeholder="Account holder name" />
             </div>
           </div>
-          <div>
-            <Label htmlFor="rain-pay-number">Account number</Label>
-            <Input id="rain-pay-number" value={paymentNumber} onChange={(e) => setPaymentNumber(e.target.value)} placeholder="e.g. 0911223344" />
-          </div>
-          <div>
-            <Label htmlFor="rain-pay-name">Full name</Label>
-            <Input id="rain-pay-name" value={paymentName} onChange={(e) => setPaymentName(e.target.value)} placeholder="Account holder name" />
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Blank fields fall back to the global payment defaults on the withdrawal card. shamo.bet&apos;s minimum
+            withdrawal is 200 ETB.
+          </p>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Blank fields fall back to the global payment defaults on the withdrawal card. shamo.bet&apos;s minimum
-          withdrawal is 200 ETB.
-        </p>
-      </div>
+      )}
       <div>
         <Label htmlFor="rain-assigned-user">Assigned user</Label>
         <Select value={assignedUserId} onValueChange={setAssignedUserId}>
@@ -303,7 +326,7 @@ function AccountForm({
 
 // Clock-driven rain autoplay: a single config row gates the engine on the
 // server, which plays eligible rain free-bets each round.
-function AutoplayCard() {
+function AutoplayCard({ group }: { group: RainGroup }) {
   const [config, setConfig] = useState<RainAutoplayConfig | null>(null);
   const [status, setStatus] = useState<RainAutoplayStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -316,7 +339,7 @@ function AutoplayCard() {
     let alive = true;
     const tick = async () => {
       try {
-        const res = await getRainAutoplayStatus();
+        const res = await getRainAutoplayStatus(group);
         if (!alive) return;
         setStatus(res.status);
         setConfig((c) => (c ? { ...c, ...res.config } : res.config));
@@ -331,7 +354,7 @@ function AutoplayCard() {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [group]);
 
   async function save() {
     if (!config) return;
@@ -351,7 +374,7 @@ function AutoplayCard() {
         two_digit_stake: 0,
         free_bet_stake_threshold: config.free_bet_stake_threshold ?? 50,
         max_cash_stake_per_round: config.max_cash_stake_per_round ?? 0,
-      });
+      }, group);
       setConfig(res.config);
       setMsg('Autoplay config saved.');
     } catch (e) {
@@ -364,8 +387,8 @@ function AutoplayCard() {
   async function start() {
     setMsg('');
     try {
-      await rainAutoplayStart();
-      const res = await getRainAutoplayStatus();
+      await rainAutoplayStart(group);
+      const res = await getRainAutoplayStatus(group);
       setStatus(res.status);
       setConfig((c) => (c ? { ...c, ...res.config } : res.config));
       setMsg('Rain autoplay engine started.');
@@ -377,8 +400,8 @@ function AutoplayCard() {
   async function stop() {
     setMsg('');
     try {
-      await rainAutoplayStop();
-      const res = await getRainAutoplayStatus();
+      await rainAutoplayStop(group);
+      const res = await getRainAutoplayStatus(group);
       setStatus(res.status);
       setConfig((c) => (c ? { ...c, ...res.config } : res.config));
       setMsg('Rain autoplay engine stopped.');
@@ -423,7 +446,7 @@ function AutoplayCard() {
             <Select value={config.provider} onValueChange={(v) => setConfig({ ...config, provider: v as RainProvider })}>
               <SelectTrigger id="rain-auto-provider"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {PROVIDERS.map((p) => (
+                {GROUP_PROVIDERS[group].map((p) => (
                   <SelectItem key={p} value={p}>{p}</SelectItem>
                 ))}
               </SelectContent>
@@ -522,7 +545,8 @@ function AutoplayCard() {
 }
 
 export default function RainAccountsPage() {
-  const { data, error, loading, refresh } = useApi(() => getRainAccounts(), []);
+  const [group, setGroup] = useState<RainGroup>('shamo');
+  const { data, error, loading, refresh } = useApi(() => getRainAccounts(group), [group]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<RainAccount | null>(null);
   const [claims, setClaims] = useState<{ account: RainAccount; rows: RainClaimRecord[] } | null>(null);
@@ -563,6 +587,8 @@ export default function RainAccountsPage() {
   }, []);
 
   async function loadPaymentChanges() {
+    // Payee-change approval belongs to the shamo withdrawal stack.
+    if (group !== 'shamo') return;
     try {
       const res = await getRainPaymentChanges('pending');
       setPaymentChanges(res.requests);
@@ -578,7 +604,8 @@ export default function RainAccountsPage() {
       clearTimeout(t);
       clearInterval(timer);
     };
-  }, []);
+    // Withdrawal automation is shamo-only; the FunGames group never fetches it.
+  }, [group]);
 
   async function onApproveChange(req: RainPaymentChangeRequest) {
     if (!window.confirm(
@@ -613,7 +640,7 @@ export default function RainAccountsPage() {
   // Played-ticket history (chosen_spots present) used by the card + the poll.
   async function loadPlayHistory() {
     try {
-      const res = await getRainFreeBets();
+      const res = await getRainFreeBets(1000, group);
       setPlayHistory(res.bets.filter((b) => (b.chosen_spots?.length ?? 0) > 0));
     } catch {
       /* keep the last list */
@@ -632,10 +659,10 @@ export default function RainAccountsPage() {
       clearTimeout(kick);
       clearInterval(timer);
     };
-  }, [refresh]);
+  }, [refresh, group]);
 
   async function onAdd(input: AccountFormInput) {
-    await createRainAccount(input);
+    await createRainAccount(input, group);
     setAdding(false);
     refresh();
   }
@@ -653,14 +680,14 @@ export default function RainAccountsPage() {
       payment_account_number: input.payment_account_number,
       payment_full_name: input.payment_full_name,
       assigned_user_id: input.assigned_user_id,
-    });
+    }, group);
     setEditing(null);
     refresh();
   }
 
   async function onDelete(acc: RainAccount) {
     if (!window.confirm(`Delete "${acc.name}"?\nThis also removes its claim history.`)) return;
-    await deleteRainAccount(acc.id);
+    await deleteRainAccount(acc.id, group);
     refresh();
   }
 
@@ -668,7 +695,7 @@ export default function RainAccountsPage() {
     if (!window.confirm(acc.autoplay_enabled
       ? `Disable autoplay for "${acc.name}"?\nIt will keep claiming rain, but its free bets and wallet will NOT be used by the autoplay engine (free-bet plays and cash-mode bets).`
       : `Enable autoplay for "${acc.name}"?\nIts free bets and wallet will be usable by the autoplay engine again.`)) return;
-    await setRainAccountAutoplayEnabled(acc.id, !acc.autoplay_enabled);
+    await setRainAccountAutoplayEnabled(acc.id, !acc.autoplay_enabled, group);
     refresh();
   }
 
@@ -676,7 +703,7 @@ export default function RainAccountsPage() {
     setBusyId(acc.id);
     setMsg('');
     try {
-      await refreshRainAccount(acc.id);
+      await refreshRainAccount(acc.id, group);
       setMsg(`Reconnect sent for "${acc.name}".`);
       refresh();
       void loadPlayHistory();
@@ -691,7 +718,7 @@ export default function RainAccountsPage() {
     setCheckingAll(true);
     setMsg('');
     try {
-      const res = await checkAllRainStatus();
+      const res = await checkAllRainStatus(group);
       refresh();
       void loadPlayHistory();
       await new Promise((r) => setTimeout(r, 1500)); // let sockets come up
@@ -711,7 +738,7 @@ export default function RainAccountsPage() {
     setClaimsLoading(true);
     setClaims({ account: acc, rows: [] });
     try {
-      const res = await getRainClaims(acc.id);
+      const res = await getRainClaims(acc.id, group);
       setClaims({ account: acc, rows: res.claims });
     } catch (e) {
       setClaims({ account: acc, rows: [] });
@@ -725,7 +752,7 @@ export default function RainAccountsPage() {
     setMsg('');
     try {
       // Get the first available free bet for this account
-      const freeBetsRes = await getRainFreeBets(1000);
+      const freeBetsRes = await getRainFreeBets(1000, group);
       // Only unplayed, unexpired rows — already-settled/bet_placed history must
       // never be picked for the Play action (the gateway rejects those rains).
       const accountFreeBets = freeBetsRes.bets.filter(
@@ -737,7 +764,7 @@ export default function RainAccountsPage() {
       }
       // Play the first available free bet using the queue ticket
       const bet = accountFreeBets[0];
-      const playRes = await playRainFreeBet(bet.id);
+      const playRes = await playRainFreeBet(bet.id, undefined, group);
       if (!playRes.result?.ok) {
         setMsg(playRes.result?.error || 'Failed to place bet.');
       } else {
@@ -755,7 +782,7 @@ export default function RainAccountsPage() {
     // Keep the modal mounted while loading — clearing to null would unmount it.
     setFreeBets([]);
     try {
-      const res = await getRainFreeBets(1000);
+      const res = await getRainFreeBets(1000, group);
       setFreeBets(res.bets);
     } catch (e) {
       setFreeBets([]);
@@ -769,7 +796,7 @@ export default function RainAccountsPage() {
     setBettingPrediction(true);
     setMsg('');
     try {
-      const res = await rainBetPrediction();
+      const res = await rainBetPrediction('ml', group);
       if (!res.ok || !res.result?.ok) {
         setMsg(res.result?.error || 'Prediction bet failed.');
       } else {
@@ -786,7 +813,7 @@ export default function RainAccountsPage() {
     setPlayingId(bet.id);
     setMsg('');
     try {
-      const res = await playRainFreeBet(bet.id);
+      const res = await playRainFreeBet(bet.id, undefined, group);
       if (!res.result.ok) {
         setMsg(res.result.error || 'Failed to place bet.');
       } else {
@@ -840,6 +867,20 @@ export default function RainAccountsPage() {
 
   return (
     <div className="space-y-5">
+      <Tabs
+        value={group}
+        onValueChange={(v) => {
+          setGroup(v as RainGroup);
+          setAdding(false);
+          setEditing(null);
+          setMsg('');
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="shamo">{GROUP_LABEL.shamo}</TabsTrigger>
+          <TabsTrigger value="fungames">{GROUP_LABEL.fungames}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-foreground">Rain Accounts</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -856,14 +897,15 @@ export default function RainAccountsPage() {
       </div>
       {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
 
-      <AutoplayCard />
+      <AutoplayCard key={group} group={group} />
 
-      <WithdrawalConfigCard />
+      {group === 'shamo' && <WithdrawalConfigCard />}
 
-      <CollapsibleCard
-        title={`Payee change requests${paymentChanges.length ? ` (${paymentChanges.length} pending)` : ''}`}
-        defaultOpen={paymentChanges.length > 0}
-      >
+      {group === 'shamo' && (
+        <CollapsibleCard
+          title={`Payee change requests${paymentChanges.length ? ` (${paymentChanges.length} pending)` : ''}`}
+          defaultOpen={paymentChanges.length > 0}
+        >
         {paymentChanges.length === 0 ? (
           <Empty label="No pending payee changes. Viewer submissions appear here for approval." />
         ) : (
@@ -915,7 +957,8 @@ export default function RainAccountsPage() {
             </Table>
           </div>
         )}
-      </CollapsibleCard>
+        </CollapsibleCard>
+      )}
 
       <CollapsibleCard title={`Prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen>
         {playHistory === null ? (
@@ -989,6 +1032,7 @@ export default function RainAccountsPage() {
               onResume,
               onPlay,
               busyId,
+              group,
             }}
             renderMobileRowCard={(acc) => (
               <RainAccountMobileCard
@@ -1003,6 +1047,7 @@ export default function RainAccountsPage() {
                   onResume,
                   onPlay,
                   busyId,
+                  group,
                 }}
               />
             )}
@@ -1014,13 +1059,13 @@ export default function RainAccountsPage() {
 
       {adding && (
         <Modal title="Add rain account" onClose={() => setAdding(false)}>
-          <AccountForm initial={null} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setAdding(false)} onSave={onAdd} />
+          <AccountForm initial={null} group={group} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setAdding(false)} onSave={onAdd} />
         </Modal>
       )}
 
       {editing && (
         <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
-          <AccountForm initial={editing} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
+          <AccountForm initial={editing} group={group} users={users} usersLoading={usersLoading} usersError={usersError} onCancel={() => setEditing(null)} onSave={(input) => onEdit(editing, input)} />
         </Modal>
       )}
 

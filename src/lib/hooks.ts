@@ -24,6 +24,8 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   const [refreshKey, setRefreshKey] = useState(0);
   const fetcherRef = useRef(fetcher);
   const hasDataRef = useRef(false);
+  const depsKey = JSON.stringify(deps);
+  const prevDepsKeyRef = useRef(depsKey);
 
   useEffect(() => {
     fetcherRef.current = fetcher;
@@ -35,6 +37,14 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   useEffect(() => {
     let cancelled = false;
+    // A dependency change means a different data set (e.g. another provider
+    // tab): drop the old payload so it is never shown under the new key.
+    if (prevDepsKeyRef.current !== depsKey) {
+      prevDepsKeyRef.current = depsKey;
+      hasDataRef.current = false;
+      setData(null);
+      setError('');
+    }
     const initial = !hasDataRef.current;
     if (initial) setLoading(true);
     fetcherRef
@@ -56,7 +66,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, refreshKey]);
+  }, [depsKey, refreshKey]);
 
   return { data, error, loading, refresh: load };
 }

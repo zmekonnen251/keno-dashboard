@@ -18,7 +18,7 @@ import { RainTicketConfigCard } from './RainTicketConfigCard';
 import type { RainAutoplayConfig, RainProvider } from '@/lib/types';
 import { CollapsibleCard } from './CollapsibleCard';
 
-const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'phoenixbet'];
+const PROVIDERS: RainProvider[] = ['fungames_shamo', 'fungames_tolobirr', 'casagames', 'phoenixbet'];
 
 // Full-hit probabilities from the keno paytable (2-spot 190/3160, 3-spot
 // 1140/82160). Used by the N-per-round hint; the expected stake per full hit is
