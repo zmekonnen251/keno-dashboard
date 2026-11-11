@@ -329,27 +329,35 @@ export async function uploadAccounts(file: File, provider = 'fungames_tolobirr')
 }
 
 // ---- autoplay ----
-export async function getAutoplayConfig(siteId?: string): Promise<AutoplayConfig> {
-  return apiFetch<AutoplayConfig>('api/accounts/autoplay/config');
+// Autoplay is split per factory provider (fungames_tolobirr / casagames): each
+// provider has its own engine, round clock and config row. `provider` is added
+// as a query param when given; omitting it keeps the server default (ToloBirr).
+function withProvider(path: string, provider?: string): string {
+  if (!provider) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}provider=${encodeURIComponent(provider)}`;
 }
 
-export async function setAutoplayConfig(siteId: string, patch: Partial<AutoplayConfig>): Promise<AutoplayConfig> {
-  return apiFetch<AutoplayConfig>('api/accounts/autoplay/config', {
+export async function getAutoplayConfig(provider?: string): Promise<AutoplayConfig> {
+  return apiFetch<AutoplayConfig>(withProvider('api/accounts/autoplay/config', provider));
+}
+
+export async function setAutoplayConfig(provider: string, patch: Partial<AutoplayConfig>): Promise<AutoplayConfig> {
+  return apiFetch<AutoplayConfig>(withProvider('api/accounts/autoplay/config', provider), {
     method: 'POST',
     body: JSON.stringify(patch),
   });
 }
 
-export async function autoplayStatus(): Promise<AutoplayStatus> {
-  return apiFetch<AutoplayStatus>('api/accounts/autoplay/status');
+export async function autoplayStatus(provider?: string): Promise<AutoplayStatus> {
+  return apiFetch<AutoplayStatus>(withProvider('api/accounts/autoplay/status', provider));
 }
 
-export async function startAutoplay() {
-  return apiFetch('api/accounts/autoplay/start', { method: 'POST' });
+export async function startAutoplay(provider?: string) {
+  return apiFetch(withProvider('api/accounts/autoplay/start', provider), { method: 'POST' });
 }
 
-export async function stopAutoplay() {
-  return apiFetch('api/accounts/autoplay/stop', { method: 'POST' });
+export async function stopAutoplay(provider?: string) {
+  return apiFetch(withProvider('api/accounts/autoplay/stop', provider), { method: 'POST' });
 }
 
 export async function refreshTokens(limit = 50) {
@@ -366,8 +374,8 @@ export async function refreshWsToken(id: number) {
   });
 }
 
-export async function testAutoplayRound(pick?: number[]): Promise<AutoplayTestRoundResponse> {
-  return apiFetch<AutoplayTestRoundResponse>('api/accounts/autoplay/test-round', {
+export async function testAutoplayRound(pick?: number[], provider?: string): Promise<AutoplayTestRoundResponse> {
+  return apiFetch<AutoplayTestRoundResponse>(withProvider('api/accounts/autoplay/test-round', provider), {
     method: 'POST',
     body: JSON.stringify({ pick }),
   });
@@ -377,8 +385,9 @@ export async function placeManualBet(
   spots: number[],
   stake: number,
   accountId?: number,
+  provider?: string,
 ): Promise<ManualBetResponse> {
-  return apiFetch<ManualBetResponse>('api/accounts/autoplay/manual-bet', {
+  return apiFetch<ManualBetResponse>(withProvider('api/accounts/autoplay/manual-bet', provider), {
     method: 'POST',
     body: JSON.stringify({ spots, stake, accountId }),
   });
@@ -390,8 +399,9 @@ export async function placePredictionBet(
   stake: number,
   accountId?: number,
   source: 'prediction' | 'temporal' = 'prediction',
+  provider?: string,
 ): Promise<ManualBetResponse> {
-  return apiFetch<ManualBetResponse>('api/accounts/autoplay/manual-bet-prediction', {
+  return apiFetch<ManualBetResponse>(withProvider('api/accounts/autoplay/manual-bet-prediction', provider), {
     method: 'POST',
     body: JSON.stringify({ stake, accountId, source }),
   });
@@ -414,9 +424,12 @@ export async function getTwoDigitTickets(siteId: string, limit = 8): Promise<Two
   return apiFetch<TwoDigitTicketsResponse>(`api/predictions/${siteId}/two-digit?limit=${limit}`);
 }
 
-export async function getEligibleAccounts(stake?: number): Promise<EligibleAccountsResponse> {
-  const q = stake !== undefined ? `?min_balance=${stake}` : '';
-  return apiFetch<EligibleAccountsResponse>(`api/accounts/autoplay/eligible${q}`, {
+export async function getEligibleAccounts(stake?: number, provider?: string): Promise<EligibleAccountsResponse> {
+  const q = new URLSearchParams();
+  if (stake !== undefined) q.set('min_balance', String(stake));
+  if (provider) q.set('provider', provider);
+  const qs = q.toString();
+  return apiFetch<EligibleAccountsResponse>(`api/accounts/autoplay/eligible${qs ? `?${qs}` : ''}`, {
     method: 'GET',
   });
 }

@@ -64,7 +64,7 @@ function TicketBadges({ tickets }: { tickets?: PredictionTicket[] }) {
   );
 }
 
-const CORE_SITES = ['fungames_tolobirr', 'fungames_shamo'] as const;
+const CORE_SITES = ['fungames_tolobirr', 'casagames', 'fungames_shamo'] as const;
 
 // Digit-count -> ticket count editor for the per-site generation plan.
 function TicketPlanEditor({ siteId, plan }: { siteId: string; plan: TicketPlan }) {

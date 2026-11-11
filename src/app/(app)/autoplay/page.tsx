@@ -48,8 +48,12 @@ import type { AutoplayPlacedBet } from '@/lib/types';
 const ACTION_BTN = 'h-8 w-8 px-0 sm:w-auto sm:px-2.5';
 const ACTION_LABEL = 'hidden sm:inline';
 
-// Site-gated autoplay: the tolobirr (real-money gateway) autoplay is shown for
-// the default site, while fungames_shamo is driven by rain free-bets.
+// Site-gated autoplay: the factory sites (tolobirr, casagames) run their own
+// cash autoplay engine each, while fungames_shamo is driven by rain free-bets.
+// ToloBirr and CasaGames see different rounds on the gateway, so every call on
+// this page is scoped to the selected provider.
+const FACTORY_SITE_IDS = ['fungames_tolobirr', 'casagames'];
+
 export default function AutoplayPage() {
 	const { siteId, siteName } = useSite();
 	if (siteId === 'fungames_shamo') {
@@ -59,7 +63,12 @@ export default function AutoplayPage() {
 }
 
 function TolobirrAutoplay({ siteName }: { siteName?: string }) {
-	const { data: conn, error, loading, refresh } = useApi(() => autoplayStatus(), []);
+	const { siteId } = useSite();
+	// Non-factory sites (melbet, phoenixbet, …) have no autoplay engine of their
+	// own: the page still works, scoped to the default factory provider.
+	const provider = FACTORY_SITE_IDS.includes(siteId) ? siteId : 'fungames_tolobirr';
+	const tokenSource = provider === 'casagames' ? 'casagames' : 'tolobirr';
+	const { data: conn, error, loading, refresh } = useApi(() => autoplayStatus(provider), [provider]);
 	const [testing, setTesting] = useState(false);
 	const [testMsg, setTestMsg] = useState('');
 	// Exactly what the last Test round sent, so the outcome is never confused
@@ -73,9 +82,8 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 	const [manualPicks, setManualPicks] = useState<number[]>([]);
 	const [showConfig, setShowConfig] = useState(false);
 	const [showTicketConfig, setShowTicketConfig] = useState(false);
-	const { siteId } = useSite();
 
-	useGatewayGameState(setGameState);
+	useGatewayGameState(setGameState, provider);
 
 	useSocket('/autoplay/signals', (data: unknown) => {
 		if (data === 'repetitive' || data === 'recurring' || data === 'hot' || data === 'none') {
@@ -100,7 +108,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 		setTesting(true);
 		setTestMsg('');
 		try {
-			const res = await testAutoplayRound();
+			const res = await testAutoplayRound(undefined, provider);
 			const placed = res.placed ?? res.bets ?? [];
 			const sent = res.sent ?? placed.filter((p) => p.ok).length;
 			const failed = placed.filter((p) => !p.ok);
@@ -173,14 +181,14 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 			<div className='sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:-mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md'>
 				<div className='flex items-center gap-2 sm:flex-wrap sm:justify-between sm:gap-3'>
 					<h2 className='hidden min-w-0 truncate text-lg font-bold text-foreground sm:block'>
-						Autoplay — {siteName ?? 'fungames_tolobirr'}
+						Autoplay — {siteName ?? provider}
 					</h2>
 					<div className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2'>
 						{conn?.running ? (
 							<Button
 								variant='destructive'
 								className={ACTION_BTN}
-								onClick={() => stopAutoplay().then(() => refresh())}
+								onClick={() => stopAutoplay(provider).then(() => refresh())}
 								title='Stop'
 								aria-label='Stop'
 							>
@@ -190,7 +198,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 						) : (
 							<Button
 								className={ACTION_BTN}
-								onClick={() => startAutoplay().then(() => refresh())}
+								onClick={() => startAutoplay(provider).then(() => refresh())}
 								title='Start'
 								aria-label='Start'
 							>
@@ -304,7 +312,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 
 			<SnapSection fill title='Live game'>
 				<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
-					<GameView bets={bets} picks={manualPicks} />
+					<GameView bets={bets} picks={manualPicks} tokenSource={tokenSource} />
 				</CollapsibleCard>
 			</SnapSection>
 
@@ -313,7 +321,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 			</SnapSection>
 
 			<SnapSection fill title='2-digit tickets'>
-				<TwoDigitTicketsCard siteId={siteId} onMessage={setTestMsg} onRefresh={refresh} />
+				<TwoDigitTicketsCard siteId={siteId} provider={provider} onMessage={setTestMsg} onRefresh={refresh} />
 			</SnapSection>
 
 			<SnapSection title='Last draws'>
@@ -336,11 +344,12 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 					onMessage={setTestMsg}
 					onRefresh={refresh}
 					onPicksChange={setManualPicks}
+					provider={provider}
 				/>
 			</SnapSection>
 
 			<SnapSection fill title='Prediction bet'>
-				<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} />
+				<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} provider={provider} />
 			</SnapSection>
 
 			{showConfig && (
@@ -349,7 +358,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 						cfg={cfg ?? null}
 						onSaved={setTestMsg}
 						onRefresh={refresh}
-						siteId={siteId}
+						siteId={provider}
 						accountCount={accounts.length}
 					/>
 				</Modal>
@@ -357,7 +366,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 
 			{showTicketConfig && (
 				<Modal title='Ticket Configuration' onClose={() => setShowTicketConfig(false)} wide>
-					<TicketConfig siteId={siteId} />
+					<TicketConfig siteId={provider} />
 				</Modal>
 			)}
 		</SnapScroll>

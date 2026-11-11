@@ -69,10 +69,10 @@ const VIEWER_NAV: NavItem[] = [
 ];
 
 const PROVIDER_NAV: NavItem[] = [
-  { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'phoenixbet'] },
-  { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'phoenixbet'] },
-  { href: '/telebeat', label: 'TeleBeat', icon: Zap, sites: ['fungames_tolobirr', 'phoenixbet'] },
-  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr'] },
+  { href: '/accounts', label: 'Accounts', icon: Users, sites: ['fungames_tolobirr', 'casagames', 'phoenixbet'] },
+  { href: '/proxies', label: 'Proxies', icon: ShieldCheck, sites: ['fungames_tolobirr', 'casagames', 'phoenixbet'] },
+  { href: '/telebeat', label: 'TeleBeat', icon: Zap, sites: ['fungames_tolobirr', 'casagames', 'phoenixbet'] },
+  { href: '/rain-accounts', label: 'Rain', icon: CloudRain, sites: ['fungames_shamo', 'fungames_tolobirr', 'casagames'] },
   { href: '/chicken-road-accounts', label: 'Chicken Road', icon: PawPrint, sites: ['fungames_shamo'] },
   { href: '/providers', label: 'Providers', icon: Server },
 ];

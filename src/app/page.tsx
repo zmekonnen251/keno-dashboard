@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 // recurring time-of-day patterns stand out.
 const KENO_SITES = [
   { id: 'fungames_tolobirr', name: 'Fungames Tolobirr' },
+  { id: 'casagames', name: 'CasaGames' },
   { id: 'fungames_shamo', name: 'Fungames Shamo' },
 ];
 const PAGE_SIZES = [10, 20, 50];

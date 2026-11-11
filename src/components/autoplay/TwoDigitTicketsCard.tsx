@@ -16,11 +16,14 @@ import { CollapsibleCard } from './CollapsibleCard';
 // on a rain free bet whose wager is the bonus amount itself.
 export function TwoDigitTicketsCard({
   siteId,
+  provider,
   onMessage,
   onRefresh,
   defaultOpen = false,
 }: {
   siteId: string;
+  /** Factory provider whose autoplay engine places the cash ticket. */
+  provider?: string;
   onMessage?: (msg: string) => void;
   onRefresh?: () => void;
   defaultOpen?: boolean;
@@ -130,7 +133,7 @@ export function TwoDigitTicketsCard({
     try {
       const res = isShamo
         ? await rainManualCashBet(null, [...spots], stakeNum)
-        : await placeManualBet([...spots], stakeNum);
+        : await placeManualBet([...spots], stakeNum, undefined, provider);
       if (res.ok) {
         const account = 'accountId' in res && res.accountId ? `#${res.accountId}` : 'auto-account';
         onMessage?.(`2-digit ticket [${spots.join(',')}] placed at ${stakeNum} ETB on ${account}.`);

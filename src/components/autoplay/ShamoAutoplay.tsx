@@ -331,12 +331,19 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       .finally(() => setFreeBetsLoading(false));
   }
 
-  const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const liveBalance = accounts.some((a) => a.balanceLive);
-  const connected = accounts.filter((a) => a.connected).length;
+  // The balance stat is the autoplay pool: accounts with autoplay disabled
+  // (typically other users' accounts) are excluded so their wallets don't
+  // inflate the working balance.
   const autoplayOffAccountIds = new Set(
     accounts.filter((a) => a.autoplay_enabled === false).map((a) => a.id),
   );
+  const autoplayAccounts = accounts.filter((a) => !autoplayOffAccountIds.has(a.id));
+  const totalBalance = autoplayAccounts.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const excludedBalance = accounts
+    .filter((a) => autoplayOffAccountIds.has(a.id))
+    .reduce((s, a) => s + (a.balance ?? 0), 0);
+  const liveBalance = autoplayAccounts.some((a) => a.balanceLive);
+  const connected = accounts.filter((a) => a.connected).length;
   const playableFb = (freeBets ?? []).filter(
     (b) =>
       isPlayableFreeBet(b) &&
@@ -481,10 +488,14 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             sub={`${accounts.length} total · wallets`}
           />
           <StatCard
-            label="Balance (rain wallets)"
+            label="Balance (autoplay wallets)"
             value={`${totalBalance.toFixed(2)} ETB`}
             tone={liveBalance ? 'accent' : 'default'}
-            sub={liveBalance ? 'live balances' : 'last stored'}
+            sub={
+              autoplayOffAccountIds.size > 0
+                ? `${autoplayAccounts.length} autoplay wallets · ${autoplayOffAccountIds.size} disabled excluded (${excludedBalance.toFixed(2)} ETB)`
+                : liveBalance ? 'live balances' : 'last stored'
+            }
           />
           <StatCard
             label="Free-bet plays"

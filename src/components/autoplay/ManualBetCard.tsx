@@ -65,6 +65,7 @@ export function ManualBetCard({
 	onMessage,
 	onRefresh,
 	onPicksChange,
+	provider,
 }: {
 	running: boolean;
 	recurrence?: RecurrenceSignal | null;
@@ -72,6 +73,8 @@ export function ManualBetCard({
 	onMessage: (msg: string) => void;
 	onRefresh: () => void;
 	onPicksChange?: (spots: number[]) => void;
+	/** Factory provider whose engine owns the bet (fungames_tolobirr | casagames). */
+	provider?: string;
 }) {
 	const [spotsCount, setSpotsCount] = useState<number>(3);
 	const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
@@ -120,7 +123,7 @@ export function ManualBetCard({
 	useEffect(() => {
 		if (accountMode !== 'manual') return;
 		let cancelled = false;
-		getEligibleAccounts(stakeNum)
+		getEligibleAccounts(stakeNum, provider)
 			.then((res) => {
 				if (!cancelled) setEligible(res.accounts || []);
 			})
@@ -130,7 +133,7 @@ export function ManualBetCard({
 		return () => {
 			cancelled = true;
 		};
-	}, [accountMode, stakeNum]);
+	}, [accountMode, stakeNum, provider]);
 
 	function toggleNumber(n: number) {
 		setSelectedSpots((prev) => {
@@ -191,7 +194,7 @@ export function ManualBetCard({
 		}
 		setPlacing(true);
 		try {
-			const res = await placeManualBet(selectedSpots, stakeNum, accountId);
+			const res = await placeManualBet(selectedSpots, stakeNum, accountId, provider);
 			if (res.ok) {
 				onMessage(`Bet placed! Ticket [${selectedSpots.join(',')}] · ${stakeNum} ETB · account #${res.accountId ?? 'auto'}.`);
 				onRefresh();
@@ -221,7 +224,7 @@ export function ManualBetCard({
 		}
 		setPlacingKey(chipId);
 		try {
-			const res = await placeManualBet(numbers, aiStakeNum, accountId);
+			const res = await placeManualBet(numbers, aiStakeNum, accountId, provider);
 			if (res.ok) {
 				onMessage(`AI ${label} ticket [${numbers.join(',')}] placed · ${aiStakeNum} ETB · account #${res.accountId ?? 'auto'}.`);
 				onRefresh();

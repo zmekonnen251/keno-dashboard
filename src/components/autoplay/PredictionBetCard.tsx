@@ -11,10 +11,13 @@ export function PredictionBetCard({
 	running,
 	onMessage,
 	onRefresh,
+	provider,
 }: {
 	running: boolean;
 	onMessage: (msg: string) => void;
 	onRefresh: () => void;
+	/** Factory provider whose engine places the bet (fungames_tolobirr | casagames). */
+	provider?: string;
 }) {
 	const [stake, setStake] = useState('2');
 	const [source, setSource] = useState<'prediction' | 'temporal'>('prediction');
@@ -29,7 +32,7 @@ export function PredictionBetCard({
 		}
 		setPlacing(true);
 		try {
-			const res = await placePredictionBet(stakeNum, undefined, source);
+			const res = await placePredictionBet(stakeNum, undefined, source, provider);
 			if (res.ok) {
 				onMessage(
 					`${source === 'temporal' ? 'Temporal-pattern' : 'Prediction'} bet placed at ${stakeNum} ETB on account #${res.accountId ?? 'auto'}. ` +

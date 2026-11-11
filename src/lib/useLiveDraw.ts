@@ -8,12 +8,14 @@ export type LiveDrawStatus = 'connecting' | 'live' | 'waiting';
 
 // Which account pool feeds the observer socket. The shamo site is the rain
 // accounts pool (their ws_tokens are raw gateway tokens, fetched from the
-// admin-only ws-tokens endpoint); the tolobirr site is the autoplay accounts.
-export type DrawTokenSource = 'tolobirr' | 'shamo';
+// admin-only ws-tokens endpoint); the factory sites (tolobirr, casagames) are
+// the autoplay accounts of that provider — each provider sees its own round.
+export type DrawTokenSource = 'tolobirr' | 'casagames' | 'shamo';
 
 // The keno site id each token pool feeds (matches the server's live hub keys).
 const SITE_BY_SOURCE: Record<DrawTokenSource, string> = {
 	tolobirr: 'fungames_tolobirr',
+	casagames: 'casagames',
 	shamo: 'fungames_shamo',
 };
 
@@ -253,7 +255,7 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 						.filter((t) => t.ws_token)
 						.map((t) => ({ phone: t.phone || t.name, ws_token: t.ws_token as string }));
 				} else {
-					const res = await getAccounts('fungames_tolobirr');
+					const res = await getAccounts(SITE_BY_SOURCE[tokenSource]);
 					if (cancelled) return;
 					tokens = res.accounts
 						.filter((a) => a.ws_token)

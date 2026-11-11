@@ -9,7 +9,7 @@ import { notificationPermission, playWinSound, playDrawSound, playBettingOpenSou
 import { isPushActive, pushSupported, subscribePush, unsubscribePush, rePostSubscription } from '@/lib/push';
 import { getNotifyPref, setNotifyPref, getSoundPref, setSoundPref } from '@/lib/notifyPrefs';
 import { useNotifications } from '@/lib/notifications';
-import { useLiveDraw } from '@/lib/useLiveDraw';
+import { useLiveDraw, type DrawTokenSource } from '@/lib/useLiveDraw';
 import { CopyPhoneButton } from '@/components/accounts-columns';
 import { DollarSign } from 'lucide-react';
 import { BOARD_CSS } from './boardStyles';
@@ -47,8 +47,16 @@ function statusLabel(p: AutoplayPlacedBet, phase?: string): { text: string; tone
   return { text: 'Pending', tone: '#facc15' };
 }
 
-export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: number[] }) {
-  const { status, observer, drawn, updatedAt, roundId, phase: livePhase, phaseAt } = useLiveDraw();
+export function GameView({
+  bets,
+  picks,
+  tokenSource = 'tolobirr',
+}: {
+  bets: AutoplayPlacedBet[];
+  picks?: number[];
+  tokenSource?: DrawTokenSource;
+}) {
+  const { status, observer, drawn, updatedAt, roundId, phase: livePhase, phaseAt } = useLiveDraw(tokenSource);
   const [soundOn, setSoundOn] = useState(() => getSoundPref());
   const [notifyOn, setNotifyOn] = useState(() => getNotifyPref());
   const [pushOn, setPushOn] = useState(() => isPushActive());

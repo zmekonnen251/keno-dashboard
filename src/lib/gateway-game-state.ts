@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-export function useGatewayGameState(setState: (state: 'betting_open' | 'drawing' | 'settled' | 'unknown') => void) {
+export function useGatewayGameState(
+  setState: (state: 'betting_open' | 'drawing' | 'settled' | 'unknown') => void,
+  provider?: string,
+) {
   const setStateRef = useRef(setState);
   const unsubRef = useRef<(() => void) | null>(null);
 
@@ -11,7 +14,8 @@ export function useGatewayGameState(setState: (state: 'betting_open' | 'drawing'
 
     const checkGameState = async () => {
       try {
-        const res = await fetch('/api/gateway/game-state', {
+        const qs = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+        const res = await fetch(`/api/gateway/game-state${qs}`, {
           credentials: 'include',
         });
         if (res.ok) {
@@ -41,5 +45,5 @@ export function useGatewayGameState(setState: (state: 'betting_open' | 'drawing'
     return () => {
       unsubRef.current?.();
     };
-  }, [setState]);
+  }, [setState, provider]);
 }
