@@ -411,7 +411,7 @@ export function RainBetView({
 
       {/* Header with Game State and Timer */}
       <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 dark:border-white/10'>
-        <div className='flex items-center gap-3'>
+        <div className='flex min-w-0 flex-wrap items-center gap-3'>
           <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${phaseInfo.bgColor}`}>
             <span className={`h-2 w-2 rounded-full ${gameState.phase === 'betting_open' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
             <span className={`text-xs font-bold uppercase tracking-wider ${phaseInfo.color}`}>{phaseInfo.label}</span>

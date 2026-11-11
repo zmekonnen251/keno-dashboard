@@ -812,6 +812,7 @@ export default function ChickenRoadAccountsPage() {
             ) : claims.rows.length === 0 ? (
               <Empty label="No claims recorded yet" />
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -832,6 +833,7 @@ export default function ChickenRoadAccountsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
             <Button variant="outline" onClick={() => setClaims(null)}>Close</Button>
           </div>

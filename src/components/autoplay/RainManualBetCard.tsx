@@ -31,11 +31,13 @@ import {
   Pencil,
   GripVertical,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import type { RainAutoplayConfig, RainAccount, RainAutoplayStatus, BotTicket, RainFreeBet } from '@/lib/types';
 import { useSocket } from '@/lib/service-gateway';
 import { isPlayableFreeBet } from '@/lib/freeBet';
 import { NumberGrid } from './NumberGrid';
+import { useSession } from '@/components/session-provider';
 
 // Pre-configured one-click tickets. Seeded with the classic defaults and then
 // fully configurable per-browser: add board picks or custom numbers, remove any
@@ -132,6 +134,7 @@ interface RainManualBetCardProps {
 }
 
 export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: RainManualBetCardProps) {
+  const { isAdmin } = useSession();
   // Viewers get no autoplay config (admin-only), but they still play on
   // fungames_shamo rain accounts, so picks fall back to that provider.
   const provider = config?.provider ?? 'fungames_shamo';
@@ -178,7 +181,13 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
   const cashTickets = savedTickets.filter((t) => !t.useFreeBet);
   const freeTickets = savedTickets.filter((t) => t.useFreeBet);
 
-  const playableFreeBets = freeBets.filter(isPlayableFreeBet);
+  const playableFreeBets = freeBets.filter(
+    (b) =>
+      isPlayableFreeBet(b) &&
+      // Admins lose an autoplay-disabled account's free bets entirely; the
+      // assigned viewer keeps them for manual play.
+      (!isAdmin || !accounts.some((a) => a.id === b.account_id && a.autoplay_enabled === false)),
+  );
   const bestFreeBet = playableFreeBets.length
     ? [...playableFreeBets].sort(
         (a, b) => b.wager_amount - a.wager_amount || (a.granted_at ?? '').localeCompare(b.granted_at ?? ''),
@@ -232,9 +241,16 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
 
   // Only enabled accounts with a playable balance (min stake is 2 ETB,
   // below that the bet can't be placed) — sorted richest first so the least
-  // likely-to-cover accounts are at the bottom.
+  // likely-to-cover accounts are at the bottom. For admins, accounts with
+  // autoplay switched off are excluded; the assigned viewer may still play
+  // their own account by hand.
   const enabledAccounts = accounts
-    .filter((a) => a.is_enabled && a.balance >= 2)
+    .filter(
+      (a) =>
+        a.is_enabled &&
+        a.balance >= 2 &&
+        (!isAdmin || a.autoplay_enabled !== false),
+    )
     .sort((a, b) => b.balance - a.balance);
 
   // Max stake = the balance of the selected account, or (auto) the highest
@@ -770,7 +786,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
         <div className="grid gap-4 lg:grid-cols-2">
           {/* LEFT — keno board */}
           <div className="rounded-lg border border-border p-3 lg:self-start">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Keno Board — tap up to 10 numbers</span>
               <Button variant="outline" size="sm" onClick={handleClearPicks} disabled={picks.length === 0} className="h-7 px-2 text-xs">
                 <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear ({picks.length})
@@ -966,10 +982,10 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             {/* One-click saved tickets — grouped into Cash + Free Bet collapsibles */}
             {(cashTickets.length > 0 || freeTickets.length > 0) && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Zap className="h-4 w-4 text-indigo-400" />
                   <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">One-Click Saved Tickets</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground">click = play · right-click = menu · drag = reorder</span>
+                  <span className="w-full text-[10px] text-muted-foreground sm:ml-auto sm:w-auto">click = play · right-click = menu · drag = reorder</span>
                 </div>
                 {ticketGroup('cash')}
                 {ticketGroup('free')}
@@ -1060,23 +1076,27 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
               </div>
             </div>
 
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Play className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <details className="group rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+                <Play className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   One-Click Pre-Configured Tickets
                 </span>
-                <span className="ml-auto flex items-center gap-1">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    className="h-6 px-1.5 text-[10px] text-emerald-700/70 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-200"
-                    onClick={resetPresets}
-                    title="Restore the default chips"
-                  >
-                    Reset
-                  </Button>
+                <span className="ml-auto flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">{presets.length} ticket{presets.length === 1 ? '' : 's'}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-emerald-700/70 transition-transform group-open:rotate-180 dark:text-emerald-300/70" />
                 </span>
+              </summary>
+              <div className="mt-0.5 flex items-center justify-end">
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-[10px] text-emerald-700/70 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-200"
+                  onClick={resetPresets}
+                  title="Restore the default chips"
+                >
+                  Reset
+                </Button>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {presets.map((p) => (
@@ -1140,7 +1160,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
                 Click a chip to place it instantly at the current stake · ✕ removes a chip · your list is
                 saved in this browser (defaults on first run).
               </p>
-            </div>
+            </details>
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1187,7 +1207,7 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             </div>
 
             <div className="rounded-lg border border-border bg-black/5 p-3 dark:border-white/10 dark:bg-white/5">
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Selected Numbers ({picks.length})
                 </span>

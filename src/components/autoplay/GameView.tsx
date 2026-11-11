@@ -315,7 +315,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
 
       {/* Enhanced Header with Game State and Timer */}
       <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 dark:border-white/10'>
-        <div className='flex items-center gap-3'>
+        <div className='flex min-w-0 flex-wrap items-center gap-3'>
           {/* Game Status Indicator */}
           <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${phaseInfo.bgColor}`}>
             <span className={`h-2 w-2 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
@@ -349,7 +349,7 @@ export function GameView({ bets, picks }: { bets: AutoplayPlacedBet[]; picks?: n
           </div>
         </div>
 
-        <div className='flex items-center gap-2 text-xs'>
+        <div className='flex min-w-0 flex-wrap items-center gap-2 text-xs'>
           <button
             onClick={onToggleSound}
             className={`rounded-md border px-2 py-1 font-bold ${soundOn ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-border bg-black/5 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400'}`}

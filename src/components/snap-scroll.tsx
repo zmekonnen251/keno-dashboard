@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, List } from 'lucide-react';
 
 // Vertical snap-scroll shell for the autoplay page. Sections snap so the next
 // section lands flush at the top of the viewport while scrolling.
@@ -10,11 +10,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 // still scrolls freely instead of being pinned to its top edge.
 //
 // The bottom-right floating control jumps straight to the previous/next
-// section, so you never have to scroll through blank space between sections.
+// section, and the counter opens a jump menu listing every section title, so
+// you never have to scroll through blank space between sections.
 export function SnapScroll({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
   const [count, setCount] = useState(0);
+  const [titles, setTitles] = useState<string[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // The element that actually scrolls. Normally this IS `ref.current` (the
   // shell owns the scrollbar once the app layout pins the scroll region to the
@@ -46,6 +49,12 @@ export function SnapScroll({ children }: { children: ReactNode }) {
       const scroller = getScroller();
       const secs = sections();
       setCount(secs.length);
+      const nextTitles = secs.map(
+        (s) => s.dataset.snapTitle || s.querySelector('h2,h3')?.textContent?.trim() || 'Section',
+      );
+      setTitles((prev) =>
+        prev.length === nextTitles.length && prev.every((t, i) => t === nextTitles[i]) ? prev : nextTitles,
+      );
       if (!scroller || !secs.length) return;
       const scrollerTop = scroller.getBoundingClientRect().top;
       let idx = 0;
@@ -99,14 +108,59 @@ export function SnapScroll({ children }: { children: ReactNode }) {
   const atBottom = count > 0 && active >= count - 1;
 
   return (
-    <div ref={ref} className="relative h-full snap-y snap-proximity space-y-4 overflow-y-auto pb-16">
+    <div
+      ref={ref}
+      className="relative h-full min-w-0 snap-y snap-proximity space-y-4 overflow-x-hidden overflow-y-auto pb-16"
+    >
       {children}
 
       {count > 1 && (
         <div className="fixed right-4 bottom-24 z-50 flex flex-col items-center gap-1.5 sm:bottom-6 sm:right-6">
-          <span className="rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-bold text-muted-foreground backdrop-blur">
-            {active + 1}/{count}
-          </span>
+          {menuOpen && (
+            <button
+              type="button"
+              aria-label="Close section menu"
+              tabIndex={-1}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 -z-10 cursor-default bg-transparent"
+            />
+          )}
+          <div className="relative">
+            {menuOpen && (
+              <div className="absolute right-0 bottom-full mb-2 max-h-[60vh] w-60 overflow-y-auto rounded-xl border border-border bg-background/95 p-1.5 shadow-xl backdrop-blur">
+                <div className="px-2 pb-1 pt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Jump to section
+                </div>
+                {titles.map((t, i) => (
+                  <button
+                    key={`${i}-${t}`}
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      goTo(i);
+                    }}
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent ${
+                      i === active ? 'bg-accent font-semibold text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <span className="w-4 shrink-0 text-right font-mono text-[10px] opacity-60">{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate">{t}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              title="Jump to a section"
+              aria-label="Jump to a section"
+              aria-expanded={menuOpen}
+              className="flex items-center gap-1 rounded-full border border-border bg-background/90 px-2 py-0.5 text-[10px] font-bold text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <List className="h-3 w-3" />
+              {active + 1}/{count}
+            </button>
+          </div>
           <div className="flex flex-col gap-1.5">
             <button
               type="button"
@@ -139,10 +193,19 @@ export function SnapScroll({ children }: { children: ReactNode }) {
 // without dead/blank space; only each section's top edge snap-aligns to the
 // viewport top while scrolling. The `fill` prop is kept for API compatibility
 // — it previously forced every section to fill a full viewport, which is what
-// produced the scrollable white gaps between sections.
-export function SnapSection({ children, fill = false }: { children: ReactNode; fill?: boolean }) {
+// produced the scrollable white gaps between sections. `title` labels the
+// section in the jump menu.
+export function SnapSection({
+  children,
+  fill = false,
+  title,
+}: {
+  children: ReactNode;
+  fill?: boolean;
+  title?: string;
+}) {
   return (
-    <section data-snap-section className="snap-start">
+    <section data-snap-section data-snap-title={title} className="min-w-0 snap-start">
       {children}
     </section>
   );

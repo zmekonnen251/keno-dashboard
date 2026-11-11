@@ -334,7 +334,16 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
   const liveBalance = accounts.some((a) => a.balanceLive);
   const connected = accounts.filter((a) => a.connected).length;
-  const playableFb = (freeBets ?? []).filter((b) => isPlayableFreeBet(b));
+  const autoplayOffAccountIds = new Set(
+    accounts.filter((a) => a.autoplay_enabled === false).map((a) => a.id),
+  );
+  const playableFb = (freeBets ?? []).filter(
+    (b) =>
+      isPlayableFreeBet(b) &&
+      // Admins lose an autoplay-disabled account's free bets; the assigned
+      // viewer keeps them for manual play.
+      (!isAdmin || !autoplayOffAccountIds.has(b.account_id)),
+  );
   const availableFb = playableFb.length;
   // This modal is the play surface: only playable rows belong here. The full
   // ledger (won/lost/expired/bet_placed history) lives on the rain-accounts page.
@@ -416,7 +425,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         </div>
       </div>
 
-      <SnapSection fill>
+      <SnapSection fill title="Stats">
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
 
       {/* Exactly what the last Test round played — its own list, so the result
@@ -493,20 +502,20 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
       </SnapSection>
 
-      <SnapSection>
+      <SnapSection title="Last draws">
       <CollapsibleCard title="Last draws" defaultOpen={false}>
         <LastDrawsBoards siteId="fungames_shamo" siteName="fungames_shamo" />
       </CollapsibleCard>
       </SnapSection>
 
       {isAdmin && (
-        <SnapSection fill>
+        <SnapSection fill title="ML predictor">
           <MlPredictorCard siteId="fungames_shamo" />
         </SnapSection>
       )}
 
       {isAdmin && (
-        <SnapSection fill>
+        <SnapSection fill title="2-digit tickets">
           <TwoDigitTicketsCard
             siteId="fungames_shamo"
             onMessage={setMsg}
@@ -515,7 +524,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         </SnapSection>
       )}
 
-      <SnapSection fill>
+      <SnapSection fill title="Manual cash bet">
         <RainManualBetCard
           running={status?.running ?? false}
           config={cfg}
@@ -525,13 +534,13 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
         />
       </SnapSection>
 
-      <SnapSection fill>
+      <SnapSection fill title="Live view">
       <CollapsibleCard title="Live view — current draw & recent bets" defaultOpen={true}>
         <RainBetView freeBets={freeBets ?? undefined} cashBets={cashBets} config={cfg} autoRefresh={true} />
       </CollapsibleCard>
       </SnapSection>
 
-      <SnapSection>
+      <SnapSection title="Play history">
       <CollapsibleCard title={`Playing with rains — prediction bets / free-bet plays (${playHistory ? playHistory.length : '…'})`} defaultOpen={false}>
         {playHistory === null ? (
           <Loading rows={2} />
@@ -583,7 +592,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       </CollapsibleCard>
       </SnapSection>
 
-      <SnapSection>
+      <SnapSection title="Rain accounts">
       <CollapsibleCard title={`Rain-claiming accounts & balance (${accounts.length})`} defaultOpen={!isAdmin}>
         {accounts.length === 0 ? (
           <Empty label={isAdmin ? 'No rain accounts yet — add them on the Rain Accounts page.' : 'No rain account is assigned to you yet. Ask an admin to assign one.'} />

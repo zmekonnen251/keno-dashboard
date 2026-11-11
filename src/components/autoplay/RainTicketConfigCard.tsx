@@ -357,7 +357,7 @@ export function RainTicketConfigCard({ config, onSaved, onRefresh }: RainTicketC
               />
             </div>
 
-            <div className="grid grid-cols-5 gap-2 items-end">
+            <div className="grid grid-cols-2 gap-2 items-end sm:grid-cols-5 [&>*]:min-w-0">
               <div>
                 <Label className="text-[10px] text-slate-500 dark:text-slate-400">Spots</Label>
                 <select

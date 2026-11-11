@@ -236,6 +236,11 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 		}
 
 		(async () => {
+			// The server re-stream needs no credentials, so open it first. The
+			// token fetch below is admin-only for the shamo pool; when it fails
+			// (viewers) the server stream must still carry the board instead of
+			// aborting the whole connection.
+			connectServer();
 			try {
 				if (tokenSource === 'shamo') {
 					const res = await getRainWsTokens();
@@ -250,13 +255,12 @@ export function useLiveDraw(tokenSource: DrawTokenSource = 'tolobirr') {
 						.filter((a) => a.ws_token)
 						.map((a) => ({ phone: a.phone, ws_token: a.ws_token as string }));
 				}
-				connectServer();
-				// Only needed if the server stream stays silent; closed on the
-				// first server frame.
-				connect();
 			} catch {
-				if (!cancelled) setStatus('waiting');
+				// No provider token available — the server re-stream is enough.
 			}
+			// Only needed if the server stream stays silent; closed on the
+			// first server frame.
+			if (!cancelled) connect();
 		})();
 
 		return () => {

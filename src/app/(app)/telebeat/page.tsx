@@ -462,6 +462,7 @@ export default function TelebeatPage() {
           <CardTitle>Accounts</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -577,6 +578,7 @@ export default function TelebeatPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -586,6 +588,7 @@ export default function TelebeatPage() {
           <CardTitle>Strategy performance</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -615,6 +618,7 @@ export default function TelebeatPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

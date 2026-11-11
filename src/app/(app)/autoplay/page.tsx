@@ -237,7 +237,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 				</div>
 			</div>
 
-			<SnapSection fill>
+			<SnapSection fill title='Stats'>
 				<div className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${stateTone}`}>
 					<span className='font-semibold'>Game state:</span>{' '}
 					{gameState === 'betting_open'
@@ -302,33 +302,33 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 				</CollapsibleCard>
 			</SnapSection>
 
-			<SnapSection fill>
+			<SnapSection fill title='Live game'>
 				<CollapsibleCard title='Live game — current draw & recent tickets' defaultOpen={true}>
 					<GameView bets={bets} picks={manualPicks} />
 				</CollapsibleCard>
 			</SnapSection>
 
-			<SnapSection fill>
+			<SnapSection fill title='ML predictor'>
 				<MlPredictorCard siteId={siteId} />
 			</SnapSection>
 
-			<SnapSection fill>
+			<SnapSection fill title='2-digit tickets'>
 				<TwoDigitTicketsCard siteId={siteId} onMessage={setTestMsg} onRefresh={refresh} />
 			</SnapSection>
 
-			<SnapSection>
+			<SnapSection title='Last draws'>
 				<CollapsibleCard title='Last draws' defaultOpen={false}>
 					<LastDrawsBoards siteId={siteId} siteName={siteName ?? siteId} />
 				</CollapsibleCard>
 			</SnapSection>
 
-			<SnapSection>
+			<SnapSection title='Signals'>
 				<CollapsibleCard title='Signals' defaultOpen={false}>
 					<SignalPanel rec={rec ?? null} signals={signals} onSignalsChange={setSignals} />
 				</CollapsibleCard>
 			</SnapSection>
 
-			<SnapSection fill>
+			<SnapSection fill title='Manual bet'>
 				<ManualBetCard
 					running={conn?.running ?? false}
 					recurrence={rec ?? null}
@@ -339,7 +339,7 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 				/>
 			</SnapSection>
 
-			<SnapSection fill>
+			<SnapSection fill title='Prediction bet'>
 				<PredictionBetCard running={conn?.running ?? false} onMessage={setTestMsg} onRefresh={refresh} />
 			</SnapSection>
 

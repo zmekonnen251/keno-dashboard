@@ -243,6 +243,7 @@ export default function UsersPage() {
         ) : users.length === 0 ? (
           <Empty label="No users yet — add one to get started." />
         ) : (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -291,6 +292,7 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </Card>
 
