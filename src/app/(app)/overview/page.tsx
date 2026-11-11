@@ -25,7 +25,7 @@ import {
   autoplayStatus,
   checkAllRainStatus,
   getAccounts,
-  getDashboard,
+  getDraws,
   getOddsLive,
   getRainAccounts,
   getRainAutoplayStatus,
@@ -41,9 +41,10 @@ import {
   syncBalances,
 } from '@/lib/api';
 import type {
-  AccountsResponse,
+  Account,
   AutoplayStatus,
-  DashboardResponse,
+  Draw,
+  DrawsResponse,
   OddsLiveResponse,
   RainAccount,
   RainAutoplayStatus,
@@ -53,10 +54,10 @@ import type {
 } from '@/lib/types';
 import { useSession } from '@/components/session-provider';
 import { useSite } from '@/components/site-provider';
-import { Badge, Card, PrettyNumbers, StatCard } from '@/components/app';
+import { Card, PrettyNumbers, StatCard } from '@/components/app';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatTime, winRate } from '@/lib/format';
+import { formatTime } from '@/lib/format';
 import { isPlayableFreeBet } from '@/lib/freeBet';
 
 // The home page is cross-site: it summarizes every surface this dashboard
@@ -67,20 +68,32 @@ const SITES = [
   { id: 'fungames_shamo', name: 'Shamo', surface: 'Rain' },
 ] as const;
 
+// Each block is fetched and rendered on its own. A slow or hanging endpoint
+// must never hold the whole page in a skeleton, so every request is timeboxed
+// and the sections fill in as they arrive.
+const REQUEST_TIMEOUT_MS = 12_000;
+
+interface SiteStats {
+  total: number;
+  latest: Draw | null;
+}
+
 interface RainGroupData {
   status: RainAutoplayStatus | null;
   accounts: RainAccount[];
   freeBets: RainFreeBet[];
 }
 
+const EMPTY_RAIN: RainGroupData = { status: null, accounts: [], freeBets: [] };
+
 interface HomeData {
-  sites: Record<string, DashboardResponse | null>;
+  siteStats: Record<string, SiteStats | null>;
   tolobirrEngine: AutoplayStatus | null;
   casagamesEngine: AutoplayStatus | null;
   shamoRain: RainGroupData;
   funRain: RainGroupData;
-  tolobirrAccounts: AccountsResponse | null;
-  casagamesAccounts: AccountsResponse | null;
+  tolobirrAccounts: Account[];
+  casagamesAccounts: Account[];
   odds: OddsLiveResponse | null;
   shamoBet: ShamoBetStatus | null;
   withdrawal: WithdrawalEngineStatus | null;
@@ -93,6 +106,16 @@ async function safe<T>(promise: Promise<T>): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+function timed<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    void safe(promise).then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    });
+  });
 }
 
 function timeFromMs(ms?: number | null): string {
@@ -116,6 +139,7 @@ function EngineCard({
   sub,
   tone,
   running,
+  ready,
   busy,
   onToggle,
   toggleTitle,
@@ -125,6 +149,7 @@ function EngineCard({
   sub?: string;
   tone: 'default' | 'positive' | 'negative' | 'accent';
   running: boolean;
+  ready: boolean;
   busy: boolean;
   onToggle: () => void;
   toggleTitle: string;
@@ -146,7 +171,7 @@ function EngineCard({
         <Button
           size="sm"
           variant={running ? 'destructive' : 'default'}
-          disabled={busy}
+          disabled={busy || !ready}
           onClick={onToggle}
           title={toggleTitle}
           aria-label={toggleTitle}
@@ -201,98 +226,94 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function EmptySkeleton() {
-  return (
-    <div className="space-y-5">
-      <Skeleton className="h-8 w-48" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full" />
-        ))}
-      </div>
-      <Skeleton className="h-64 w-full" />
-    </div>
-  );
-}
-
 export default function OverviewPage() {
   const { isAdmin, loading: sessionLoading } = useSession();
   const { setSiteId } = useSite();
   const router = useRouter();
-  const [data, setData] = useState<HomeData | null>(null);
+  const [data, setData] = useState<Partial<HomeData>>({});
   const [msg, setMsg] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const [
-        tolobirr,
-        casagames,
-        shamo,
-        tolobirrEngine,
-        casagamesEngine,
-        shamoStatus,
-        shamoAccounts,
-        shamoBets,
-        funStatus,
-        funAccounts,
-        funBets,
-        tolobirrAccounts,
-        casagamesAccounts,
-        odds,
-        shamoBet,
-        withdrawal,
-        pendingPayments,
-      ] = await Promise.all([
-        safe(getDashboard('fungames_tolobirr')),
-        safe(getDashboard('casagames')),
-        safe(getDashboard('fungames_shamo')),
-        safe(autoplayStatus('fungames_tolobirr')),
-        safe(autoplayStatus('casagames')),
-        safe(getRainAutoplayStatus('shamo')),
-        safe(getRainAccounts('shamo')),
-        safe(getRainFreeBets(500, 'shamo')),
-        safe(getRainAutoplayStatus('fungames')),
-        safe(getRainAccounts('fungames')),
-        safe(getRainFreeBets(500, 'fungames')),
-        safe(getAccounts('fungames_tolobirr')),
-        safe(getAccounts('casagames')),
-        safe(getOddsLive()),
-        safe(getShamoBetStatus()),
-        safe(getWithdrawalStatus()),
-        safe(getRainPaymentChanges('pending')),
-      ]);
+    const patch = (p: Partial<HomeData>) => setData((d) => ({ ...d, ...p }));
 
-      setData({
-        sites: {
-          fungames_tolobirr: tolobirr,
-          casagames,
-          fungames_shamo: shamo,
+    const loadSites = async () => {
+      const [tolobirr, casagames, shamo] = await Promise.all([
+        timed(getDraws('fungames_tolobirr', 1)),
+        timed(getDraws('casagames', 1)),
+        timed(getDraws('fungames_shamo', 1)),
+      ]);
+      const toStats = (res: DrawsResponse | null): SiteStats | null =>
+        res ? { total: res.total, latest: res.draws[0] ?? null } : null;
+      patch({
+        siteStats: {
+          fungames_tolobirr: toStats(tolobirr),
+          casagames: toStats(casagames),
+          fungames_shamo: toStats(shamo),
         },
-        tolobirrEngine,
-        casagamesEngine,
+      });
+    };
+
+    const loadEngines = async () => {
+      const [tolobirr, casagames] = await Promise.all([
+        timed(autoplayStatus('fungames_tolobirr')),
+        timed(autoplayStatus('casagames')),
+      ]);
+      patch({ tolobirrEngine: tolobirr, casagamesEngine: casagames });
+    };
+
+    const loadRain = async () => {
+      const [status, shamoAccounts, shamoBets, funAccounts, funBets] = await Promise.all([
+        timed(getRainAutoplayStatus('shamo')),
+        timed(getRainAccounts('shamo')),
+        timed(getRainFreeBets(500, 'shamo')),
+        timed(getRainAccounts('fungames')),
+        timed(getRainFreeBets(500, 'fungames')),
+      ]);
+      patch({
         shamoRain: {
-          status: shamoStatus?.status ?? null,
+          status: status?.status ?? null,
           accounts: shamoAccounts?.accounts ?? [],
           freeBets: shamoBets?.bets ?? [],
         },
         funRain: {
-          status: funStatus?.status ?? null,
+          status: null,
           accounts: funAccounts?.accounts ?? [],
           freeBets: funBets?.bets ?? [],
         },
-        tolobirrAccounts,
-        casagamesAccounts,
+      });
+    };
+
+    const loadAccounts = async () => {
+      const [tolobirr, casagames] = await Promise.all([
+        timed(getAccounts('fungames_tolobirr')),
+        timed(getAccounts('casagames')),
+      ]);
+      patch({
+        tolobirrAccounts: tolobirr?.accounts ?? [],
+        casagamesAccounts: casagames?.accounts ?? [],
+      });
+    };
+
+    const loadBetting = async () => {
+      const [odds, shamoBet, withdrawal, payments] = await Promise.all([
+        timed(getOddsLive()),
+        timed(getShamoBetStatus()),
+        timed(getWithdrawalStatus()),
+        timed(getRainPaymentChanges('pending')),
+      ]);
+      patch({
         odds,
         shamoBet,
         withdrawal: withdrawal?.status ?? null,
-        pendingPayments: pendingPayments?.count ?? null,
+        pendingPayments: payments?.count ?? null,
       });
-    } finally {
-      setRefreshing(false);
-    }
+    };
+
+    await Promise.allSettled([loadSites(), loadEngines(), loadRain(), loadAccounts(), loadBetting()]);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -388,7 +409,19 @@ export default function OverviewPage() {
     }
   }
 
-  if (sessionLoading) return <EmptySkeleton />;
+  if (sessionLoading) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -402,9 +435,11 @@ export default function OverviewPage() {
     );
   }
 
-  if (!data) return <EmptySkeleton />;
-
-  const { tolobirrEngine, casagamesEngine, shamoRain, funRain, odds, shamoBet, withdrawal } = data;
+  const { tolobirrEngine, casagamesEngine, odds, shamoBet, withdrawal } = data;
+  const shamoRain = data.shamoRain ?? EMPTY_RAIN;
+  const funRain = data.funRain ?? EMPTY_RAIN;
+  const tolobirrAccounts = data.tolobirrAccounts ?? [];
+  const casagamesAccounts = data.casagamesAccounts ?? [];
 
   const rainAccounts = [...shamoRain.accounts, ...funRain.accounts];
   const enabledRainAccounts = rainAccounts.filter((a) => a.autoplay_enabled !== false);
@@ -412,9 +447,6 @@ export default function OverviewPage() {
   const excludedRainBalance = balanceOf(rainAccounts) - rainBalance;
   const disabledRainCount = rainAccounts.length - enabledRainAccounts.length;
   const freeBets = playableFreeBets(shamoRain) + playableFreeBets(funRain);
-
-  const tolobirrAccounts = data.tolobirrAccounts?.accounts ?? [];
-  const casagamesAccounts = data.casagamesAccounts?.accounts ?? [];
 
   const oddsStatus = odds?.status;
   const betStatus = shamoBet;
@@ -457,42 +489,57 @@ export default function OverviewPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <EngineCard
             label="ToloBirr autoplay"
-            value={tolobirrEngine?.running ? 'RUNNING' : 'IDLE'}
-            sub={`${tolobirrEngine?.connectedWorkers ?? 0}/${tolobirrEngine?.workers ?? 0} sockets · ${tolobirrEngine?.freshAccounts ?? 0} fresh tokens`}
+            value={tolobirrEngine ? (tolobirrEngine.running ? 'RUNNING' : 'IDLE') : '—'}
+            sub={
+              tolobirrEngine
+                ? `${tolobirrEngine.connectedWorkers ?? 0}/${tolobirrEngine.workers ?? 0} sockets · ${tolobirrEngine.freshAccounts ?? 0} fresh tokens`
+                : 'loading…'
+            }
             tone={tolobirrEngine?.running ? 'positive' : 'default'}
             running={tolobirrEngine?.running ?? false}
+            ready={!!tolobirrEngine}
             busy={busy === 'fungames_tolobirr'}
             onToggle={() => void onToggleFactory('fungames_tolobirr', tolobirrEngine?.running ?? false)}
             toggleTitle={tolobirrEngine?.running ? 'Stop ToloBirr autoplay' : 'Start ToloBirr autoplay'}
           />
           <EngineCard
             label="CasaGames autoplay"
-            value={casagamesEngine?.running ? 'RUNNING' : 'IDLE'}
-            sub={`${casagamesEngine?.connectedWorkers ?? 0}/${casagamesEngine?.workers ?? 0} sockets · ${casagamesEngine?.freshAccounts ?? 0} fresh tokens`}
+            value={casagamesEngine ? (casagamesEngine.running ? 'RUNNING' : 'IDLE') : '—'}
+            sub={
+              casagamesEngine
+                ? `${casagamesEngine.connectedWorkers ?? 0}/${casagamesEngine.workers ?? 0} sockets · ${casagamesEngine.freshAccounts ?? 0} fresh tokens`
+                : 'loading…'
+            }
             tone={casagamesEngine?.running ? 'positive' : 'default'}
             running={casagamesEngine?.running ?? false}
+            ready={!!casagamesEngine}
             busy={busy === 'casagames'}
             onToggle={() => void onToggleFactory('casagames', casagamesEngine?.running ?? false)}
             toggleTitle={casagamesEngine?.running ? 'Stop CasaGames autoplay' : 'Start CasaGames autoplay'}
           />
           <EngineCard
             label="Shamo rain autoplay"
-            value={shamoRain.status?.running ? 'RUNNING' : 'IDLE'}
-            sub={`${shamoRain.status?.totalPlayed ?? 0} rounds played · last ${timeFromMs(shamoRain.status?.lastRoundAt)}`}
+            value={shamoRain.status ? (shamoRain.status.running ? 'RUNNING' : 'IDLE') : '—'}
+            sub={
+              shamoRain.status
+                ? `${shamoRain.status.totalPlayed} rounds played · last ${timeFromMs(shamoRain.status.lastRoundAt)}`
+                : 'loading…'
+            }
             tone={shamoRain.status?.running ? 'positive' : 'default'}
             running={shamoRain.status?.running ?? false}
+            ready={!!shamoRain.status}
             busy={busy === 'shamo-rain'}
             onToggle={() => void onToggleShamoRain(shamoRain.status?.running ?? false)}
             toggleTitle={shamoRain.status?.running ? 'Stop Shamo rain autoplay' : 'Start Shamo rain autoplay'}
           />
           <StatCard
             label="Shamo bet engine"
-            value={betStatus?.engine.running ? 'RUNNING' : betStatus?.config.enabled ? 'ARMED' : 'IDLE'}
+            value={betStatus ? (betStatus.engine.running ? 'RUNNING' : betStatus.config.enabled ? 'ARMED' : 'IDLE') : '—'}
             tone={betStatus?.engine.running ? 'positive' : 'default'}
             sub={
               betStatus
                 ? `mode ${betStatus.config.mode} · ${betStatus.placedToday} placed today · ${betStatus.stakeUsedToday} ETB staked`
-                : 'unavailable'
+                : 'loading…'
             }
           />
         </div>
@@ -505,9 +552,11 @@ export default function OverviewPage() {
             value={`${rainBalance.toFixed(2)} ETB`}
             tone="accent"
             sub={
-              disabledRainCount
-                ? `${enabledRainAccounts.length} enabled · ${disabledRainCount} disabled excluded (${excludedRainBalance.toFixed(2)} ETB)`
-                : `${enabledRainAccounts.length} accounts · ${shamoRain.accounts.length} shamo · ${funRain.accounts.length} fungames`
+              rainAccounts.length === 0
+                ? 'no rain accounts yet'
+                : disabledRainCount
+                  ? `${enabledRainAccounts.length} enabled · ${disabledRainCount} disabled excluded (${excludedRainBalance.toFixed(2)} ETB)`
+                  : `${enabledRainAccounts.length} accounts · ${shamoRain.accounts.length} shamo · ${funRain.accounts.length} fungames`
             }
           />
           <StatCard
@@ -530,8 +579,10 @@ export default function OverviewPage() {
             value={`${withdrawalStatus?.active ?? 0} active · ${withdrawalStatus?.queued ?? 0} queued`}
             tone={withdrawalStatus?.lastError ? 'negative' : 'default'}
             sub={
-              `${withdrawalStatus?.succeeded ?? 0} succeeded · ${withdrawalStatus?.failed ?? 0} failed` +
-              (data.pendingPayments ? ` · ${data.pendingPayments} payment change${data.pendingPayments === 1 ? '' : 's'} pending` : '')
+              withdrawalStatus
+                ? `${withdrawalStatus.succeeded} succeeded · ${withdrawalStatus.failed} failed` +
+                  (data.pendingPayments ? ` · ${data.pendingPayments} payment change${data.pendingPayments === 1 ? '' : 's'} pending` : '')
+                : 'loading…'
             }
           />
           <StatCard
@@ -540,7 +591,7 @@ export default function OverviewPage() {
             sub={
               betStatus
                 ? `${betStatus.claimed} claimed · ${betStatus.placedToday} placed today`
-                : 'unavailable'
+                : 'loading…'
             }
           />
         </div>
@@ -550,9 +601,9 @@ export default function OverviewPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Odd-drop watcher"
-            value={oddsStatus?.running ? 'RUNNING' : oddsStatus?.enabled ? 'ARMED' : 'IDLE'}
+            value={oddsStatus ? (oddsStatus.running ? 'RUNNING' : oddsStatus.enabled ? 'ARMED' : 'IDLE') : '—'}
             tone={oddsStatus?.lastError ? 'negative' : oddsStatus?.running ? 'positive' : 'default'}
-            sub={oddsStatus ? `last poll ${formatTime(oddsStatus.lastPollAt)}` : 'unavailable'}
+            sub={oddsStatus ? `last poll ${formatTime(oddsStatus.lastPollAt)}` : 'loading…'}
           />
           <StatCard
             label="Drops (60 min)"
@@ -562,12 +613,12 @@ export default function OverviewPage() {
           <StatCard
             label="Bookie coverage"
             value={oddsStatus ? `${oddsStatus.matchedFootball}/${oddsStatus.melbetFootball}` : '—'}
-            sub={oddsStatus ? `${oddsStatus.melbetEvents} melbet · ${oddsStatus.shamoEvents} shamo events` : 'unavailable'}
+            sub={oddsStatus ? `${oddsStatus.melbetEvents} melbet · ${oddsStatus.shamoEvents} shamo events` : 'loading…'}
           />
           <StatCard
             label="Shamo session"
-            value={betStatus?.botTokenSet ? 'READY' : 'MISSING'}
-            tone={betStatus?.botTokenSet ? 'positive' : 'negative'}
+            value={betStatus ? (betStatus.botTokenSet ? 'READY' : 'MISSING') : '—'}
+            tone={betStatus ? (betStatus.botTokenSet ? 'positive' : 'negative') : 'default'}
             sub={betStatus?.engine.lastTickAt ? `last tick ${formatTime(betStatus.engine.lastTickAt)}` : 'no tick yet'}
           />
         </div>
@@ -579,27 +630,15 @@ export default function OverviewPage() {
       <Section title="Keno sites">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {SITES.map((site) => {
-            const d = data.sites[site.id];
-            const latest = d?.recentDraws?.[0];
+            const stats = data.siteStats?.[site.id] ?? null;
+            const latest = stats?.latest;
             return (
-              <Card
-                key={site.id}
-                title={site.name}
-                actions={
-                  <Badge variant={d?.liveRound ? 'default' : 'outline'}>
-                    {d?.liveRound ? 'live round' : 'idle'}
-                  </Badge>
-                }
-              >
+              <Card key={site.id} title={site.name}>
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <div className="text-xl font-bold text-foreground">{d?.totalDraws ?? '—'}</div>
+                      <div className="text-xl font-bold text-foreground">{stats?.total ?? '—'}</div>
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">draws</div>
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold text-foreground">{winRate(d?.accuracy)}</div>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">accuracy</div>
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-foreground">
@@ -607,11 +646,17 @@ export default function OverviewPage() {
                       </div>
                       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">last draw</div>
                     </div>
+                    <div>
+                      <div className="text-xl font-bold text-foreground">{latest?.roundNo ?? '—'}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">round</div>
+                    </div>
                   </div>
                   {latest?.results?.length ? (
                     <PrettyNumbers nums={latest.results} />
                   ) : (
-                    <p className="text-xs text-muted-foreground">No draws recorded yet.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {stats ? 'No draws recorded yet.' : 'Loading draws…'}
+                    </p>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => openSite(site.id, '/stats')}>
