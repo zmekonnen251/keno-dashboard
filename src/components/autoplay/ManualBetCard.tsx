@@ -12,6 +12,7 @@ import {
 	DIFFICULTY_OPTIONS,
 	STRATEGY_OPTIONS,
 	buildStrategyTicket,
+	providerLabel,
 	slicePool,
 	type TicketDifficulty,
 	type TicketStrategy,
@@ -240,7 +241,18 @@ export function ManualBetCard({
 			if (!selectedSpots.includes(n)) markers[n] = 'suggested';
 		}
 	}
-	const manualAccounts = accountMode === 'manual' ? (eligible.length > 0 ? eligible : accounts.map((a) => ({ accountId: a.accountId, phone: a.phone, balance: a.balance, connected: a.connected }))) : [];
+	const manualAccounts =
+		accountMode === 'manual'
+			? eligible.length > 0
+				? eligible
+				: accounts.map((a) => ({
+						accountId: a.accountId,
+						phone: a.phone,
+						provider: a.provider,
+						balance: a.balance,
+						connected: a.connected,
+					}))
+			: [];
 
 	// Stake cap: min 2, max = the selected account's balance (manual mode) or
 	// the richest enabled wallet (auto mode, server picks which one).
@@ -471,7 +483,8 @@ export function ManualBetCard({
 									<option value=''>Select account…</option>
 									{manualAccounts.map((a) => (
 										<option key={a.accountId} value={String(a.accountId)}>
-											#{a.accountId} · {a.phone} · {a.balance} ETB{a.connected ? '' : ' (offline)'}
+											#{a.accountId} · {a.phone} · {providerLabel(a.provider)} · {a.balance} ETB
+											{a.connected ? '' : ' (offline)'}
 										</option>
 									))}
 								</select>

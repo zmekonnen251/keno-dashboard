@@ -606,6 +606,9 @@ export interface AutoplayTestRoundResponse {
 export interface AccountGameStatus {
 	accountId: number;
 	phone: string;
+	// Factory provider (fungames_tolobirr / casagames). Optional so older
+	// cached payloads still parse.
+	provider?: string;
 	tokenOk: boolean;
 	wsTokenOk: boolean;
 	connected: boolean;
@@ -831,6 +834,8 @@ export interface ManualBetResponse {
 export interface EligibleAccount {
 	accountId: number;
 	phone: string;
+	// Factory provider (fungames_tolobirr / casagames) behind the account.
+	provider?: string;
 	balance: number;
 	connected: boolean;
 }

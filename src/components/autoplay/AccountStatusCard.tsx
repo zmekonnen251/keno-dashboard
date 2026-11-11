@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Empty } from '@/components/app';
 import type { AccountGameStatus } from '@/lib/types';
 import { CollapsibleCard } from './CollapsibleCard';
-import { stateTone } from './utils';
+import { providerLabel, stateTone } from './utils';
 
 // Live view: only accounts with a connected socket. Disconnected workers are
 // not live bets, so they stay out of this card (see the autoplay pool in the
@@ -41,6 +41,9 @@ export function AccountStatusCard({ accounts, running }: { accounts: AccountGame
 								<td className='px-2 py-2'>
 									<div className='font-medium'>#{a.accountId}</div>
 									<div className='text-muted-foreground'>{a.phone}</div>
+									<Badge variant='outline' className='mt-0.5'>
+										{providerLabel(a.provider)}
+									</Badge>
 								</td>
 								<td className='px-2 py-2'>
 									<Badge variant={stateTone(a.state)}>{a.state}</Badge>

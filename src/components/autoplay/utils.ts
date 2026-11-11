@@ -20,6 +20,14 @@ export function textToTickets(text: string): number[][] | null {
 	return tickets.length > 0 ? tickets : null;
 }
 
+// Short label for the factory provider behind an autoplay account. Both
+// providers bet the same fungames site; the label just names the wallet.
+export function providerLabel(provider?: string | null): string {
+	if (provider === 'casagames') return 'CasaGames';
+	if (provider === 'fungames_tolobirr') return 'ToloBirr';
+	return provider || '—';
+}
+
 export function stateTone(state: string): 'default' | 'destructive' | 'secondary' | 'outline' {
 	if (state === 'won') return 'default';
 	if (state === 'lost' || state === 'error' || state === 'failed') return 'destructive';
