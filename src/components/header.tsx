@@ -3,17 +3,32 @@
 import { useSite } from './site-provider';
 import { useSession } from './session-provider';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Moon, Sun, ChevronDown } from 'lucide-react';
+import { Moon, Sun, ChevronDown, LogOut } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { NotificationsBell } from './notifications-bell';
+import { logout } from '@/lib/api';
 import { useState } from 'react';
 
 export default function Header() {
   const { sites, siteId, setSiteId, siteName } = useSite();
   const { isAdmin } = useSession();
   const { resolvedTheme, setTheme } = useTheme();
+  const router = useRouter();
   const [showMobileSiteSelector, setShowMobileSiteSelector] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setSigningOut(false);
+      router.push('/login');
+      router.refresh();
+    }
+  }
 
   return (
     <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-sidebar px-3 py-2 sm:gap-3 sm:px-5 sm:py-3">
@@ -72,6 +87,16 @@ export default function Header() {
           </select>
         </label>}
         <NotificationsBell />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Sign out"
+          title="Sign out"
+          onClick={onSignOut}
+          disabled={signingOut}
+        >
+          <LogOut />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
