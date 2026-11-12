@@ -251,6 +251,11 @@ export default function UsersPage() {
                 <TableHead>Display name</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead
+                  title="Sum of every rain account assigned to this user. Accounts with autoplay disabled by an admin still count — that toggle only stops the engine using the wallet."
+                >
+                  Total balance
+                </TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Last login</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -266,6 +271,14 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge active={u.isActive} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs">
+                    <span className="font-semibold text-foreground">
+                      {(u.totalBalance ?? 0).toFixed(2)} ETB
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {u.accountCount ? `${u.accountCount} account${u.accountCount === 1 ? '' : 's'}` : 'no accounts'}
+                    </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatTime(u.createdAt)}

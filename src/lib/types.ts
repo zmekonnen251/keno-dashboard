@@ -1226,6 +1226,9 @@ export interface User {
 	isActive: boolean;
 	createdAt: string;
 	lastLoginAt: string | null;
+	/** Sum of every rain account assigned to this user (set by GET /api/users). */
+	totalBalance?: number;
+	accountCount?: number;
 }
 
 export interface UsersResponse {

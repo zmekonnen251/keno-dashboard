@@ -1165,14 +1165,14 @@ export function RainManualBetCard({ config, accounts, onMessage, onRefresh }: Ra
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={handleGeneratePicks}
-                disabled={predicting || !config}
+                disabled={predicting}
                 className="flex-1 min-w-40"
               >
                 {predicting ? 'Generating…' : <><Sparkles className="w-4 h-4 mr-1" /> Generate AI Picks</>}
               </Button>
               <Button
                 onClick={handleGenerateTemporalPicks}
-                disabled={predicting || !config}
+                disabled={predicting}
                 variant="outline"
                 className="flex-1 min-w-40"
                 title="Top ticket mined from the draws in this same ±10-min clock window over the last 7 days"
