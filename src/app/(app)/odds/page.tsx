@@ -536,14 +536,14 @@ function SuggestionsTab({
                     {s.shamoUrl && (
                       <Button asChild variant="outline" size="xs">
                         <a href={s.shamoUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink /> Shamo
+                          <ExternalLink /> Open in Shamo
                         </a>
                       </Button>
                     )}
                     {s.melbetUrl && (
                       <Button asChild variant="outline" size="xs">
                         <a href={s.melbetUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink /> Melbet
+                          <ExternalLink /> Open in Melbet
                         </a>
                       </Button>
                     )}
