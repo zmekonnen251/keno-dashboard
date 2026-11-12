@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ExternalLink, Play, RotateCw, TrendingDown, Ticket, ShieldCheck, Ban } from 'lucide-react';
+import { Bell, ExternalLink, Play, RotateCw, TrendingDown, Ticket, ShieldCheck, Ban, Activity, Zap, Gauge } from 'lucide-react';
 import {
   getOddsLive,
   getOddsConfig,
@@ -18,6 +18,7 @@ import {
   getShamoBetSession,
   clearShamoBetSession,
   createShamoBetOrder,
+  getShamoBetPerformance,
   pushTest,
   type OddsLiveResponse,
 } from '@/lib/api';
@@ -41,6 +42,7 @@ import type {
   OddsWatcherConfig,
   ShamoBetConfig,
   ShamoBetOrder,
+  ShamoBetPerformance,
   ShamoBetRecord,
   ShamoBetSessionInfo,
   ShamoBetStatus,
@@ -53,6 +55,17 @@ import type {
 
 const POLL_MS = 5000;
 const FLASH_MS = 2600;
+
+/** Compact age label for feed freshness / quote staleness. */
+function ageLabel(ms: number | null): string {
+  if (ms == null) return 'never';
+  if (ms < 1000) return 'just now';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.round(m / 60)}h ago`;
+}
 
 export default function OddsPage() {
   const live = useApi<OddsLiveResponse>(() => getOddsLive(), []);
@@ -207,7 +220,7 @@ export default function OddsPage() {
       </div>
 
       {/* ── status strip ── */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <StatCard
           label="Watcher"
           value={status ? (status.enabled ? 'Enabled' : 'Disabled') : '—'}
@@ -215,17 +228,28 @@ export default function OddsPage() {
           sub={status?.lastPollOk ? `last poll ${formatTime(status.lastPollAt)}` : status?.lastError ? `error: ${status.lastError}` : 'polling…'}
         />
         <StatCard
-          label="Feeds"
-          value={
-            status ? (
-              <span className="text-base">
-                M{status.melbetEvents} · S{status.shamoEvents}
-              </span>
-            ) : (
-              '—'
-            )
+          label="Melbet (reference)"
+          value={status ? (status.melbetOk ? 'OK' : 'DOWN') : '—'}
+          tone={status ? (status.melbetOk ? 'positive' : 'negative') : 'default'}
+          sub={
+            status
+              ? status.melbetError
+                ? status.melbetError
+                : `${status.melbetEvents} events · ${status.melbetFootball} football · ${ageLabel(status.melbetAgeMs)}`
+              : '—'
           }
-          sub={status ? `melbet ${formatTime(status.lastMelbetAt)} · shamo ${formatTime(status.lastShamoAt)}` : '—'}
+        />
+        <StatCard
+          label="Shamo (bet venue)"
+          value={status ? (status.shamoOk ? 'OK' : 'DOWN') : '—'}
+          tone={status ? (status.shamoOk ? 'positive' : 'negative') : 'default'}
+          sub={
+            status
+              ? status.shamoError
+                ? status.shamoError
+                : `${status.shamoEvents} events · ${status.shamoFootball} football · ${ageLabel(status.shamoAgeMs)}`
+              : '—'
+          }
         />
         <StatCard
           label="Football coverage"
@@ -247,6 +271,16 @@ export default function OddsPage() {
           tone={drops.length > 0 ? 'negative' : 'default'}
           sub="in last window"
         />
+        <StatCard
+          label="Fast signals"
+          value={status ? String(status.fastRechecks) : '—'}
+          tone={status && status.fastRechecks > 0 ? 'positive' : 'default'}
+          sub={
+            status
+              ? `shamo re-checks · last signal ${formatTime(status.lastSignalAt)}`
+              : '—'
+          }
+        />
       </div>
 
       {status && !status.configured && (
@@ -267,6 +301,7 @@ export default function OddsPage() {
           <TabsTrigger value="drops">Drops ({drops.length})</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions ({suggestions.length})</TabsTrigger>
           <TabsTrigger value="bets">Bet slips</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="config">Watcher config</TabsTrigger>
         </TabsList>
 
@@ -285,6 +320,10 @@ export default function OddsPage() {
 
         <TabsContent value="bets">
           <BetsTab />
+        </TabsContent>
+
+        <TabsContent value="performance">
+          <PerformanceTab />
         </TabsContent>
 
         <TabsContent value="config">
@@ -462,8 +501,7 @@ function SuggestionsTab({
       ) : (
         <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-1">
           {suggestions.map((s) => {
-            const gap =
-              s.shamoOdd && s.melbetCurrent > 0 ? ((s.shamoOdd - s.melbetCurrent) / s.melbetCurrent) * 100 : null;
+            const resolvable = s.shamoGroup != null && s.shamoType != null;
             return (
               <div key={s.id} className="rounded-lg border border-border bg-card p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -478,6 +516,15 @@ function SuggestionsTab({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Badge
+                      className={
+                        s.kind === 'value'
+                          ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
+                          : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                      }
+                    >
+                      {s.kind === 'value' ? 'LAG GAP' : 'DROP'}
+                    </Badge>
                     {s.steam && (
                       <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
                         STEAM
@@ -500,7 +547,7 @@ function SuggestionsTab({
                         </a>
                       </Button>
                     )}
-                    {onQueue && s.shamoUrl && (
+                    {onQueue && s.shamoUrl && resolvable && (
                       <Button size="xs" onClick={() => onQueue(s.id)}>
                         <Ticket /> Queue bet
                       </Button>
@@ -519,13 +566,23 @@ function SuggestionsTab({
                   ) : (
                     <span className="text-xs text-muted-foreground">no shamo price</span>
                   )}
-                  {gap != null && gap > 0 && (
+                  {s.edgePct > 0 && (
                     <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      +{gap.toFixed(1)}% edge vs melbet
+                      +{s.edgePct.toFixed(1)}% lag edge
+                    </span>
+                  )}
+                  {s.shamoStaleMs != null && (
+                    <span className="text-[11px] text-muted-foreground">
+                      quote {ageLabel(s.shamoStaleMs)}
+                    </span>
+                  )}
+                  {s.shamoOdd != null && !resolvable && (
+                    <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                      side unresolved — cannot queue
                     </span>
                   )}
                   <span className="ml-auto text-xs text-muted-foreground">
-                    dropped {Math.abs(s.dropPct).toFixed(1)}%
+                    {s.kind === 'drop' ? `dropped ${Math.abs(s.dropPct).toFixed(1)}%` : 'standing gap'}
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">{s.reason}</p>
@@ -579,6 +636,7 @@ function ConfigTab({
         {num('dropWindowMin', 'Drop window (min)', 1)}
         {num('matchToleranceMin', 'Match tolerance (min)', 1)}
         {num('maxSuggestions', 'Max suggestions', 1)}
+        {num('minValueEdgePct', 'Min lag edge for value (%)', 0.5, 0)}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button
@@ -586,6 +644,12 @@ function ConfigTab({
           onClick={() => onDraft({ enabled: !draft.enabled })}
         >
           {draft.enabled ? 'Watcher enabled' : 'Watcher disabled'}
+        </Button>
+        <Button
+          variant={draft.fastRecheck ? 'default' : 'outline'}
+          onClick={() => onDraft({ fastRecheck: !draft.fastRecheck })}
+        >
+          <Zap /> Fast shamo re-check {draft.fastRecheck ? 'on' : 'off'}
         </Button>
         <Button
           variant={draft.pushEnabled ? 'default' : 'outline'}
@@ -828,6 +892,15 @@ function BetsTab() {
                   {m}
                 </Button>
               ))}
+              {draft.mode === 'auto' && (
+                <Button
+                  variant={draft.autoPlace ? 'default' : 'outline'}
+                  onClick={() => patchDraft({ autoPlace: !draft.autoPlace })}
+                  title="Place queued orders server-side with the stored shamo session (no extension)"
+                >
+                  <Zap /> Server auto-place {draft.autoPlace ? 'on' : 'off'}
+                </Button>
+              )}
               <Button onClick={onSave} disabled={saving}>
                 {saving ? 'Saving…' : 'Save config'}
               </Button>
@@ -970,9 +1043,19 @@ function BetsTab() {
                       placed @ {o.actualOdd.toFixed(2)}
                     </span>
                   )}
+                  {o.melbetAtPlace != null && (
+                    <span className="font-mono text-muted-foreground">
+                      melbet@place {o.melbetAtPlace.toFixed(2)}
+                    </span>
+                  )}
                   <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    +{o.edgePct.toFixed(1)}%
+                    queued +{o.edgePct.toFixed(1)}%
                   </span>
+                  {o.edgeAtPlacePct != null && (
+                    <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+                      edge@place {o.edgeAtPlacePct.toFixed(1)}%
+                    </span>
+                  )}
                   <span className="font-mono text-muted-foreground">stake {o.stake.toFixed(1)}</span>
                   {o.action === 'auto' && <Badge variant="outline">auto</Badge>}
                   <span className="ml-auto text-[10px] text-muted-foreground">
@@ -1014,6 +1097,119 @@ function BetsTab() {
                 )}
                 {b.message && <span className="text-xs text-muted-foreground">{b.message}</span>}
                 <span className="ml-auto text-[10px] text-muted-foreground">{formatTime(b.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Execution quality: did the queued lag edges survive to placement? A healthy
+// run keeps "edge @ place" positive with small odd drift; converged orders are
+// cancelled by the engine sweep and show up in the cancelled count.
+function PerformanceTab() {
+  const [days, setDays] = useState(7);
+  const perf = useApi<ShamoBetPerformance>(() => getShamoBetPerformance(days), [days]);
+  const data = perf.data;
+  const pct = (v: number | null, digits = 1) =>
+    v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(digits)}%`;
+  const toneOf = (v: number | null) =>
+    v == null ? 'default' : v > 0 ? 'positive' : v < 0 ? 'negative' : 'default';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Window</span>
+        {[1, 7, 30].map((d) => (
+          <Button
+            key={d}
+            size="sm"
+            variant={days === d ? 'default' : 'outline'}
+            onClick={() => setDays(d)}
+          >
+            {d}d
+          </Button>
+        ))}
+      </div>
+
+      <Card title={`Execution quality (last ${days}d)`} actions={<Gauge className="h-4 w-4 text-sky-500" />}>
+        {perf.loading && !data ? (
+          <Loading rows={3} />
+        ) : perf.error && !data ? (
+          <ErrorBox message={perf.error} />
+        ) : !data ? null : (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <StatCard
+                label="Placed"
+                value={`${data.placed}`}
+                tone={data.placed > 0 ? 'positive' : 'default'}
+                sub={`${data.rejected} rejected · ${data.failed} failed · ${data.cancelled} cancelled`}
+              />
+              <StatCard
+                label="Stake placed"
+                value={data.stakePlaced.toFixed(0)}
+                sub="sum of placed stakes"
+              />
+              <StatCard
+                label="Avg edge @ queue"
+                value={pct(data.avgQuotedEdgePct)}
+                tone={toneOf(data.avgQuotedEdgePct)}
+                sub="shamo − melbet when queued"
+              />
+              <StatCard
+                label="Avg edge @ place"
+                value={pct(data.avgPlacedEdgePct)}
+                tone={toneOf(data.avgPlacedEdgePct)}
+                sub="re-checked right before placing"
+              />
+              <StatCard
+                label="Avg odd drift"
+                value={pct(data.avgOddDriftPct)}
+                tone={data.avgOddDriftPct != null && Math.abs(data.avgOddDriftPct) < 1 ? 'positive' : 'default'}
+                sub="actual vs quoted shamo price"
+              />
+              <StatCard
+                label="Avg CLV"
+                value={pct(data.avgClvPct)}
+                tone={toneOf(data.avgClvPct)}
+                sub="actual shamo price vs melbet"
+              />
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Lag edge = (shamo − melbet) / melbet. Orders whose edge converges before placement
+              are cancelled by the engine sweep, so a healthy distribution keeps “edge @ place”
+              positive with small odd drift.
+            </p>
+          </>
+        )}
+      </Card>
+
+      <Card title="Daily breakdown" actions={<Activity className="h-4 w-4 text-muted-foreground" />}>
+        {perf.loading && !data ? (
+          <Loading rows={3} />
+        ) : !data || data.daily.length === 0 ? (
+          <Empty label="No placed orders in this window yet. Queue or auto-place a few lag-edge bets to populate the breakdown." />
+        ) : (
+          <div className="space-y-1.5">
+            {data.daily.map((d) => (
+              <div
+                key={d.day}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              >
+                <span className="font-mono text-xs text-muted-foreground">{d.day}</span>
+                <span className="font-medium text-foreground">{d.placed} placed</span>
+                <span className="font-mono text-muted-foreground">stake {d.stake.toFixed(0)}</span>
+                <span className="text-xs text-muted-foreground">
+                  edge@place <span className="font-mono">{pct(d.avgPlacedEdgePct)}</span>
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  CLV <span className="font-mono">{pct(d.avgClvPct)}</span>
+                </span>
               </div>
             ))}
           </div>

@@ -1618,6 +1618,10 @@ export interface OddsWatcherConfig {
 	matchToleranceMin: number;
 	maxSuggestions: number;
 	pushEnabled: boolean;
+	/** Minimum standing (shamo − melbet) edge % to surface a value suggestion. */
+	minValueEdgePct: number;
+	/** Re-fetch just the dropped shamo matches right after a melbet drop. */
+	fastRecheck: boolean;
 	updatedAt?: string;
 }
 
@@ -1639,8 +1643,22 @@ export interface OddsWatcherStatus {
 	matchedFootball: number;
 	/** Number of shamo leagues resolved to names via the coredata dictionary. */
 	shamoLeagueCount: number;
+	/** Reference feed health — an empty melbet snapshot counts as not ok. */
+	melbetOk: boolean;
+	shamoOk: boolean;
+	melbetError: string | null;
+	shamoError: string | null;
+	/** Milliseconds since the last successful snapshot per feed. */
+	melbetAgeMs: number | null;
+	shamoAgeMs: number | null;
+	/** Last time a drop/value signal was handed to the bet engine. */
+	lastSignalAt: string | null;
+	/** Targeted shamo re-fetches performed since start. */
+	fastRechecks: number;
 	config: OddsWatcherConfig;
 }
+
+export type SuggestionKind = 'drop' | 'value';
 
 export interface OddsSuggestion {
 	id: number;
@@ -1661,6 +1679,15 @@ export interface OddsSuggestion {
 	melbetOdd: number;
 	melbetCurrent: number;
 	shamoOdd: number | null;
+	/** Resolved shamo win_odds pick (bet_group + bet_type) for the side. */
+	shamoGroup: number | null;
+	shamoType: number | null;
+	/** (shamoOdd − melbetCurrent) / melbetCurrent * 100 — the lag edge. */
+	edgePct: number;
+	/** drop = triggered by a Melbet move · value = standing lag gap. */
+	kind: SuggestionKind;
+	/** Age of the shamo quote when the suggestion was built (ms). */
+	shamoStaleMs: number | null;
 	dropPct: number;
 	steam: boolean;
 	score: number;
@@ -1704,6 +1731,8 @@ export interface ShamoBetConfig {
 	cooldownMin: number;
 	orderTtlMin: number;
 	maxOddDriftPct: number;
+	/** Place queued orders server-side with the stored session (only when mode=auto). */
+	autoPlace: boolean;
 	botToken: string;
 	updatedAt?: string;
 }
@@ -1722,6 +1751,8 @@ export interface ShamoBetOrderDraft {
 	outcomeLabel: string | null;
 	betGroup: number | null;
 	betType: number | null;
+	/** Melbet event external id, used to re-check the lag edge at placement. */
+	melbetExternalId: string | null;
 	quotedOdd: number;
 	melbetCurrent: number;
 	edgePct: number;
@@ -1743,8 +1774,12 @@ export interface ShamoBetOrder {
 	outcomeLabel: string | null;
 	betGroup: number | null;
 	betType: number | null;
+	melbetExternalId: string | null;
 	quotedOdd: number;
 	melbetCurrent: number;
+	/** Re-checked at placement: melbet price and (shamo − melbet) % edge. */
+	melbetAtPlace: number | null;
+	edgeAtPlacePct: number | null;
 	edgePct: number;
 	stake: number;
 	action: BetOrderAction;
@@ -1782,6 +1817,34 @@ export interface ShamoBetStatus {
 	placedToday: number;
 	stakeUsedToday: number;
 	botTokenSet: boolean;
+	/** True when a stored shamo session exists (server-side placement ready). */
+	sessionSet: boolean;
+}
+
+/** Execution-quality summary for the Performance tab. */
+export interface ShamoBetPerformance {
+	days: number;
+	placed: number;
+	rejected: number;
+	failed: number;
+	cancelled: number;
+	/** Total stake on placed orders. */
+	stakePlaced: number;
+	/** Average quoted (shamo − melbet) edge % at queue time. */
+	avgQuotedEdgePct: number | null;
+	/** Average recalculated edge % at placement time. */
+	avgPlacedEdgePct: number | null;
+	/** Average price drift % between quoted and actually placed odd. */
+	avgOddDriftPct: number | null;
+	/** Average shamo-vs-melbet edge % actually captured (actual odd basis). */
+	avgClvPct: number | null;
+	daily: {
+		day: string;
+		placed: number;
+		stake: number;
+		avgPlacedEdgePct: number | null;
+		avgClvPct: number | null;
+	}[];
 }
 
 /** Server-side shamo session (mobile/dashboard placement, token never returned). */

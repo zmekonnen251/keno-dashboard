@@ -71,6 +71,7 @@ import type {
   OddsWatcherStatus,
   ShamoBetConfig,
   ShamoBetOrder,
+  ShamoBetPerformance,
   ShamoBetRecord,
   ShamoBetSessionInfo,
   ShamoBetStatus,
@@ -1008,6 +1009,10 @@ export async function clearShamoBetSession(): Promise<ShamoBetSessionInfo> {
 
 export async function getShamoBets(limit = 50): Promise<ShamoBetRecord[]> {
   return apiFetch<ShamoBetRecord[]>(`api/odds/bet/bets?limit=${limit}`);
+}
+
+export async function getShamoBetPerformance(days = 7): Promise<ShamoBetPerformance> {
+  return apiFetch<ShamoBetPerformance>(`api/odds/bet/performance?days=${days}`);
 }
 
 /** Send a browser-push test notification to every subscribed dashboard. */
