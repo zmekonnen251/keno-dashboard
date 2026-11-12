@@ -178,12 +178,12 @@ function TolobirrAutoplay({ siteName }: { siteName?: string }) {
 		<SnapScroll>
 			{/* Sticky control bar — always reachable while the deck scrolls. On
 			    phones it collapses to a single scrollable row of icon buttons. */}
-			<div className='sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:-mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md'>
+			<div className='sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md'>
 				<div className='flex items-center gap-2 sm:flex-wrap sm:justify-between sm:gap-3'>
 					<h2 className='hidden min-w-0 truncate text-lg font-bold text-foreground sm:block'>
 						Autoplay — {siteName ?? provider}
 					</h2>
-					<div className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2'>
+					<div className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2'>
 						{conn?.running ? (
 							<Button
 								variant='destructive'

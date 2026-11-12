@@ -444,7 +444,6 @@ export default function OverviewPage() {
   const rainAccounts = [...shamoRain.accounts, ...funRain.accounts];
   const enabledRainAccounts = rainAccounts.filter((a) => a.autoplay_enabled !== false);
   const rainBalance = balanceOf(enabledRainAccounts);
-  const excludedRainBalance = balanceOf(rainAccounts) - rainBalance;
   const disabledRainCount = rainAccounts.length - enabledRainAccounts.length;
   const freeBets = playableFreeBets(shamoRain) + playableFreeBets(funRain);
 
@@ -555,7 +554,7 @@ export default function OverviewPage() {
               rainAccounts.length === 0
                 ? 'no rain accounts yet'
                 : disabledRainCount
-                  ? `${enabledRainAccounts.length} enabled · ${disabledRainCount} disabled excluded (${excludedRainBalance.toFixed(2)} ETB)`
+                  ? `${enabledRainAccounts.length} enabled · ${disabledRainCount} disabled`
                   : `${enabledRainAccounts.length} accounts · ${shamoRain.accounts.length} shamo · ${funRain.accounts.length} fungames`
             }
           />

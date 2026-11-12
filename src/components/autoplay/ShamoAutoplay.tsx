@@ -339,9 +339,6 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
   );
   const autoplayAccounts = accounts.filter((a) => !autoplayOffAccountIds.has(a.id));
   const totalBalance = autoplayAccounts.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const excludedBalance = accounts
-    .filter((a) => autoplayOffAccountIds.has(a.id))
-    .reduce((s, a) => s + (a.balance ?? 0), 0);
   const liveBalance = autoplayAccounts.some((a) => a.balanceLive);
   const connected = accounts.filter((a) => a.connected).length;
   const playableFb = (freeBets ?? []).filter(
@@ -361,12 +358,12 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
       {/* Sticky control bar — always reachable while the deck scrolls. On
           phones it collapses to a single row of icon buttons so it does not
           eat the viewport; labels return on larger screens. */}
-      <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:-mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md">
+      <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:mx-0 sm:mb-4 sm:rounded-xl sm:border sm:p-3 sm:shadow-md">
         <div className="flex items-center gap-2 sm:flex-wrap sm:justify-between sm:gap-3">
           <h2 className="hidden min-w-0 truncate text-lg font-bold text-foreground sm:block">
             Autoplay — {siteName ?? 'fungames_shamo'} (rain free-bets)
           </h2>
-          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden sm:flex-none sm:flex-wrap sm:gap-2">
             {isAdmin && (status?.running ? (
               <Button variant="destructive" className={ACTION_BTN} onClick={() => void onStop()} title="Stop" aria-label="Stop">
                 <Square />
@@ -493,7 +490,7 @@ export function ShamoAutoplay({ siteName }: { siteName?: string }) {
             tone={liveBalance ? 'accent' : 'default'}
             sub={
               autoplayOffAccountIds.size > 0
-                ? `${autoplayAccounts.length} autoplay wallets · ${autoplayOffAccountIds.size} disabled excluded (${excludedBalance.toFixed(2)} ETB)`
+                ? `${autoplayAccounts.length} autoplay wallets · ${autoplayOffAccountIds.size} disabled`
                 : liveBalance ? 'live balances' : 'last stored'
             }
           />

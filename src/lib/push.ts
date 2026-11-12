@@ -4,7 +4,7 @@ import { apiFetch } from './api-client';
 
 // The VAPID public key is needed to create or reuse a browser push subscription.
 // It can come from the NEXT_PUBLIC_ env or from the server (the dashboard proxy
-// passes through the admin-only /api/push/vapid-public-key endpoint).
+// passes through /api/push/vapid-public-key; any signed-in user may fetch it).
 
 const CACHE_KEY = 'keno_vapid_key';
 
