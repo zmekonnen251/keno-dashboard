@@ -17,6 +17,14 @@ jobs:
       - name: Deploy to Dokku
         uses: idoberko2/dokku-deploy-github-action@v1
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: |
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDKERJWQb
+J3Zlg3YXfhPuu5AAAAIAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIO7aIHS/6IcieV+f
+q7VghhjnqBmmB2w99aj7L23nzBRxAAAAoPJB9pHALszCoee7HnFPGztEG8A+b7hrhvlYhu
+HIRnuMn2vi3i6n8rIpLzPlLlnAqpty34/8nhskJWQEo4nCqy2TZlxTPxC4RP6Zqar3auHj
+ITSh9OIRWvkzdzjlNpKOK0MTRZ1ThYo6zcAy9RdW8SNy+0iB4G0fgWqYo+bszdX6FGu/aJ
+MeKmZ+ebxiJP5bq7tmzbqo4FdqmWb6Lqku15Q=
+-----END OPENSSH PRIVATE KEY-----
           dokku-host: '148.230.91.234'
           app-name: 'keno251'
